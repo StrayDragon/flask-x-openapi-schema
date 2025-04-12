@@ -1,0 +1,350 @@
+"""
+OpenAPI Schema Generator for Dify API.
+
+This module provides the main class for generating OpenAPI schemas from Flask-RESTful resources.
+"""
+
+import re
+from typing import Any, Optional, get_type_hints
+
+from flask import Blueprint
+from flask_restful import Resource  # type: ignore
+from pydantic import BaseModel
+
+from .i18n.i18n_model import I18nBaseModel
+from .i18n.i18n_string import I18nString, get_current_language
+from .utils import pydantic_to_openapi_schema
+
+
+class OpenAPISchemaGenerator:
+    """
+    Generator for OpenAPI schemas from Flask-RESTful resources.
+
+    This class scans Flask-RESTful resources and generates OpenAPI schemas based on
+    the resource methods, docstrings, and type annotations.
+    """
+
+    def __init__(self, title: str, version: str, description: str = "", language: Optional[str] = None):
+        """
+        Initialize the OpenAPI schema generator.
+
+        Args:
+            title: The title of the API
+            version: The version of the API
+            description: The description of the API
+            language: The language to use for internationalized strings (default: current language)
+        """
+        # Handle I18nString for title and description
+        self.title = title.get(language) if isinstance(title, I18nString) else title
+        self.version = version
+        self.description = description.get(language) if isinstance(description, I18nString) else description
+        self.language = language or get_current_language()
+        self.paths: dict[str, dict[str, Any]] = {}
+        self.components: dict[str, dict[str, Any]] = {"schemas": {}, "securitySchemes": {}}
+        self.tags: list[dict[str, str]] = []
+        self._registered_models: set[type[BaseModel]] = set()
+
+    def add_security_scheme(self, name: str, scheme: dict[str, Any]) -> None:
+        """
+        Add a security scheme to the OpenAPI schema.
+
+        Args:
+            name: The name of the security scheme
+            scheme: The security scheme definition
+        """
+        self.components["securitySchemes"][name] = scheme
+
+    def add_tag(self, name: str, description: str = "") -> None:
+        """
+        Add a tag to the OpenAPI schema.
+
+        Args:
+            name: The name of the tag
+            description: The description of the tag
+        """
+        self.tags.append({"name": name, "description": description})
+
+    def scan_blueprint(self, blueprint: Blueprint) -> None:
+        """
+        Scan a Flask blueprint for API resources and add them to the schema.
+
+        Args:
+            blueprint: The Flask blueprint to scan
+        """
+        # Get all resources registered to the blueprint
+        if not hasattr(blueprint, "resources"):
+            return
+
+        for resource, urls, kwargs in blueprint.resources:
+            self._process_resource(resource, urls, blueprint.url_prefix)
+
+    def _process_resource(self, resource: type[Resource], urls: tuple[str], prefix: Optional[str] = None) -> None:
+        """
+        Process a Flask-RESTful resource and add its endpoints to the schema.
+
+        Args:
+            resource: The Flask-RESTful resource class
+            urls: The URLs registered for the resource
+            prefix: The URL prefix for the resource
+        """
+        for url in urls:
+            full_url = f"{prefix or ''}{url}"
+            # Convert Flask URL parameters to OpenAPI parameters
+            openapi_path = self._convert_flask_path_to_openapi_path(full_url)
+
+            # Initialize path item if it doesn't exist
+            if openapi_path not in self.paths:
+                self.paths[openapi_path] = {}
+
+            # Process HTTP methods
+            for method_name in ["get", "post", "put", "delete", "patch", "head", "options"]:
+                if hasattr(resource, method_name):
+                    method = getattr(resource, method_name)
+                    operation = self._build_operation_from_method(method, resource)
+
+                    # Add parameters from URL
+                    path_params = self._extract_path_parameters(full_url)
+                    if path_params:
+                        if "parameters" not in operation:
+                            operation["parameters"] = []
+                        operation["parameters"].extend(path_params)
+
+                    self.paths[openapi_path][method_name] = operation
+
+    def _convert_flask_path_to_openapi_path(self, flask_path: str) -> str:
+        """
+        Convert a Flask URL path to an OpenAPI path.
+
+        Args:
+            flask_path: The Flask URL path
+
+        Returns:
+            The OpenAPI path
+        """
+        # Replace Flask's <converter:param> with OpenAPI's {param}
+        return re.sub(r"<(?:[^:>]+:)?([^>]+)>", r"{\1}", flask_path)
+
+    def _extract_path_parameters(self, flask_path: str) -> list[dict[str, Any]]:
+        """
+        Extract path parameters from a Flask URL path.
+
+        Args:
+            flask_path: The Flask URL path
+
+        Returns:
+            A list of OpenAPI parameter objects
+        """
+        parameters = []
+        # Match Flask's <converter:param> or <param>
+        for match in re.finditer(r"<(?:([^:>]+):)?([^>]+)>", flask_path):
+            converter, param_name = match.groups()
+            param = {
+                "name": param_name,
+                "in": "path",
+                "required": True,
+                "schema": self._get_schema_for_converter(converter or "string"),
+            }
+            parameters.append(param)
+        return parameters
+
+    def _get_schema_for_converter(self, converter: str) -> dict[str, Any]:
+        """
+        Get an OpenAPI schema for a Flask URL converter.
+
+        Args:
+            converter: The Flask URL converter
+
+        Returns:
+            An OpenAPI schema object
+        """
+        # Map Flask URL converters to OpenAPI types
+        converter_map = {
+            "string": {"type": "string"},
+            "int": {"type": "integer"},
+            "float": {"type": "number", "format": "float"},
+            "path": {"type": "string"},
+            "uuid": {"type": "string", "format": "uuid"},
+            "any": {"type": "string"},
+        }
+        return converter_map.get(converter, {"type": "string"})
+
+    def _build_operation_from_method(self, method: Any, resource_cls: type[Resource]) -> dict[str, Any]:
+        """
+        Build an OpenAPI operation object from a Flask-RESTful resource method.
+
+        Args:
+            method: The resource method
+            resource_cls: The resource class
+
+        Returns:
+            An OpenAPI operation object
+        """
+        operation: dict[str, Any] = {}
+
+        # Get metadata from method if available
+        metadata = getattr(method, "_openapi_metadata", {})
+
+        # Process metadata, handling I18nString values
+        for key, value in metadata.items():
+            if isinstance(value, I18nString):
+                operation[key] = value.get(self.language)
+            elif isinstance(value, dict):
+                # Handle nested dictionaries that might contain I18nString values
+                operation[key] = self._process_i18n_dict(value)
+            else:
+                operation[key] = value
+
+        # Extract summary and description from docstring
+        if method.__doc__:
+            docstring = method.__doc__.strip()
+            lines = docstring.split("\n")
+            operation["summary"] = lines[0].strip()
+            if len(lines) > 1:
+                operation["description"] = "\n".join(line.strip() for line in lines[1:]).strip()
+
+        # Get operation ID
+        if "operationId" not in operation:
+            operation["operationId"] = f"{resource_cls.__name__}_{method.__name__}"
+
+        # Extract request and response schemas from type annotations
+        self._add_request_schema(method, operation)
+        self._add_response_schema(method, operation)
+
+        return operation
+
+    def _add_request_schema(self, method: Any, operation: dict[str, Any]) -> None:
+        """
+        Add request schema to an OpenAPI operation based on method type annotations.
+
+        Args:
+            method: The resource method
+            operation: The OpenAPI operation object to update
+        """
+        type_hints = get_type_hints(method)
+
+        # Look for parameters that might be request bodies
+        for param_name, param_type in type_hints.items():
+            if param_name == "return":
+                continue
+
+            # Check if the parameter is a Pydantic model
+            if isinstance(param_type, type) and issubclass(param_type, BaseModel):
+                self._register_model(param_type)
+
+                # Add request body
+                operation["requestBody"] = {
+                    "content": {
+                        "application/json": {"schema": {"$ref": f"#/components/schemas/{param_type.__name__}"}}
+                    },
+                    "required": True,
+                }
+                break
+
+    def _add_response_schema(self, method: Any, operation: dict[str, Any]) -> None:
+        """
+        Add response schema to an OpenAPI operation based on method return type annotation.
+
+        Args:
+            method: The resource method
+            operation: The OpenAPI operation object to update
+        """
+        type_hints = get_type_hints(method)
+
+        # Check if there's a return type hint
+        if "return" in type_hints:
+            return_type = type_hints["return"]
+
+            # Handle Pydantic models
+            if isinstance(return_type, type) and issubclass(return_type, BaseModel):
+                self._register_model(return_type)
+
+                operation["responses"] = {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {"schema": {"$ref": f"#/components/schemas/{return_type.__name__}"}}
+                        },
+                    }
+                }
+            else:
+                # Default response
+                operation["responses"] = {"200": {"description": "Successful response"}}
+        else:
+            # Default response if no return type is specified
+            operation["responses"] = {"200": {"description": "Successful response"}}
+
+    def _register_model(self, model: type[BaseModel]) -> None:
+        """
+        Register a Pydantic model in the components schemas.
+
+        Args:
+            model: The Pydantic model to register
+        """
+        if model in self._registered_models:
+            return
+
+        self._registered_models.add(model)
+
+        # Handle I18nBaseModel by creating a language-specific version
+        if issubclass(model, I18nBaseModel):
+            # Create a language-specific version of the model
+            language_model = model.for_language(self.language)
+            self.components["schemas"][model.__name__] = pydantic_to_openapi_schema(language_model)
+        else:
+            self.components["schemas"][model.__name__] = pydantic_to_openapi_schema(model)
+
+    def _process_i18n_dict(self, data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Process a dictionary that might contain I18nString values.
+
+        Args:
+            data: The dictionary to process
+
+        Returns:
+            A new dictionary with I18nString values converted to strings
+        """
+        result = {}
+        for key, value in data.items():
+            if isinstance(value, I18nString):
+                result[key] = value.get(self.language)
+            elif isinstance(value, dict):
+                result[key] = self._process_i18n_dict(value)
+            elif isinstance(value, list):
+                result[key] = [self._process_i18n_value(item) for item in value]
+            else:
+                result[key] = value
+        return result
+
+    def _process_i18n_value(self, value: Any) -> Any:
+        """
+        Process a value that might be an I18nString or contain I18nString values.
+
+        Args:
+            value: The value to process
+
+        Returns:
+            The processed value
+        """
+        if isinstance(value, I18nString):
+            return value.get(self.language)
+        elif isinstance(value, dict):
+            return self._process_i18n_dict(value)
+        elif isinstance(value, list):
+            return [self._process_i18n_value(item) for item in value]
+        else:
+            return value
+
+    def generate_schema(self) -> dict[str, Any]:
+        """
+        Generate the complete OpenAPI schema.
+
+        Returns:
+            The OpenAPI schema as a dictionary
+        """
+        return {
+            "openapi": "3.0.3",
+            "info": {"title": self.title, "version": self.version, "description": self.description},
+            "paths": self.paths,
+            "components": self.components,
+            "tags": self.tags,
+        }
