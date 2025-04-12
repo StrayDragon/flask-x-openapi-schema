@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field, field_validator
 from werkzeug.datastructures import FileStorage
 
 
-
 class FileUploadModel(BaseModel):
     """Base model for file uploads."""
 

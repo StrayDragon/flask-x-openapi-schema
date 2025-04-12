@@ -3,9 +3,7 @@ name = "flask-x-openapi-schema"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-authors = [
-    { name = "straydragon", email = "straydragonl@foxmail.com" }
-]
+authors = [{ name = "straydragon", email = "straydragonl@foxmail.com" }]
 
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -16,16 +14,14 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
 ]
 
-license = {text = "MIT"}
+license = { text = "MIT" }
 
 requires-python = ">=3.8"
 
-dependencies = [
-    "flask>=2.0.0",
-    "flask-restful>=0.3.9",
-    "pydantic>=2.0.0",
-    "PyYAML>=6.0",
-]
+dependencies = ["flask>=2.0.0", "pydantic>=2.0.0", "PyYAML>=6.0"]
+
+[project.optional-dependencies]
+flask-restful = ["flask-restful>=0.3.9"]
 
 [project.urls]
 Homepage = "https://github.com/langgenius/dify"
@@ -49,10 +45,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 source = ["src/flask_x_openapi_schema"]
-omit = [
-    "*/__init__.py",
-    "*/tests/*",
-]
+omit = ["*/__init__.py", "*/tests/*"]
 
 [tool.coverage.report]
 exclude_lines = [

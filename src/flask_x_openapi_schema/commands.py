@@ -12,7 +12,6 @@ from flask import Flask
 from flask.cli import with_appcontext
 
 from .i18n import I18nString, set_current_language
-from .mdx_generator import generate_mdx_from_openapi
 from .mixins import OpenAPIIntegrationMixin
 
 
@@ -155,21 +154,6 @@ def generate_openapi_command(
 
                 mdx_dir = os.path.join(mdx_output_dir, lang)
                 os.makedirs(mdx_dir, exist_ok=True)
-
-                mdx_file = os.path.join(mdx_dir, f"{name}.mdx")
-                # Convert schema back to dict if it's a YAML string
-                schema_dict = (
-                    yaml.safe_load(lang_schema) if format == "yaml" else lang_schema
-                )
-
-                # Generate MDX documentation with the current language
-                # This will set the current language in the thread and handle I18nString objects
-                generate_mdx_from_openapi(schema_dict, mdx_file, lang)
-
-                click.echo(
-                    f"Generated MDX documentation for {name} blueprint in {lang}: {mdx_file}"
-                )
-
 
 def register_commands(app: Flask) -> None:
     """

@@ -7,7 +7,8 @@ from .decorators import (
 )
 from .i18n import I18nString, get_current_language, set_current_language
 from .i18n.i18n_model import I18nBaseModel
-from .mixins import OpenAPIIntegrationMixin
+from .mixins import OpenAPIIntegrationMixin, OpenAPIBlueprintMixin
+from .methodview_utils import OpenAPIMethodViewMixin
 from .models import (
     BaseRespModel,
     DocumentUploadModel,
@@ -43,6 +44,8 @@ __all__ = [
     "I18nString",
     # Core OpenAPI functionality
     "OpenAPIIntegrationMixin",
+    "OpenAPIBlueprintMixin",
+    "OpenAPIMethodViewMixin",
     "OpenAPISchemaGenerator",
     # Utility functions
     "create_reqparse_from_pydantic",

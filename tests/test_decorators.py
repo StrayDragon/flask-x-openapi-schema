@@ -128,16 +128,14 @@ def test_openapi_metadata_with_i18n():
     set_current_language("en-US")
 
     # Apply the decorator
-    @openapi_metadata(
-        summary=summary, description=description, tags=["test"]
-    )
+    @openapi_metadata(summary=summary, description=description, tags=["test"])
     def test_function():
         return {"message": "Hello, world!"}
 
     # Check metadata in English
     metadata = test_function._openapi_metadata
-    assert metadata["summary"] == "Test endpoint"
-    assert metadata["description"] == "This is a test endpoint"
+    assert str(metadata["summary"]) == "Test endpoint"
+    assert str(metadata["description"]) == "This is a test endpoint"
 
     # Change language to Chinese
     set_current_language("zh-Hans")

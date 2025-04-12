@@ -11,10 +11,30 @@ from pydantic import BaseModel
 
 from .i18n.i18n_string import I18nString, get_current_language
 from .models.base import BaseRespModel
-from .restful_utils import (
-    create_reqparse_from_pydantic,
-    extract_openapi_parameters_from_pydantic,
-)
+
+try:
+    from .restful_utils import (
+        create_reqparse_from_pydantic,
+        extract_openapi_parameters_from_pydantic,
+    )
+
+    HAS_FLASK_RESTFUL = True
+except ImportError:
+    HAS_FLASK_RESTFUL = False
+
+    # Define placeholder functions for when Flask-RESTful is not available
+    def create_reqparse_from_pydantic(*args, **kwargs):
+        raise ImportError(
+            "Flask-RESTful is not installed. Install with 'pip install flask-x-openapi-schema[restful]'"
+        )
+
+    def extract_openapi_parameters_from_pydantic(*args, **kwargs):
+        raise ImportError(
+            "Flask-RESTful is not installed. Install with 'pip install flask-x-openapi-schema[restful]'"
+        )
+
+
+from flask import request
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -150,17 +170,15 @@ def openapi_metadata(
 
         # Handle I18nString fields
         if summary is not None:
-            metadata["summary"] = (
-                summary.get(current_lang)
-                if isinstance(summary, I18nString)
-                else summary
-            )
+            if isinstance(summary, I18nString):
+                metadata["summary"] = summary.get(current_lang)
+            else:
+                metadata["summary"] = summary
         if description is not None:
-            metadata["description"] = (
-                description.get(current_lang)
-                if isinstance(description, I18nString)
-                else description
-            )
+            if isinstance(description, I18nString):
+                metadata["description"] = description.get(current_lang)
+            else:
+                metadata["description"] = description
         if tags:
             metadata["tags"] = tags
         if operation_id:
@@ -284,16 +302,44 @@ def openapi_metadata(
         # Create a wrapper function that handles parameter binding
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # Create a parser for request parameters if needed
+            # Process request parameters based on whether Flask-RESTful is available
             if actual_request_body or actual_query_model:
-                parser = create_reqparse_from_pydantic(
-                    query_model=actual_query_model,
-                    body_model=actual_request_body
-                    if isinstance(actual_request_body, type)
-                    and issubclass(actual_request_body, BaseModel)
-                    else None,
-                )
-                parsed_args = parser.parse_args()
+                if HAS_FLASK_RESTFUL:
+                    # Flask-RESTful approach using reqparse
+                    parser = create_reqparse_from_pydantic(
+                        query_model=actual_query_model,
+                        body_model=actual_request_body
+                        if isinstance(actual_request_body, type)
+                        and issubclass(actual_request_body, BaseModel)
+                        else None,
+                    )
+                    parsed_args = parser.parse_args()
+                else:
+                    # Direct Flask approach without reqparse
+                    parsed_args = {}
+
+                    # Process query parameters
+                    if actual_query_model:
+                        query_data = {}
+                        for field_name in actual_query_model.model_fields:
+                            if field_name in request.args:
+                                query_data[field_name] = request.args.get(field_name)
+
+                        # Add to parsed args
+                        for field_name, value in query_data.items():
+                            parsed_args[field_name] = value
+
+                    # Process body parameters
+                    if (
+                        actual_request_body
+                        and isinstance(actual_request_body, type)
+                        and issubclass(actual_request_body, BaseModel)
+                    ):
+                        if request.is_json:
+                            body_data = request.get_json(silent=True) or {}
+                            # Add to parsed args
+                            for field_name, value in body_data.items():
+                                parsed_args[field_name] = value
 
                 # Check for parameters with special prefixes and bind accordingly
                 for param_name in param_names:
@@ -308,26 +354,46 @@ def openapi_metadata(
                         and isinstance(actual_request_body, type)
                         and issubclass(actual_request_body, BaseModel)
                     ):
-                        # Create a Pydantic model instance from the parsed arguments
-                        body_data = {}
-                        for field_name in actual_request_body.model_fields:
-                            if field_name in parsed_args:
-                                body_data[field_name] = parsed_args[field_name]
-
-                        # Create the model instance
-                        model_instance = actual_request_body(**body_data)
-                        kwargs[param_name] = model_instance
+                        # Create a Pydantic model instance
+                        if request.is_json:
+                            body_data = request.get_json(silent=True) or {}
+                            # Remove any keys that are not in the model to avoid unexpected keyword argument errors
+                            filtered_body_data = {}
+                            for field_name in actual_request_body.model_fields:
+                                if field_name in body_data:
+                                    filtered_body_data[field_name] = body_data[
+                                        field_name
+                                    ]
+                            model_instance = actual_request_body(**filtered_body_data)
+                            kwargs[param_name] = model_instance
+                        elif HAS_FLASK_RESTFUL:
+                            # Create from parsed arguments if using Flask-RESTful
+                            body_data = {}
+                            for field_name in actual_request_body.model_fields:
+                                if field_name in parsed_args:
+                                    body_data[field_name] = parsed_args[field_name]
+                            model_instance = actual_request_body(**body_data)
+                            kwargs[param_name] = model_instance
 
                     # Handle x_request_query parameter
                     elif (
                         param_name.startswith(REQUEST_QUERY_PREFIX)
                         and actual_query_model
                     ):
-                        # Create a Pydantic model instance from the parsed arguments
+                        # Create a Pydantic model instance from query parameters
                         query_data = {}
-                        for field_name in actual_query_model.model_fields:
-                            if field_name in parsed_args:
-                                query_data[field_name] = parsed_args[field_name]
+                        if HAS_FLASK_RESTFUL:
+                            # Use parsed args from reqparse
+                            for field_name in actual_query_model.model_fields:
+                                if field_name in parsed_args:
+                                    query_data[field_name] = parsed_args[field_name]
+                        else:
+                            # Use request.args directly
+                            for field_name in actual_query_model.model_fields:
+                                if field_name in request.args:
+                                    query_data[field_name] = request.args.get(
+                                        field_name
+                                    )
 
                         # Create the model instance
                         model_instance = actual_query_model(**query_data)
@@ -349,9 +415,6 @@ def openapi_metadata(
 
                     # Handle x_request_file parameter
                     elif param_name.startswith(REQUEST_FILE_PREFIX):
-                        # Get the file from Flask's request.files
-                        from flask import request
-
                         # Get the parameter type annotation
                         param_type = (
                             param_types.get(param_name) if param_types else None
@@ -401,16 +464,26 @@ def openapi_metadata(
                                     kwargs[param_name] = file_obj
 
                 # Add all parsed arguments to kwargs for regular parameters
-                for arg_name, arg_value in parsed_args.items():
-                    if arg_name not in kwargs:
-                        kwargs[arg_name] = arg_value
+                if HAS_FLASK_RESTFUL:
+                    for arg_name, arg_value in parsed_args.items():
+                        if arg_name not in kwargs:
+                            kwargs[arg_name] = arg_value
 
-            # Call the original function
-            result = func(*args, **kwargs)
+            # No debug print in production code
+
+            # Filter out any kwargs that are not in the function signature
+            signature = inspect.signature(func)
+            valid_kwargs = {}
+            for param_name in signature.parameters:
+                if param_name in kwargs:
+                    valid_kwargs[param_name] = kwargs[param_name]
+
+            # Call the original function with filtered kwargs
+            result = func(*args, **valid_kwargs)
 
             # Handle response conversion for BaseRespModel instances
             if isinstance(result, BaseRespModel):
-                # Convert the model to a Flask-RESTful compatible response
+                # Convert the model to a response
                 return result.to_response()
             elif (
                 isinstance(result, tuple)

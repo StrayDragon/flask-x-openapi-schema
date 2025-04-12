@@ -196,59 +196,6 @@ def test_generate_openapi_command_multiple_languages(app_with_blueprint, tmp_pat
     assert os.path.exists(output_file)
 
 
-def test_generate_openapi_command_with_mdx(app_with_blueprint, tmp_path, monkeypatch):
-    """Test generate_openapi_command with MDX generation."""
-    # Mock the generate_mdx_from_openapi function
-    mock_called = False
-
-    def mock_generate_mdx(schema, output_file, language):
-        nonlocal mock_called
-        mock_called = True
-        # Create an empty file
-        os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
-        with open(output_file, "w") as f:
-            f.write("# Mock MDX Content")
-
-    monkeypatch.setattr(
-        "flask_x_openapi_schema.commands.generate_mdx_from_openapi", mock_generate_mdx
-    )
-
-    runner = CliRunner()
-    output_file = str(tmp_path / "openapi.yaml")
-    mdx_output_dir = str(tmp_path / "mdx")
-
-    with app_with_blueprint.app_context():
-        result = runner.invoke(
-            generate_openapi_command,
-            [
-                "--output",
-                output_file,
-                "--title",
-                "Test API",
-                "--version",
-                "1.0.0",
-                "--description",
-                "Test API Description",
-                "--format",
-                "yaml",
-                "--mdx",
-                "--mdx-output-dir",
-                mdx_output_dir,
-                "--language",
-                "en",
-            ],
-        )
-
-    assert result.exit_code == 0
-    assert "Generated OpenAPI schema for service_api blueprint" in result.output
-    assert "Generated MDX documentation for service_api blueprint" in result.output
-    assert mock_called
-
-    # Check that the MDX file was created
-    mdx_file = os.path.join(mdx_output_dir, "en", "service_api.mdx")
-    assert os.path.exists(mdx_file)
-
-
 def test_generate_openapi_command_specific_blueprint(app_with_blueprint, tmp_path):
     """Test generate_openapi_command with a specific blueprint."""
     runner = CliRunner()

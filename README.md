@@ -1,16 +1,17 @@
-# Dify OpenAPI Schema Generator
+# Flask-X-OpenAPI-Schema
 
-This module provides utilities for generating OpenAPI schemas from Flask-RESTful resources and Pydantic models. It can be used as a standalone package or as part of the Dify platform.
+This module provides utilities for generating OpenAPI schemas from Flask-RESTful resources, Flask.MethodView classes, and Pydantic models. It can be used as a standalone package or as part of the Dify platform.
 
 ## Features
 
-- Generate OpenAPI schemas from Flask-RESTful resources
+- Generate OpenAPI schemas from Flask-RESTful resources and Flask.MethodView classes
 - Convert Pydantic models to OpenAPI schemas
 - Automatically inject request parameters from Pydantic models
 - Preserve type annotations from Pydantic models for better IDE support
 - Output schemas in YAML or JSON format
 - Support for internationalization (i18n) in API documentation
 - Handle file uploads with automatic parameter injection
+- Flexible architecture with optional Flask-RESTful dependency
 
 ## Installation
 
@@ -24,7 +25,6 @@ To install as a standalone package:
 
 ```bash
 # From the repository root
-cd api/core/openapi
 pip install -e .
 ```
 
@@ -32,6 +32,14 @@ Or install from GitHub:
 
 ```bash
 pip install git+https://github.com/langgenius/dify.git#subdirectory=api/core/openapi
+```
+
+#### Optional Dependencies
+
+By default, only Flask, Pydantic, and PyYAML are installed. If you want to use Flask-RESTful integration, install with the `restful` extra:
+
+```bash
+pip install -e .[restful]
 ```
 
 ## Usage
@@ -310,7 +318,8 @@ flask generate-openapi --blueprint service_api --output openapi.json --format js
 - `schema_generator.py`: Contains the `OpenAPISchemaGenerator` class for generating OpenAPI schemas
 - `utils.py`: Contains utility functions for converting Pydantic models to OpenAPI schemas
 - `restful_utils.py`: Contains utility functions for integrating Pydantic models with Flask-RESTful
-- `external_api_extension.py`: Contains the `OpenAPIIntegrationMixin` class for extending the Flask-RESTful API
+- `methodview_utils.py`: Contains utility functions for integrating Pydantic models with Flask.MethodView
+- `mixins.py`: Contains the `OpenAPIIntegrationMixin` and `OpenAPIBlueprintMixin` classes for extending Flask-RESTful API and Flask Blueprint
 - `commands.py`: Contains the Flask CLI commands for generating OpenAPI schemas
 
 ## Internationalization (i18n) Support
@@ -433,6 +442,94 @@ The OpenAPI module provides several built-in models:
 
 See the `examples/file_upload_example.py`, `examples/pydantic_file_upload_example.py`, and `examples/file_upload_readme.md` for more details.
 
+## Using with Flask.MethodView
+
+You can use the library with Flask.MethodView classes instead of Flask-RESTful resources:
+
+```python
+from flask import Flask, Blueprint
+from flask.views import MethodView
+from pydantic import BaseModel, Field
+
+from flask_x_openapi_schema import (
+    BaseRespModel,
+    OpenAPIBlueprintMixin,
+    OpenAPIMethodViewMixin,
+    openapi_metadata,
+)
+
+# Define Pydantic models for request and response
+class ItemRequest(BaseModel):
+    name: str = Field(..., description="The name of the item")
+    price: float = Field(..., description="The price of the item")
+
+class ItemResponse(BaseRespModel):
+    id: str = Field(..., description="The ID of the item")
+    name: str = Field(..., description="The name of the item")
+    price: float = Field(..., description="The price of the item")
+
+# Create a custom Blueprint class with OpenAPI support
+class OpenAPIBlueprint(OpenAPIBlueprintMixin, Blueprint):
+    pass
+
+# Define a MethodView class with OpenAPI metadata
+class ItemView(OpenAPIMethodViewMixin, MethodView):
+    @openapi_metadata(
+        summary="Get an item",
+        description="Get an item by ID",
+        tags=["Items"],
+        operation_id="getItem",
+    )
+    def get(self, item_id: str):
+        """Get an item by ID."""
+        # In a real app, this would fetch from a database
+        response = ItemResponse(
+            id=item_id,
+            name="Test Item",
+            price=10.99,
+        )
+        return response
+
+    @openapi_metadata(
+        summary="Create an item",
+        description="Create a new item",
+        tags=["Items"],
+        operation_id="createItem",
+        request_body=ItemRequest,
+    )
+    def post(self, item_id: str, x_request_body: ItemRequest):
+        """Create a new item."""
+        # In a real app, this would save to a database
+        response = ItemResponse(
+            id=item_id,
+            name=x_request_body.name,
+            price=x_request_body.price,
+        )
+        return response, 201
+
+# Create a Flask app
+app = Flask(__name__)
+
+# Create a blueprint with OpenAPI support
+api_bp = OpenAPIBlueprint("api", __name__, url_prefix="/api")
+
+# Register the MethodView
+ItemView.register_to_blueprint(api_bp, "/items/<string:item_id>", endpoint="item")
+
+# Register the blueprint with the app
+app.register_blueprint(api_bp)
+
+# Add a route to get the OpenAPI schema
+@app.route("/openapi.yaml")
+def get_openapi_schema():
+    schema = api_bp.generate_openapi_schema(
+        title="Items API",
+        version="1.0.0",
+        description="API for managing items",
+    )
+    return schema
+```
+
 ## Examples
 
-See the `examples` directory for complete examples of how to use the OpenAPI schema generator, including internationalization support and file uploads.
+See the `examples` directory for complete examples of how to use the OpenAPI schema generator, including internationalization support, file uploads, and Flask.MethodView integration.
