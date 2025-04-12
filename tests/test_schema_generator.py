@@ -8,7 +8,7 @@ import pytest
 from flask import Blueprint
 from flask_restful import Resource
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional
 
 from flask_x_openapi_schema.schema_generator import OpenAPISchemaGenerator
 from flask_x_openapi_schema.i18n.i18n_string import set_current_language

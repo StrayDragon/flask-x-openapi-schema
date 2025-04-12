@@ -75,17 +75,17 @@ def _get_field_type(annotation: Any) -> Callable:
         A type function
     """
     # Handle basic types
-    if annotation == str:
+    if annotation is str:
         return str
-    elif annotation == int:
+    elif annotation is int:
         return int
-    elif annotation == float:
+    elif annotation is float:
         return float
-    elif annotation == bool:
+    elif annotation is bool:
         return lambda x: x.lower() == "true" if isinstance(x, str) else bool(x)
-    elif annotation == list:
+    elif annotation is list:
         return list
-    elif annotation == dict:
+    elif annotation is dict:
         return dict
 
     # Handle Optional types
@@ -93,7 +93,7 @@ def _get_field_type(annotation: Any) -> Callable:
     if origin == Union:
         args = getattr(annotation, "__args__", [])
         # Check if it's Optional[X]
-        if len(args) == 2 and args[1] == type(None):
+        if len(args) == 2 and args[1] is type(None):
             return _get_field_type(args[0])
 
     # Handle Enum types
@@ -159,7 +159,14 @@ def extract_openapi_parameters_from_pydantic(
     # Add path parameters
     if path_params:
         for param in path_params:
-            parameters.append({"name": param, "in": "path", "required": True, "schema": {"type": "string"}})
+            parameters.append(
+                {
+                    "name": param,
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string"},
+                }
+            )
 
     # Add query parameters
     if query_model:
@@ -168,7 +175,12 @@ def extract_openapi_parameters_from_pydantic(
         required = schema.get("required", [])
 
         for field_name, field_schema in properties.items():
-            param = {"name": field_name, "in": "query", "required": field_name in required, "schema": field_schema}
+            param = {
+                "name": field_name,
+                "in": "query",
+                "required": field_name in required,
+                "schema": field_schema,
+            }
 
             # Add description if available
             if "description" in field_schema:

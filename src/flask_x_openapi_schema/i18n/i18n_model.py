@@ -99,7 +99,8 @@ class I18nBaseModel(BaseModel):
                 properties[field_name]["type"] = "string"
                 # Add a note about internationalization
                 properties[field_name]["description"] = (
-                    properties[field_name].get("description", "") + " (Internationalized field)"
+                    properties[field_name].get("description", "")
+                    + " (Internationalized field)"
                 )
 
         return schema

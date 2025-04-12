@@ -4,10 +4,9 @@ Tests for the utils module.
 This module tests the utility functions for OpenAPI schema generation.
 """
 
-import pytest
 from enum import Enum
 from datetime import date, datetime, time
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 from uuid import UUID
 from pydantic import BaseModel, Field
 

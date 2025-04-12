@@ -4,10 +4,8 @@ Tests for the restful_utils module.
 This module tests the utilities for integrating Pydantic models with Flask-RESTful.
 """
 
-import pytest
 from enum import Enum
-from typing import Optional, List, Dict, Any, Union
-from flask_restful import reqparse
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
 from flask_x_openapi_schema.restful_utils import (
@@ -96,15 +94,15 @@ def test_pydantic_model_to_reqparse():
     # Check field types
     string_arg = next((arg for arg in parser.args if arg.name == "string_field"), None)
     assert string_arg is not None
-    assert string_arg.type == str
+    assert string_arg.type is str
 
     int_arg = next((arg for arg in parser.args if arg.name == "int_field"), None)
     assert int_arg is not None
-    assert int_arg.type == int
+    assert int_arg.type is int
 
     float_arg = next((arg for arg in parser.args if arg.name == "float_field"), None)
     assert float_arg is not None
-    assert float_arg.type == float
+    assert float_arg.type is float
 
     # Check field descriptions
     assert string_arg.help == "A string field"
@@ -130,17 +128,17 @@ def test_pydantic_model_to_reqparse():
 def test_get_field_type():
     """Test the _get_field_type function."""
     # Test basic types
-    assert _get_field_type(str) == str
-    assert _get_field_type(int) == int
-    assert _get_field_type(float) == float
+    assert _get_field_type(str) is str
+    assert _get_field_type(int) is int
+    assert _get_field_type(float) is float
     assert _get_field_type(bool) is not bool  # It returns a lambda function
-    assert _get_field_type(list) == list
-    assert _get_field_type(dict) == dict
+    assert _get_field_type(list) is list
+    assert _get_field_type(dict) is dict
 
     # Test Optional types
-    assert _get_field_type(Optional[str]) == str
-    assert _get_field_type(Optional[int]) == int
-    assert _get_field_type(Optional[float]) == float
+    assert _get_field_type(Optional[str]) is str
+    assert _get_field_type(Optional[int]) is int
+    assert _get_field_type(Optional[float]) is float
 
     # Test Enum types
     enum_type = _get_field_type(SampleEnum)
@@ -150,7 +148,7 @@ def test_get_field_type():
     class UnknownType:
         pass
 
-    assert _get_field_type(UnknownType) == str  # Default to string
+    assert _get_field_type(UnknownType) is str  # Default to string
 
 
 def test_create_reqparse_from_pydantic():

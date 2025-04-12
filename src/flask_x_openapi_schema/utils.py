@@ -51,22 +51,22 @@ def python_type_to_openapi_type(python_type: Any) -> dict[str, Any]:
         The OpenAPI type definition
     """
     # Handle primitive types
-    if python_type == str:
+    if python_type is str:
         return {"type": "string"}
-    elif python_type == int:
+    elif python_type is int:
         return {"type": "integer"}
-    elif python_type == float:
+    elif python_type is float:
         return {"type": "number"}
-    elif python_type == bool:
+    elif python_type is bool:
         return {"type": "boolean"}
-    elif python_type == list or getattr(python_type, "__origin__", None) == list:
+    elif python_type is list or getattr(python_type, "__origin__", None) is list:
         # Handle List[X]
         args = getattr(python_type, "__args__", [])
         if args:
             item_type = python_type_to_openapi_type(args[0])
             return {"type": "array", "items": item_type}
         return {"type": "array"}
-    elif python_type == dict or getattr(python_type, "__origin__", None) == dict:
+    elif python_type is dict or getattr(python_type, "__origin__", None) is dict:
         # Handle Dict[X, Y]
         return {"type": "object"}
     elif python_type == UUID:
@@ -107,7 +107,11 @@ def response_schema(
     return {
         str(status_code): {
             "description": description,
-            "content": {"application/json": {"schema": {"$ref": f"#/components/schemas/{model.__name__}"}}},
+            "content": {
+                "application/json": {
+                    "schema": {"$ref": f"#/components/schemas/{model.__name__}"}
+                }
+            },
         }
     }
 

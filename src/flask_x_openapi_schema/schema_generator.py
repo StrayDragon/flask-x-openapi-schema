@@ -24,7 +24,13 @@ class OpenAPISchemaGenerator:
     the resource methods, docstrings, and type annotations.
     """
 
-    def __init__(self, title: str, version: str, description: str = "", language: Optional[str] = None):
+    def __init__(
+        self,
+        title: str,
+        version: str,
+        description: str = "",
+        language: Optional[str] = None,
+    ):
         """
         Initialize the OpenAPI schema generator.
 
@@ -37,10 +43,17 @@ class OpenAPISchemaGenerator:
         # Handle I18nString for title and description
         self.title = title.get(language) if isinstance(title, I18nString) else title
         self.version = version
-        self.description = description.get(language) if isinstance(description, I18nString) else description
+        self.description = (
+            description.get(language)
+            if isinstance(description, I18nString)
+            else description
+        )
         self.language = language or get_current_language()
         self.paths: dict[str, dict[str, Any]] = {}
-        self.components: dict[str, dict[str, Any]] = {"schemas": {}, "securitySchemes": {}}
+        self.components: dict[str, dict[str, Any]] = {
+            "schemas": {},
+            "securitySchemes": {},
+        }
         self.tags: list[dict[str, str]] = []
         self._registered_models: set[type[BaseModel]] = set()
 
@@ -78,7 +91,9 @@ class OpenAPISchemaGenerator:
         for resource, urls, kwargs in blueprint.resources:
             self._process_resource(resource, urls, blueprint.url_prefix)
 
-    def _process_resource(self, resource: type[Resource], urls: tuple[str], prefix: Optional[str] = None) -> None:
+    def _process_resource(
+        self, resource: type[Resource], urls: tuple[str], prefix: Optional[str] = None
+    ) -> None:
         """
         Process a Flask-RESTful resource and add its endpoints to the schema.
 
@@ -97,7 +112,15 @@ class OpenAPISchemaGenerator:
                 self.paths[openapi_path] = {}
 
             # Process HTTP methods
-            for method_name in ["get", "post", "put", "delete", "patch", "head", "options"]:
+            for method_name in [
+                "get",
+                "post",
+                "put",
+                "delete",
+                "patch",
+                "head",
+                "options",
+            ]:
                 if hasattr(resource, method_name):
                     method = getattr(resource, method_name)
                     operation = self._build_operation_from_method(method, resource)
@@ -168,7 +191,9 @@ class OpenAPISchemaGenerator:
         }
         return converter_map.get(converter, {"type": "string"})
 
-    def _build_operation_from_method(self, method: Any, resource_cls: type[Resource]) -> dict[str, Any]:
+    def _build_operation_from_method(
+        self, method: Any, resource_cls: type[Resource]
+    ) -> dict[str, Any]:
         """
         Build an OpenAPI operation object from a Flask-RESTful resource method.
 
@@ -200,7 +225,9 @@ class OpenAPISchemaGenerator:
             lines = docstring.split("\n")
             operation["summary"] = lines[0].strip()
             if len(lines) > 1:
-                operation["description"] = "\n".join(line.strip() for line in lines[1:]).strip()
+                operation["description"] = "\n".join(
+                    line.strip() for line in lines[1:]
+                ).strip()
 
         # Get operation ID
         if "operationId" not in operation:
@@ -234,7 +261,11 @@ class OpenAPISchemaGenerator:
                 # Add request body
                 operation["requestBody"] = {
                     "content": {
-                        "application/json": {"schema": {"$ref": f"#/components/schemas/{param_type.__name__}"}}
+                        "application/json": {
+                            "schema": {
+                                "$ref": f"#/components/schemas/{param_type.__name__}"
+                            }
+                        }
                     },
                     "required": True,
                 }
@@ -262,7 +293,11 @@ class OpenAPISchemaGenerator:
                     "200": {
                         "description": "Successful response",
                         "content": {
-                            "application/json": {"schema": {"$ref": f"#/components/schemas/{return_type.__name__}"}}
+                            "application/json": {
+                                "schema": {
+                                    "$ref": f"#/components/schemas/{return_type.__name__}"
+                                }
+                            }
                         },
                     }
                 }
@@ -289,9 +324,13 @@ class OpenAPISchemaGenerator:
         if issubclass(model, I18nBaseModel):
             # Create a language-specific version of the model
             language_model = model.for_language(self.language)
-            self.components["schemas"][model.__name__] = pydantic_to_openapi_schema(language_model)
+            self.components["schemas"][model.__name__] = pydantic_to_openapi_schema(
+                language_model
+            )
         else:
-            self.components["schemas"][model.__name__] = pydantic_to_openapi_schema(model)
+            self.components["schemas"][model.__name__] = pydantic_to_openapi_schema(
+                model
+            )
 
     def _process_i18n_dict(self, data: dict[str, Any]) -> dict[str, Any]:
         """
@@ -343,7 +382,11 @@ class OpenAPISchemaGenerator:
         """
         return {
             "openapi": "3.0.3",
-            "info": {"title": self.title, "version": self.version, "description": self.description},
+            "info": {
+                "title": self.title,
+                "version": self.version,
+                "description": self.description,
+            },
             "paths": self.paths,
             "components": self.components,
             "tags": self.tags,

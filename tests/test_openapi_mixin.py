@@ -4,9 +4,7 @@ Test for the OpenAPIIntegrationMixin class.
 This module tests the OpenAPIIntegrationMixin class without using the openapi_metadata decorator.
 """
 
-import json
 import pytest
-import yaml
 from typing import List, Optional
 
 from flask import Flask, Blueprint

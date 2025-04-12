@@ -90,7 +90,9 @@ def generate_openapi_command(
             blueprints.append((name, bp))
 
     if not blueprints:
-        click.echo(f"No blueprints found{' with name ' + blueprint if blueprint else ''}.")
+        click.echo(
+            f"No blueprints found{' with name ' + blueprint if blueprint else ''}."
+        )
         return
 
     # Create internationalized description
@@ -99,7 +101,9 @@ def generate_openapi_command(
     # Generate schema for each blueprint
     for name, bp in blueprints:
         if not hasattr(bp, "api") or not isinstance(bp.api, OpenAPIIntegrationMixin):
-            click.echo(f"Blueprint {name} does not have an OpenAPIExternalApi instance.")
+            click.echo(
+                f"Blueprint {name} does not have an OpenAPIExternalApi instance."
+            )
             continue
 
         api = bp.api
@@ -154,13 +158,17 @@ def generate_openapi_command(
 
                 mdx_file = os.path.join(mdx_dir, f"{name}.mdx")
                 # Convert schema back to dict if it's a YAML string
-                schema_dict = yaml.safe_load(lang_schema) if format == "yaml" else lang_schema
+                schema_dict = (
+                    yaml.safe_load(lang_schema) if format == "yaml" else lang_schema
+                )
 
                 # Generate MDX documentation with the current language
                 # This will set the current language in the thread and handle I18nString objects
                 generate_mdx_from_openapi(schema_dict, mdx_file, lang)
 
-                click.echo(f"Generated MDX documentation for {name} blueprint in {lang}: {mdx_file}")
+                click.echo(
+                    f"Generated MDX documentation for {name} blueprint in {lang}: {mdx_file}"
+                )
 
 
 def register_commands(app: Flask) -> None:

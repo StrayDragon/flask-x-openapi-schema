@@ -8,9 +8,8 @@ This example demonstrates how to:
 4. Process uploaded files with validation in Flask-RESTful resources
 """
 
-from flask import Flask, request
+from flask import Flask
 from flask_restful import Api, Resource  # type: ignore
-from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
 from flask_x_openapi_schema import (
@@ -49,26 +48,32 @@ class CustomImageUploadModel(ImageUploadModel):
 # Define a resource for file uploads using Pydantic models
 class FileUploadResource(Resource):
     @openapi_metadata(
-        summary=I18nString({
-            "en-US": "Upload a file",
-            "zh-Hans": "上传文件",
-            "ja-JP": "ファイルをアップロードする",
-        }),
-        description=I18nString({
-            "en-US": "Upload a file to the server with validation",
-            "zh-Hans": "将文件上传到服务器并进行验证",
-            "ja-JP": "検証付きでサーバーにファイルをアップロードする",
-        }),
+        summary=I18nString(
+            {
+                "en-US": "Upload a file",
+                "zh-Hans": "上传文件",
+                "ja-JP": "ファイルをアップロードする",
+            }
+        ),
+        description=I18nString(
+            {
+                "en-US": "Upload a file to the server with validation",
+                "zh-Hans": "将文件上传到服务器并进行验证",
+                "ja-JP": "検証付きでサーバーにファイルをアップロードする",
+            }
+        ),
         tags=["Files"],
         operation_id="uploadFile",
         responses=responses_schema(
             success_responses={
                 "200": {
-                    "description": I18nString({
-                        "en-US": "File uploaded successfully",
-                        "zh-Hans": "文件上传成功",
-                        "ja-JP": "ファイルが正常にアップロードされました",
-                    }),
+                    "description": I18nString(
+                        {
+                            "en-US": "File uploaded successfully",
+                            "zh-Hans": "文件上传成功",
+                            "ja-JP": "ファイルが正常にアップロードされました",
+                        }
+                    ),
                     "content": {
                         "application/json": {
                             "schema": {
@@ -84,11 +89,13 @@ class FileUploadResource(Resource):
                 },
             },
             errors={
-                "400": I18nString({
-                    "en-US": "Invalid file or validation failed",
-                    "zh-Hans": "无效的文件或验证失败",
-                    "ja-JP": "無効なファイルまたは検証に失敗しました",
-                }),
+                "400": I18nString(
+                    {
+                        "en-US": "Invalid file or validation failed",
+                        "zh-Hans": "无效的文件或验证失败",
+                        "ja-JP": "無効なファイルまたは検証に失敗しました",
+                    }
+                ),
             },
         ),
     )
@@ -123,26 +130,32 @@ class FileUploadResource(Resource):
 # Define a resource for image uploads with validation
 class ImageUploadResource(Resource):
     @openapi_metadata(
-        summary=I18nString({
-            "en-US": "Upload an image",
-            "zh-Hans": "上传图片",
-            "ja-JP": "画像をアップロードする",
-        }),
-        description=I18nString({
-            "en-US": "Upload an image with validation for file type and size",
-            "zh-Hans": "上传图片并验证文件类型和大小",
-            "ja-JP": "ファイルタイプとサイズの検証付きで画像をアップロードする",
-        }),
+        summary=I18nString(
+            {
+                "en-US": "Upload an image",
+                "zh-Hans": "上传图片",
+                "ja-JP": "画像をアップロードする",
+            }
+        ),
+        description=I18nString(
+            {
+                "en-US": "Upload an image with validation for file type and size",
+                "zh-Hans": "上传图片并验证文件类型和大小",
+                "ja-JP": "ファイルタイプとサイズの検証付きで画像をアップロードする",
+            }
+        ),
         tags=["Images"],
         operation_id="uploadImage",
         responses=responses_schema(
             success_responses={
                 "200": {
-                    "description": I18nString({
-                        "en-US": "Image uploaded successfully",
-                        "zh-Hans": "图片上传成功",
-                        "ja-JP": "画像が正常にアップロードされました",
-                    }),
+                    "description": I18nString(
+                        {
+                            "en-US": "Image uploaded successfully",
+                            "zh-Hans": "图片上传成功",
+                            "ja-JP": "画像が正常にアップロードされました",
+                        }
+                    ),
                     "content": {
                         "application/json": {
                             "schema": {
@@ -165,11 +178,13 @@ class ImageUploadResource(Resource):
                 },
             },
             errors={
-                "400": I18nString({
-                    "en-US": "Invalid image or validation failed",
-                    "zh-Hans": "无效的图片或验证失败",
-                    "ja-JP": "無効な画像または検証に失敗しました",
-                }),
+                "400": I18nString(
+                    {
+                        "en-US": "Invalid image or validation failed",
+                        "zh-Hans": "无效的图片或验证失败",
+                        "ja-JP": "無効な画像または検証に失敗しました",
+                    }
+                ),
             },
         ),
     )
@@ -195,7 +210,10 @@ class ImageUploadResource(Resource):
             file.seek(0)  # Rewind to the beginning
 
             # For images, we could get dimensions (mock implementation)
-            dimensions = {"width": 800, "height": 600}  # In a real app, use PIL or similar
+            dimensions = {
+                "width": 800,
+                "height": 600,
+            }  # In a real app, use PIL or similar
 
             # Return information about the uploaded image
             return {
@@ -212,26 +230,32 @@ class ImageUploadResource(Resource):
 # Define a resource for document uploads
 class DocumentUploadResource(Resource):
     @openapi_metadata(
-        summary=I18nString({
-            "en-US": "Upload a document",
-            "zh-Hans": "上传文档",
-            "ja-JP": "文書をアップロードする",
-        }),
-        description=I18nString({
-            "en-US": "Upload a document with validation for file type and size",
-            "zh-Hans": "上传文档并验证文件类型和大小",
-            "ja-JP": "ファイルタイプとサイズの検証付きで文書をアップロードする",
-        }),
+        summary=I18nString(
+            {
+                "en-US": "Upload a document",
+                "zh-Hans": "上传文档",
+                "ja-JP": "文書をアップロードする",
+            }
+        ),
+        description=I18nString(
+            {
+                "en-US": "Upload a document with validation for file type and size",
+                "zh-Hans": "上传文档并验证文件类型和大小",
+                "ja-JP": "ファイルタイプとサイズの検証付きで文書をアップロードする",
+            }
+        ),
         tags=["Documents"],
         operation_id="uploadDocument",
         responses=responses_schema(
             success_responses={
                 "200": {
-                    "description": I18nString({
-                        "en-US": "Document uploaded successfully",
-                        "zh-Hans": "文档上传成功",
-                        "ja-JP": "文書が正常にアップロードされました",
-                    }),
+                    "description": I18nString(
+                        {
+                            "en-US": "Document uploaded successfully",
+                            "zh-Hans": "文档上传成功",
+                            "ja-JP": "文書が正常にアップロードされました",
+                        }
+                    ),
                     "content": {
                         "application/json": {
                             "schema": {
@@ -247,11 +271,13 @@ class DocumentUploadResource(Resource):
                 },
             },
             errors={
-                "400": I18nString({
-                    "en-US": "Invalid document or validation failed",
-                    "zh-Hans": "无效的文档或验证失败",
-                    "ja-JP": "無効な文書または検証に失敗しました",
-                }),
+                "400": I18nString(
+                    {
+                        "en-US": "Invalid document or validation failed",
+                        "zh-Hans": "无效的文档或验证失败",
+                        "ja-JP": "無効な文書または検証に失敗しました",
+                    }
+                ),
             },
         ),
     )

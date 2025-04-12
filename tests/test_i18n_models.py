@@ -4,10 +4,8 @@ Tests for the i18n models module.
 This module tests the I18nBaseModel and I18nString classes.
 """
 
-import pytest
 import json
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from pydantic import BaseModel
 
 # Import the real functions but use a mock I18nString class
 from flask_x_openapi_schema.i18n.i18n_string import (

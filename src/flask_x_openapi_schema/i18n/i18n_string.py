@@ -105,7 +105,9 @@ class I18nString:
             if self.default_language not in self.strings:
                 # If default language is not provided, use the first available language
                 if self.strings:
-                    self.strings[self.default_language] = next(iter(self.strings.values()))
+                    self.strings[self.default_language] = next(
+                        iter(self.strings.values())
+                    )
                 else:
                     self.strings[self.default_language] = ""
 

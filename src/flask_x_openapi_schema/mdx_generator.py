@@ -9,7 +9,9 @@ from typing import Any
 from .i18n.i18n_string import set_current_language
 
 
-def generate_mdx_from_openapi(schema: dict[str, Any], output_file: str, language: str = "en-US") -> None:
+def generate_mdx_from_openapi(
+    schema: dict[str, Any], output_file: str, language: str = "en-US"
+) -> None:
     """
     Generate MDX documentation from an OpenAPI schema.
 
@@ -48,11 +50,23 @@ def _create_mdx_content(schema: dict[str, Any], language: str) -> str:
     version = info.get("version", "1.0.0")
 
     # Handle I18nString objects
-    if isinstance(title, dict) and "type" in title and title.get("type") == "i18n_string":
-        title = title.get("value", {}).get(language, title.get("value", {}).get("en-US", "API Documentation"))
+    if (
+        isinstance(title, dict)
+        and "type" in title
+        and title.get("type") == "i18n_string"
+    ):
+        title = title.get("value", {}).get(
+            language, title.get("value", {}).get("en-US", "API Documentation")
+        )
 
-    if isinstance(description, dict) and "type" in description and description.get("type") == "i18n_string":
-        description = description.get("value", {}).get(language, description.get("value", {}).get("en-US", ""))
+    if (
+        isinstance(description, dict)
+        and "type" in description
+        and description.get("type") == "i18n_string"
+    ):
+        description = description.get("value", {}).get(
+            language, description.get("value", {}).get("en-US", "")
+        )
 
     # Create header
     mdx = f"""---
@@ -80,11 +94,23 @@ Version: {version}
             operation_id = operation.get("operationId", "")
 
             # Handle I18nString objects for summary and description
-            if isinstance(summary, dict) and "type" in summary and summary.get("type") == "i18n_string":
-                summary = summary.get("value", {}).get(language, summary.get("value", {}).get("en-US", ""))
+            if (
+                isinstance(summary, dict)
+                and "type" in summary
+                and summary.get("type") == "i18n_string"
+            ):
+                summary = summary.get("value", {}).get(
+                    language, summary.get("value", {}).get("en-US", "")
+                )
 
-            if isinstance(description, dict) and "type" in description and description.get("type") == "i18n_string":
-                description = description.get("value", {}).get(language, description.get("value", {}).get("en-US", ""))
+            if (
+                isinstance(description, dict)
+                and "type" in description
+                and description.get("type") == "i18n_string"
+            ):
+                description = description.get("value", {}).get(
+                    language, description.get("value", {}).get("en-US", "")
+                )
 
             mdx += f"### {method_upper} {summary}\n\n"
 
@@ -180,7 +206,11 @@ Version: {version}
                 description = response.get("description", "")
 
                 # Handle I18nString objects for response descriptions
-                if isinstance(description, dict) and "type" in description and description.get("type") == "i18n_string":
+                if (
+                    isinstance(description, dict)
+                    and "type" in description
+                    and description.get("type") == "i18n_string"
+                ):
                     description = description.get("value", {}).get(
                         language, description.get("value", {}).get("en-US", "")
                     )

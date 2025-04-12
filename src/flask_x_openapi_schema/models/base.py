@@ -60,7 +60,9 @@ class BaseRespModel(BaseModel):
         """
         return self.model_dump(exclude_none=True)
 
-    def to_response(self, status_code: Optional[int] = None) -> Union[dict[str, Any], tuple[dict[str, Any], int]]:
+    def to_response(
+        self, status_code: Optional[int] = None
+    ) -> Union[dict[str, Any], tuple[dict[str, Any], int]]:
         """
         Convert the model to a Flask-RESTful compatible response.
 

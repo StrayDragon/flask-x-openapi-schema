@@ -6,10 +6,10 @@ This module tests the openapi_metadata decorator and its functionality.
 
 import inspect
 import pytest
-from flask import Flask, request
+from flask import Flask
 from flask_restful import Api, Resource
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional
 
 from flask_x_openapi_schema.decorators import openapi_metadata
 from flask_x_openapi_schema.models.base import BaseRespModel
@@ -129,7 +129,7 @@ def test_openapi_metadata_with_i18n():
 
     # Apply the decorator
     @openapi_metadata(
-        summary="Test endpoint", description="This is a test endpoint", tags=["test"]
+        summary=summary, description=description, tags=["test"]
     )
     def test_function():
         return {"message": "Hello, world!"}

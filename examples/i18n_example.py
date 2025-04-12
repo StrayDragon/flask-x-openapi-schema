@@ -24,8 +24,12 @@ class ItemI18nResponse(I18nBaseModel, BaseRespModel):
 
     id: str = Field(..., description="The ID of the item")
     name: str = Field(..., description="The name of the item")
-    description: I18nString = Field(..., description="The description of the item (internationalized)")
-    category: Optional[I18nString] = Field(None, description="The category of the item (internationalized)")
+    description: I18nString = Field(
+        ..., description="The description of the item (internationalized)"
+    )
+    category: Optional[I18nString] = Field(
+        None, description="The category of the item (internationalized)"
+    )
 
 
 # Example API resource with internationalized metadata

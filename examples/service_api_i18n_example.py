@@ -30,7 +30,9 @@ class ServiceI18nResponse(I18nBaseModel, BaseRespModel):
 
     id: UUID = Field(..., description="The ID of the service")
     name: str = Field(..., description="The name of the service")
-    description: I18nString = Field(..., description="The description of the service (internationalized)")
+    description: I18nString = Field(
+        ..., description="The description of the service (internationalized)"
+    )
     status: str = Field(..., description="The status of the service")
     created_at: str = Field(..., description="The creation timestamp")
     updated_at: str = Field(..., description="The last update timestamp")
@@ -234,7 +236,9 @@ def demonstrate_service_api_i18n():
     print(f"Description (JA): {metadata_ja.get('description')}")
 
     # Create a request and get a response in different languages
-    request = ServiceCreateRequest(name="Test Service", description="This is a test service")
+    request = ServiceCreateRequest(
+        name="Test Service", description="This is a test service"
+    )
 
     set_current_language("en-US")
     response_en, _ = api.post("tenant1", request)

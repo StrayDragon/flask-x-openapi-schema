@@ -11,7 +11,10 @@ from pydantic import BaseModel
 
 from .i18n.i18n_string import I18nString, get_current_language
 from .models.base import BaseRespModel
-from .restful_utils import create_reqparse_from_pydantic, extract_openapi_parameters_from_pydantic
+from .restful_utils import (
+    create_reqparse_from_pydantic,
+    extract_openapi_parameters_from_pydantic,
+)
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -95,15 +98,25 @@ def openapi_metadata(
                     continue
 
                 # Check for x_request_body parameter
-                if param_name.startswith(REQUEST_BODY_PREFIX) and param_name in type_hints:
+                if (
+                    param_name.startswith(REQUEST_BODY_PREFIX)
+                    and param_name in type_hints
+                ):
                     param_type = type_hints[param_name]
-                    if isinstance(param_type, type) and issubclass(param_type, BaseModel):
+                    if isinstance(param_type, type) and issubclass(
+                        param_type, BaseModel
+                    ):
                         detected_request_body = param_type
 
                 # Check for x_request_query parameter
-                elif param_name.startswith(REQUEST_QUERY_PREFIX) and param_name in type_hints:
+                elif (
+                    param_name.startswith(REQUEST_QUERY_PREFIX)
+                    and param_name in type_hints
+                ):
                     param_type = type_hints[param_name]
-                    if isinstance(param_type, type) and issubclass(param_type, BaseModel):
+                    if isinstance(param_type, type) and issubclass(
+                        param_type, BaseModel
+                    ):
                         detected_query_model = param_type
 
                 # Check for x_request_path parameter
@@ -111,7 +124,9 @@ def openapi_metadata(
                     # Extract the path parameter name from the parameter name
                     # Format: x_request_path_<param_name>
                     if "_" in param_name[len(REQUEST_PATH_PREFIX) + 1 :]:
-                        path_param_name = param_name[len(REQUEST_PATH_PREFIX) + 1 :].split("_", 1)[1]
+                        path_param_name = param_name[
+                            len(REQUEST_PATH_PREFIX) + 1 :
+                        ].split("_", 1)[1]
                         detected_path_params.append(path_param_name)
 
         # Use detected parameters if not explicitly provided
@@ -135,10 +150,16 @@ def openapi_metadata(
 
         # Handle I18nString fields
         if summary is not None:
-            metadata["summary"] = summary.get(current_lang) if isinstance(summary, I18nString) else summary
+            metadata["summary"] = (
+                summary.get(current_lang)
+                if isinstance(summary, I18nString)
+                else summary
+            )
         if description is not None:
             metadata["description"] = (
-                description.get(current_lang) if isinstance(description, I18nString) else description
+                description.get(current_lang)
+                if isinstance(description, I18nString)
+                else description
             )
         if tags:
             metadata["tags"] = tags
@@ -153,11 +174,17 @@ def openapi_metadata(
 
         # Handle request body
         if actual_request_body:
-            if isinstance(actual_request_body, type) and issubclass(actual_request_body, BaseModel):
+            if isinstance(actual_request_body, type) and issubclass(
+                actual_request_body, BaseModel
+            ):
                 # It's a Pydantic model
                 metadata["requestBody"] = {
                     "content": {
-                        "application/json": {"schema": {"$ref": f"#/components/schemas/{actual_request_body.__name__}"}}
+                        "application/json": {
+                            "schema": {
+                                "$ref": f"#/components/schemas/{actual_request_body.__name__}"
+                            }
+                        }
                     },
                     "required": True,
                 }
@@ -195,17 +222,20 @@ def openapi_metadata(
                         param_type = func_annotations[param_name]
 
                     # Extract the file parameter name
-                    if "_" in param_name[len(REQUEST_FILE_PREFIX) + 1:]:
-                        file_param_name = param_name[len(REQUEST_FILE_PREFIX) + 1:].split("_", 1)[1]
+                    if "_" in param_name[len(REQUEST_FILE_PREFIX) + 1 :]:
+                        file_param_name = param_name[
+                            len(REQUEST_FILE_PREFIX) + 1 :
+                        ].split("_", 1)[1]
                     else:
                         file_param_name = "file"
 
                     # Check if the parameter is a Pydantic model
                     is_pydantic_model = (
-                        param_type and isinstance(param_type, type) and
-                        issubclass(param_type, BaseModel) and
-                        hasattr(param_type, "model_fields") and
-                        "file" in param_type.model_fields
+                        param_type
+                        and isinstance(param_type, type)
+                        and issubclass(param_type, BaseModel)
+                        and hasattr(param_type, "model_fields")
+                        and "file" in param_type.model_fields
                     )
 
                     # Get description from Pydantic model if available
@@ -221,7 +251,7 @@ def openapi_metadata(
                         "in": "formData",
                         "required": True,
                         "type": "file",
-                        "description": file_description
+                        "description": file_description,
                     }
                     openapi_parameters.append(file_param)
 
@@ -239,7 +269,9 @@ def openapi_metadata(
         param_types = {}
 
         # Add types from request_body if it's a Pydantic model
-        if isinstance(actual_request_body, type) and issubclass(actual_request_body, BaseModel):
+        if isinstance(actual_request_body, type) and issubclass(
+            actual_request_body, BaseModel
+        ):
             # Get field types from the Pydantic model
             for field_name, field in actual_request_body.model_fields.items():
                 param_types[field_name] = field.annotation
@@ -257,7 +289,8 @@ def openapi_metadata(
                 parser = create_reqparse_from_pydantic(
                     query_model=actual_query_model,
                     body_model=actual_request_body
-                    if isinstance(actual_request_body, type) and issubclass(actual_request_body, BaseModel)
+                    if isinstance(actual_request_body, type)
+                    and issubclass(actual_request_body, BaseModel)
                     else None,
                 )
                 parsed_args = parser.parse_args()
@@ -286,7 +319,10 @@ def openapi_metadata(
                         kwargs[param_name] = model_instance
 
                     # Handle x_request_query parameter
-                    elif param_name.startswith(REQUEST_QUERY_PREFIX) and actual_query_model:
+                    elif (
+                        param_name.startswith(REQUEST_QUERY_PREFIX)
+                        and actual_query_model
+                    ):
                         # Create a Pydantic model instance from the parsed arguments
                         query_data = {}
                         for field_name in actual_query_model.model_fields:
@@ -298,11 +334,16 @@ def openapi_metadata(
                         kwargs[param_name] = model_instance
 
                     # Handle x_request_path parameter
-                    elif param_name.startswith(REQUEST_PATH_PREFIX) and actual_path_params:
+                    elif (
+                        param_name.startswith(REQUEST_PATH_PREFIX)
+                        and actual_path_params
+                    ):
                         # Extract the path parameter name from the parameter name
                         # Format: x_request_path_<param_name>
                         if "_" in param_name[len(REQUEST_PATH_PREFIX) + 1 :]:
-                            path_param_name = param_name[len(REQUEST_PATH_PREFIX) + 1 :].split("_", 1)[1]
+                            path_param_name = param_name[
+                                len(REQUEST_PATH_PREFIX) + 1 :
+                            ].split("_", 1)[1]
                             if path_param_name in kwargs:
                                 kwargs[param_name] = kwargs[path_param_name]
 
@@ -312,20 +353,25 @@ def openapi_metadata(
                         from flask import request
 
                         # Get the parameter type annotation
-                        param_type = param_types.get(param_name) if param_types else None
+                        param_type = (
+                            param_types.get(param_name) if param_types else None
+                        )
 
                         # Check if the parameter is a Pydantic model
                         is_pydantic_model = (
-                            param_type and isinstance(param_type, type) and
-                            issubclass(param_type, BaseModel) and
-                            hasattr(param_type, "model_fields") and
-                            "file" in param_type.model_fields
+                            param_type
+                            and isinstance(param_type, type)
+                            and issubclass(param_type, BaseModel)
+                            and hasattr(param_type, "model_fields")
+                            and "file" in param_type.model_fields
                         )
 
                         # Extract the file parameter name from the parameter name
                         # Format: x_request_file_<param_name>
-                        if "_" in param_name[len(REQUEST_FILE_PREFIX) + 1:]:
-                            file_param_name = param_name[len(REQUEST_FILE_PREFIX) + 1:].split("_", 1)[1]
+                        if "_" in param_name[len(REQUEST_FILE_PREFIX) + 1 :]:
+                            file_param_name = param_name[
+                                len(REQUEST_FILE_PREFIX) + 1 :
+                            ].split("_", 1)[1]
                             if file_param_name in request.files:
                                 file_obj = request.files[file_param_name]
                                 if is_pydantic_model:
@@ -366,7 +412,11 @@ def openapi_metadata(
             if isinstance(result, BaseRespModel):
                 # Convert the model to a Flask-RESTful compatible response
                 return result.to_response()
-            elif isinstance(result, tuple) and len(result) >= 1 and isinstance(result[0], BaseRespModel):
+            elif (
+                isinstance(result, tuple)
+                and len(result) >= 1
+                and isinstance(result[0], BaseRespModel)
+            ):
                 # Handle tuple returns with status code
                 model = result[0]
                 if len(result) >= 2 and isinstance(result[1], int):

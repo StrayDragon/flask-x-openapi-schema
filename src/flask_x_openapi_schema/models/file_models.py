@@ -9,7 +9,6 @@ from typing import Any, List, Optional
 from pydantic import BaseModel, Field, field_validator
 from werkzeug.datastructures import FileStorage
 
-from ..i18n.i18n_string import I18nString
 
 
 class FileUploadModel(BaseModel):
@@ -18,9 +17,7 @@ class FileUploadModel(BaseModel):
     file: FileStorage = Field(..., description="The uploaded file")
 
     # Allow arbitrary types for FileStorage
-    model_config = {
-        "arbitrary_types_allowed": True
-    }
+    model_config = {"arbitrary_types_allowed": True}
 
     @field_validator("file")
     def validate_file(cls, v: Any) -> FileStorage:
@@ -36,11 +33,10 @@ class ImageUploadModel(FileUploadModel):
     file: FileStorage = Field(..., description="The uploaded image file")
     allowed_extensions: List[str] = Field(
         default=["jpg", "jpeg", "png", "gif", "webp", "svg"],
-        description="Allowed file extensions"
+        description="Allowed file extensions",
     )
     max_size: Optional[int] = Field(
-        default=None,
-        description="Maximum file size in bytes"
+        default=None, description="Maximum file size in bytes"
     )
 
     @field_validator("file")
@@ -53,7 +49,9 @@ class ImageUploadModel(FileUploadModel):
             raise ValueError("No file provided")
 
         # Check file extension
-        allowed_extensions = values.get("allowed_extensions", ["jpg", "jpeg", "png", "gif", "webp", "svg"])
+        allowed_extensions = values.get(
+            "allowed_extensions", ["jpg", "jpeg", "png", "gif", "webp", "svg"]
+        )
         if "." in v.filename:
             ext = v.filename.rsplit(".", 1)[1].lower()
             if ext not in allowed_extensions:
@@ -69,7 +67,9 @@ class ImageUploadModel(FileUploadModel):
             v.seek(0)  # Rewind to the beginning
 
             if size > max_size:
-                raise ValueError(f"File size ({size} bytes) exceeds maximum allowed size ({max_size} bytes)")
+                raise ValueError(
+                    f"File size ({size} bytes) exceeds maximum allowed size ({max_size} bytes)"
+                )
 
         return v
 
@@ -80,11 +80,10 @@ class DocumentUploadModel(FileUploadModel):
     file: FileStorage = Field(..., description="The uploaded document file")
     allowed_extensions: List[str] = Field(
         default=["pdf", "doc", "docx", "txt", "rtf", "md"],
-        description="Allowed file extensions"
+        description="Allowed file extensions",
     )
     max_size: Optional[int] = Field(
-        default=None,
-        description="Maximum file size in bytes"
+        default=None, description="Maximum file size in bytes"
     )
 
     @field_validator("file")
@@ -97,7 +96,9 @@ class DocumentUploadModel(FileUploadModel):
             raise ValueError("No file provided")
 
         # Check file extension
-        allowed_extensions = values.get("allowed_extensions", ["pdf", "doc", "docx", "txt", "rtf", "md"])
+        allowed_extensions = values.get(
+            "allowed_extensions", ["pdf", "doc", "docx", "txt", "rtf", "md"]
+        )
         if "." in v.filename:
             ext = v.filename.rsplit(".", 1)[1].lower()
             if ext not in allowed_extensions:
@@ -113,7 +114,9 @@ class DocumentUploadModel(FileUploadModel):
             v.seek(0)  # Rewind to the beginning
 
             if size > max_size:
-                raise ValueError(f"File size ({size} bytes) exceeds maximum allowed size ({max_size} bytes)")
+                raise ValueError(
+                    f"File size ({size} bytes) exceeds maximum allowed size ({max_size} bytes)"
+                )
 
         return v
 
@@ -124,9 +127,7 @@ class MultipleFileUploadModel(BaseModel):
     files: List[FileStorage] = Field(..., description="The uploaded files")
 
     # Allow arbitrary types for FileStorage
-    model_config = {
-        "arbitrary_types_allowed": True
-    }
+    model_config = {"arbitrary_types_allowed": True}
 
     @field_validator("files")
     def validate_files(cls, v: List[Any]) -> List[FileStorage]:

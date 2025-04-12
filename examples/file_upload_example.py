@@ -7,7 +7,7 @@ This example demonstrates how to:
 3. Process uploaded files in Flask-RESTful resources
 """
 
-from flask import Flask, request
+from flask import Flask
 from flask_restful import Api, Resource  # type: ignore
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
@@ -37,26 +37,32 @@ api = OpenAPIApi(app)
 # Define a resource for file uploads
 class FileUploadResource(Resource):
     @openapi_metadata(
-        summary=I18nString({
-            "en-US": "Upload a file",
-            "zh-Hans": "上传文件",
-            "ja-JP": "ファイルをアップロードする",
-        }),
-        description=I18nString({
-            "en-US": "Upload a file to the server",
-            "zh-Hans": "将文件上传到服务器",
-            "ja-JP": "サーバーにファイルをアップロードする",
-        }),
+        summary=I18nString(
+            {
+                "en-US": "Upload a file",
+                "zh-Hans": "上传文件",
+                "ja-JP": "ファイルをアップロードする",
+            }
+        ),
+        description=I18nString(
+            {
+                "en-US": "Upload a file to the server",
+                "zh-Hans": "将文件上传到服务器",
+                "ja-JP": "サーバーにファイルをアップロードする",
+            }
+        ),
         tags=["Files"],
         operation_id="uploadFile",
         responses=responses_schema(
             success_responses={
                 "200": {
-                    "description": I18nString({
-                        "en-US": "File uploaded successfully",
-                        "zh-Hans": "文件上传成功",
-                        "ja-JP": "ファイルが正常にアップロードされました",
-                    }),
+                    "description": I18nString(
+                        {
+                            "en-US": "File uploaded successfully",
+                            "zh-Hans": "文件上传成功",
+                            "ja-JP": "ファイルが正常にアップロードされました",
+                        }
+                    ),
                     "content": {
                         "application/json": {
                             "schema": {
@@ -72,11 +78,13 @@ class FileUploadResource(Resource):
                 },
             },
             errors={
-                "400": I18nString({
-                    "en-US": "No file provided",
-                    "zh-Hans": "未提供文件",
-                    "ja-JP": "ファイルが提供されていません",
-                }),
+                "400": I18nString(
+                    {
+                        "en-US": "No file provided",
+                        "zh-Hans": "未提供文件",
+                        "ja-JP": "ファイルが提供されていません",
+                    }
+                ),
             },
         ),
     )
@@ -111,26 +119,32 @@ class FileUploadResource(Resource):
 # Define a resource for multiple file uploads
 class MultipleFileUploadResource(Resource):
     @openapi_metadata(
-        summary=I18nString({
-            "en-US": "Upload multiple files",
-            "zh-Hans": "上传多个文件",
-            "ja-JP": "複数のファイルをアップロードする",
-        }),
-        description=I18nString({
-            "en-US": "Upload multiple files to the server",
-            "zh-Hans": "将多个文件上传到服务器",
-            "ja-JP": "サーバーに複数のファイルをアップロードする",
-        }),
+        summary=I18nString(
+            {
+                "en-US": "Upload multiple files",
+                "zh-Hans": "上传多个文件",
+                "ja-JP": "複数のファイルをアップロードする",
+            }
+        ),
+        description=I18nString(
+            {
+                "en-US": "Upload multiple files to the server",
+                "zh-Hans": "将多个文件上传到服务器",
+                "ja-JP": "サーバーに複数のファイルをアップロードする",
+            }
+        ),
         tags=["Files"],
         operation_id="uploadMultipleFiles",
         responses=responses_schema(
             success_responses={
                 "200": {
-                    "description": I18nString({
-                        "en-US": "Files uploaded successfully",
-                        "zh-Hans": "文件上传成功",
-                        "ja-JP": "ファイルが正常にアップロードされました",
-                    }),
+                    "description": I18nString(
+                        {
+                            "en-US": "Files uploaded successfully",
+                            "zh-Hans": "文件上传成功",
+                            "ja-JP": "ファイルが正常にアップロードされました",
+                        }
+                    ),
                     "content": {
                         "application/json": {
                             "schema": {
@@ -154,15 +168,19 @@ class MultipleFileUploadResource(Resource):
                 },
             },
             errors={
-                "400": I18nString({
-                    "en-US": "No files provided",
-                    "zh-Hans": "未提供文件",
-                    "ja-JP": "ファイルが提供されていません",
-                }),
+                "400": I18nString(
+                    {
+                        "en-US": "No files provided",
+                        "zh-Hans": "未提供文件",
+                        "ja-JP": "ファイルが提供されていません",
+                    }
+                ),
             },
         ),
     )
-    def post(self, x_request_file_document: FileStorage, x_request_file_image: FileStorage):
+    def post(
+        self, x_request_file_document: FileStorage, x_request_file_image: FileStorage
+    ):
         """
         Upload multiple files to the server.
 
@@ -181,12 +199,14 @@ class MultipleFileUploadResource(Resource):
             file_size = x_request_file_document.tell()
             x_request_file_document.seek(0)
 
-            files_info.append({
-                "filename": filename,
-                "size": file_size,
-                "content_type": content_type,
-                "type": "document",
-            })
+            files_info.append(
+                {
+                    "filename": filename,
+                    "size": file_size,
+                    "content_type": content_type,
+                    "type": "document",
+                }
+            )
 
         # Process the image file
         if x_request_file_image:
@@ -198,12 +218,14 @@ class MultipleFileUploadResource(Resource):
             file_size = x_request_file_image.tell()
             x_request_file_image.seek(0)
 
-            files_info.append({
-                "filename": filename,
-                "size": file_size,
-                "content_type": content_type,
-                "type": "image",
-            })
+            files_info.append(
+                {
+                    "filename": filename,
+                    "size": file_size,
+                    "content_type": content_type,
+                    "type": "image",
+                }
+            )
 
         if not files_info:
             return {"error": "No files provided"}, 400

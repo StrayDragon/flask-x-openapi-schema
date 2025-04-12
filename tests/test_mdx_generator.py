@@ -4,10 +4,8 @@ Tests for the MDX generator module.
 This module tests the generation of MDX documentation from OpenAPI schemas.
 """
 
-import json
 import os
 import pytest
-import yaml
 
 from flask_x_openapi_schema.mdx_generator import (
     generate_mdx_from_openapi,

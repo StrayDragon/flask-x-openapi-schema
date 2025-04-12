@@ -40,7 +40,9 @@ class OpenAPIIntegrationMixin(Api):
         # Use the specified language or get the current language
         current_lang = language or get_current_language()
 
-        generator = OpenAPISchemaGenerator(title, version, description, language=current_lang)
+        generator = OpenAPISchemaGenerator(
+            title, version, description, language=current_lang
+        )
 
         for resource, urls, _ in self.resources:
             generator._process_resource(resource, urls, self.blueprint.url_prefix)
