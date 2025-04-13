@@ -7,6 +7,12 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Any, Optional, TypeVar, Union, cast, get_type_hints
 
+# For Python 3.10+, use typing directly; for older versions, use typing_extensions
+try:
+    from typing import ParamSpec  # Python 3.10+
+except ImportError:
+    from typing_extensions import ParamSpec  # Python < 3.10
+
 from pydantic import BaseModel
 
 from .i18n.i18n_string import I18nString, get_current_language
@@ -20,8 +26,6 @@ try:
 
     HAS_FLASK_RESTFUL = True
 except ImportError:
-    HAS_FLASK_RESTFUL = False
-
     # Define placeholder functions for when Flask-RESTful is not available
     def create_reqparse_from_pydantic(*args, **kwargs):
         raise ImportError(
@@ -33,9 +37,13 @@ except ImportError:
             "Flask-RESTful is not installed. Install with 'pip install flask-x-openapi-schema[restful]'"
         )
 
+    HAS_FLASK_RESTFUL = False
 
 from flask import request
 
+# Type variables for function parameters and return type
+P = ParamSpec("P")
+R = TypeVar("R")
 F = TypeVar("F", bound=Callable[..., Any])
 
 # Special parameter prefixes for binding
@@ -43,6 +51,163 @@ REQUEST_BODY_PREFIX = "x_request_body"
 REQUEST_QUERY_PREFIX = "x_request_query"
 REQUEST_PATH_PREFIX = "x_request_path"
 REQUEST_FILE_PREFIX = "x_request_file"
+
+
+def _detect_parameters(
+    signature: inspect.Signature, type_hints: dict[str, Any]
+) -> tuple[Optional[type[BaseModel]], Optional[type[BaseModel]], list[str]]:
+    """
+    Detect request parameters from function signature.
+
+    Args:
+        signature: Function signature
+        type_hints: Function type hints
+
+    Returns:
+        Tuple of (detected_request_body, detected_query_model, detected_path_params)
+    """
+    detected_request_body = None
+    detected_query_model = None
+    detected_path_params = []
+
+    # Look for parameters with special prefixes
+    for param_name in signature.parameters:
+        # Skip 'self' and 'cls' parameters
+        if param_name in ("self", "cls"):
+            continue
+
+        # Check for x_request_body parameter
+        if param_name.startswith(REQUEST_BODY_PREFIX) and param_name in type_hints:
+            param_type = type_hints[param_name]
+            if isinstance(param_type, type) and issubclass(param_type, BaseModel):
+                detected_request_body = param_type
+
+        # Check for x_request_query parameter
+        elif param_name.startswith(REQUEST_QUERY_PREFIX) and param_name in type_hints:
+            param_type = type_hints[param_name]
+            if isinstance(param_type, type) and issubclass(param_type, BaseModel):
+                detected_query_model = param_type
+
+        # Check for x_request_path parameter
+        elif param_name.startswith(REQUEST_PATH_PREFIX):
+            # Extract the path parameter name from the parameter name
+            # Format: x_request_path_<param_name>
+            if "_" in param_name[len(REQUEST_PATH_PREFIX) + 1 :]:
+                path_param_name = param_name[len(REQUEST_PATH_PREFIX) + 1 :].split(
+                    "_", 1
+                )[1]
+                detected_path_params.append(path_param_name)
+
+    return detected_request_body, detected_query_model, detected_path_params
+
+
+def _generate_openapi_metadata(
+    summary: Optional[Union[str, I18nString]],
+    description: Optional[Union[str, I18nString]],
+    tags: Optional[list[str]],
+    operation_id: Optional[str],
+    deprecated: bool,
+    security: Optional[list[dict[str, list[str]]]],
+    external_docs: Optional[dict[str, str]],
+    actual_request_body: Optional[Union[type[BaseModel], dict[str, Any]]],
+    responses: Optional[dict[str, Any]],
+    parameters: Optional[list[dict[str, Any]]],
+    actual_query_model: Optional[type[BaseModel]],
+    actual_path_params: Optional[list[str]],
+    language: Optional[str],
+) -> dict[str, Any]:
+    """
+    Generate OpenAPI metadata dictionary.
+
+    Args:
+        Various parameters for OpenAPI metadata
+
+    Returns:
+        OpenAPI metadata dictionary
+    """
+    metadata: dict[str, Any] = {}
+
+    # Use the specified language or get the current language
+    current_lang = language or get_current_language()
+
+    # Handle I18nString fields
+    if summary is not None:
+        if isinstance(summary, I18nString):
+            metadata["summary"] = summary.get(current_lang)
+        else:
+            metadata["summary"] = summary
+    if description is not None:
+        if isinstance(description, I18nString):
+            metadata["description"] = description.get(current_lang)
+        else:
+            metadata["description"] = description
+    if tags:
+        metadata["tags"] = tags
+    if operation_id:
+        metadata["operationId"] = operation_id
+    if deprecated:
+        metadata["deprecated"] = deprecated
+    if security:
+        metadata["security"] = security
+    if external_docs:
+        metadata["externalDocs"] = external_docs
+
+    # Handle request body
+    if actual_request_body:
+        if isinstance(actual_request_body, type) and issubclass(
+            actual_request_body, BaseModel
+        ):
+            # It's a Pydantic model
+            metadata["requestBody"] = {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": f"#/components/schemas/{actual_request_body.__name__}"
+                        }
+                    }
+                },
+                "required": True,
+            }
+        else:
+            # It's a dict
+            metadata["requestBody"] = actual_request_body
+
+    # Handle responses
+    if responses:
+        metadata["responses"] = responses
+
+    return metadata
+
+
+def _handle_response(result: Any) -> Any:
+    """
+    Handle response conversion for BaseRespModel instances.
+
+    Args:
+        result: Function result
+
+    Returns:
+        Processed result
+    """
+    if isinstance(result, BaseRespModel):
+        # Convert the model to a response
+        return result.to_response()
+    elif (
+        isinstance(result, tuple)
+        and len(result) >= 1
+        and isinstance(result[0], BaseRespModel)
+    ):
+        # Handle tuple returns with status code
+        model = result[0]
+        if len(result) >= 2 and isinstance(result[1], int):
+            # Return with status code
+            return model.to_response(result[1])
+        else:
+            # Return without status code
+            return model.to_response()
+
+    # Return the original result if it's not a BaseRespModel
+    return result
 
 
 def openapi_metadata(
@@ -62,7 +227,7 @@ def openapi_metadata(
     # The following parameters are optional and can be automatically detected from the function signature
     auto_detect_params: bool = True,
     language: Optional[str] = None,
-) -> Callable[[F], F]:
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """
     Decorator to add OpenAPI metadata to an API endpoint.
 
@@ -97,7 +262,7 @@ def openapi_metadata(
         The decorated function with OpenAPI metadata attached and type annotations preserved
     """
 
-    def decorator(func: F) -> F:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
         # Get the function signature to find parameters with special prefixes
         signature = inspect.signature(func)
         param_names = list(signature.parameters.keys())
@@ -111,43 +276,10 @@ def openapi_metadata(
         detected_path_params = []
 
         if auto_detect_params:
-            # Look for parameters with special prefixes
-            for param_name in signature.parameters:
-                # Skip 'self' and 'cls' parameters
-                if param_name in ("self", "cls"):
-                    continue
-
-                # Check for x_request_body parameter
-                if (
-                    param_name.startswith(REQUEST_BODY_PREFIX)
-                    and param_name in type_hints
-                ):
-                    param_type = type_hints[param_name]
-                    if isinstance(param_type, type) and issubclass(
-                        param_type, BaseModel
-                    ):
-                        detected_request_body = param_type
-
-                # Check for x_request_query parameter
-                elif (
-                    param_name.startswith(REQUEST_QUERY_PREFIX)
-                    and param_name in type_hints
-                ):
-                    param_type = type_hints[param_name]
-                    if isinstance(param_type, type) and issubclass(
-                        param_type, BaseModel
-                    ):
-                        detected_query_model = param_type
-
-                # Check for x_request_path parameter
-                elif param_name.startswith(REQUEST_PATH_PREFIX):
-                    # Extract the path parameter name from the parameter name
-                    # Format: x_request_path_<param_name>
-                    if "_" in param_name[len(REQUEST_PATH_PREFIX) + 1 :]:
-                        path_param_name = param_name[
-                            len(REQUEST_PATH_PREFIX) + 1 :
-                        ].split("_", 1)[1]
-                        detected_path_params.append(path_param_name)
+            # Use helper function to detect parameters
+            detected_request_body, detected_query_model, detected_path_params = (
+                _detect_parameters(signature, type_hints)
+            )
 
         # Use detected parameters if not explicitly provided
         actual_request_body = request_body
@@ -162,57 +294,22 @@ def openapi_metadata(
         if actual_path_params is None and detected_path_params:
             actual_path_params = detected_path_params
 
-        # Generate OpenAPI metadata
-        metadata: dict[str, Any] = {}
-
-        # Use the specified language or get the current language
-        current_lang = language or get_current_language()
-
-        # Handle I18nString fields
-        if summary is not None:
-            if isinstance(summary, I18nString):
-                metadata["summary"] = summary.get(current_lang)
-            else:
-                metadata["summary"] = summary
-        if description is not None:
-            if isinstance(description, I18nString):
-                metadata["description"] = description.get(current_lang)
-            else:
-                metadata["description"] = description
-        if tags:
-            metadata["tags"] = tags
-        if operation_id:
-            metadata["operationId"] = operation_id
-        if deprecated:
-            metadata["deprecated"] = deprecated
-        if security:
-            metadata["security"] = security
-        if external_docs:
-            metadata["externalDocs"] = external_docs
-
-        # Handle request body
-        if actual_request_body:
-            if isinstance(actual_request_body, type) and issubclass(
-                actual_request_body, BaseModel
-            ):
-                # It's a Pydantic model
-                metadata["requestBody"] = {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": f"#/components/schemas/{actual_request_body.__name__}"
-                            }
-                        }
-                    },
-                    "required": True,
-                }
-            else:
-                # It's a dict
-                metadata["requestBody"] = actual_request_body
-
-        # Handle responses
-        if responses:
-            metadata["responses"] = responses
+        # Generate OpenAPI metadata using helper function
+        metadata = _generate_openapi_metadata(
+            summary=summary,
+            description=description,
+            tags=tags,
+            operation_id=operation_id,
+            deprecated=deprecated,
+            security=security,
+            external_docs=external_docs,
+            actual_request_body=actual_request_body,
+            responses=responses,
+            parameters=parameters,
+            actual_query_model=actual_query_model,
+            actual_path_params=actual_path_params,
+            language=language,
+        )
 
         # Handle parameters from the parameters argument
         openapi_parameters = parameters or []
@@ -481,26 +578,8 @@ def openapi_metadata(
             # Call the original function with filtered kwargs
             result = func(*args, **valid_kwargs)
 
-            # Handle response conversion for BaseRespModel instances
-            if isinstance(result, BaseRespModel):
-                # Convert the model to a response
-                return result.to_response()
-            elif (
-                isinstance(result, tuple)
-                and len(result) >= 1
-                and isinstance(result[0], BaseRespModel)
-            ):
-                # Handle tuple returns with status code
-                model = result[0]
-                if len(result) >= 2 and isinstance(result[1], int):
-                    # Return with status code
-                    return model.to_response(result[1])
-                else:
-                    # Return without status code
-                    return model.to_response()
-
-            # Return the original result if it's not a BaseRespModel
-            return result
+            # Handle response conversion using helper function
+            return _handle_response(result)
 
         # Copy OpenAPI metadata to the wrapper
         wrapper._openapi_metadata = metadata  # type: ignore
@@ -514,6 +593,6 @@ def openapi_metadata(
             # Apply the merged type hints to the wrapper
             wrapper.__annotations__ = merged_hints
 
-        return cast(F, wrapper)
+        return cast(Callable[P, R], wrapper)
 
     return decorator

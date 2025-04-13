@@ -5,6 +5,8 @@ Internationalization support for strings in OpenAPI metadata.
 import contextvars
 from typing import Any, ClassVar, Optional, Union
 
+from pydantic_core import CoreSchema, core_schema
+
 # Thread-local storage for current language
 _current_language = contextvars.ContextVar[str]("current_language", default="en-US")
 
@@ -52,6 +54,13 @@ class I18nString:
         print(greeting.get("zh-Hans"))  # Outputs "你好"
         ```
     """
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _source_type: Any, _handler: Any
+    ) -> CoreSchema:
+        """Generate a pydantic core schema for I18nString."""
+        return core_schema.is_instance_schema(cls)
 
     # Default supported languages
     SUPPORTED_LANGUAGES: ClassVar[list[str]] = [

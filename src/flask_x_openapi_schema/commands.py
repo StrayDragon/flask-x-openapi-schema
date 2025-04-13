@@ -7,7 +7,6 @@ import os
 from typing import Literal, Optional
 
 import click
-import yaml
 from flask import Flask
 from flask.cli import with_appcontext
 
@@ -144,7 +143,7 @@ def generate_openapi_command(
                 set_current_language(lang)
 
                 # Generate a language-specific schema
-                lang_schema = api.generate_openapi_schema(
+                api.generate_openapi_schema(
                     title=I18nString(dict.fromkeys(language, f"{title} - {name}")),
                     version=version,
                     description=i18n_description,
@@ -154,6 +153,7 @@ def generate_openapi_command(
 
                 mdx_dir = os.path.join(mdx_output_dir, lang)
                 os.makedirs(mdx_dir, exist_ok=True)
+
 
 def register_commands(app: Flask) -> None:
     """

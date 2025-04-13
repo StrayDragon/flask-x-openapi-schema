@@ -6,7 +6,7 @@ These models provide a structured way to handle file uploads with validation and
 
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from werkzeug.datastructures import FileStorage
 
 
@@ -16,7 +16,7 @@ class FileUploadModel(BaseModel):
     file: FileStorage = Field(..., description="The uploaded file")
 
     # Allow arbitrary types for FileStorage
-    model_config = {"arbitrary_types_allowed": True}
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("file")
     def validate_file(cls, v: Any) -> FileStorage:

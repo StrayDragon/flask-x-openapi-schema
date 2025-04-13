@@ -4,7 +4,7 @@ Internationalization support for Pydantic models.
 
 from typing import Any, ClassVar, Optional, TypeVar, get_type_hints
 
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, ConfigDict, create_model, field_serializer
 
 from .i18n_string import I18nString, get_current_language
 
@@ -28,6 +28,16 @@ class I18nBaseModel(BaseModel):
 
     # Class variable to store i18n field names
     __i18n_fields__: ClassVar[list[str]] = []
+
+    # Configure Pydantic model to allow arbitrary types
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    # Serialize I18nString fields to strings
+    @field_serializer("*")
+    def serialize_i18n_string(self, v, _):
+        if isinstance(v, I18nString):
+            return str(v)
+        return v
 
     def __init_subclass__(cls, **kwargs):
         """
