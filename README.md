@@ -1,535 +1,153 @@
 # Flask-X-OpenAPI-Schema
 
-This module provides utilities for generating OpenAPI schemas from Flask-RESTful resources, Flask.MethodView classes, and Pydantic models. It can be used as a standalone package or as part of the Dify platform.
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Features
+A powerful utility for automatically generating OpenAPI schemas from Flask-RESTful resources, Flask.MethodView classes, and Pydantic models. Simplify your API documentation with minimal effort.
 
-- Generate OpenAPI schemas from Flask-RESTful resources and Flask.MethodView classes
-- Convert Pydantic models to OpenAPI schemas
-- Automatically inject request parameters from Pydantic models
-- Preserve type annotations from Pydantic models for better IDE support
-- Output schemas in YAML or JSON format
-- Support for internationalization (i18n) in API documentation
-- Handle file uploads with automatic parameter injection
-- Flexible architecture with optional Flask-RESTful dependency
+## 📚 Documentation
 
-## Installation
+Full documentation is available in the [docs](./docs) directory.
 
-### As Part of Dify
-
-This module is included in the Dify platform and can be used directly.
-
-### As a Standalone Package
-
-To install as a standalone package:
+## 🚀 Quick Start
 
 ```bash
+# Install the package
+pip install flask-x-openapi-schema
+
+# With Flask-RESTful support
+pip install flask-x-openapi-schema[restful]
+```
+
+## ✨ Features
+
+- **Auto-Generation**: Generate OpenAPI schemas from Flask-RESTful resources and Flask.MethodView classes
+- **Pydantic Integration**: Seamlessly convert Pydantic models to OpenAPI schemas
+- **Smart Parameter Handling**: Automatically inject request parameters from Pydantic models
+- **Type Safety**: Preserve type annotations for better IDE support and validation
+- **Multiple Formats**: Output schemas in YAML or JSON format
+- **Internationalization**: Built-in i18n support for API documentation
+- **File Upload Support**: Simplified handling of file uploads
+- **Flexible Architecture**: Optional Flask-RESTful dependency
+
+## 📦 Installation
+
+### Basic Installation
+
+```bash
+# Install from PyPI
+pip install flask-x-openapi-schema
+
 # From the repository root
 pip install -e .
 ```
 
-Or install from GitHub:
+### Optional Dependencies
+
+By default, only Flask, Pydantic, and PyYAML are installed. For Flask-RESTful integration:
 
 ```bash
-pip install git+https://github.com/langgenius/dify.git#subdirectory=api/core/openapi
-```
-
-#### Optional Dependencies
-
-By default, only Flask, Pydantic, and PyYAML are installed. If you want to use Flask-RESTful integration, install with the `restful` extra:
-
-```bash
+pip install flask-x-openapi-schema[restful]
+# or
 pip install -e .[restful]
 ```
 
-## Usage
-
-### Decorating API Endpoints with Auto-Detection
-
-Use the `openapi_metadata` decorator to add OpenAPI metadata to your API endpoints. The decorator automatically detects parameters with special prefixes and their types:
+## 🛠️ Basic Usage
 
 ```python
-from typing import Optional
+from flask import Flask
+from flask_restful import Resource, Api
 from pydantic import BaseModel, Field
-from flask_x_openapi_schema import openapi_metadata
+from flask_x_openapi_schema import openapi_metadata, OpenAPIIntegrationMixin
 
-# Define a Pydantic model for the request body
-class CreateItemRequest(BaseModel):
-    """Request model for creating an item."""
-    name: str = Field(..., description="The name of the item")
-    price: float = Field(..., description="The price of the item")
+# Create a Flask app with OpenAPI support
+app = Flask(__name__)
+class OpenAPIApi(OpenAPIIntegrationMixin, Api):
+    pass
+api = OpenAPIApi(app)
 
-# Use the decorator on your API endpoint
-# No need to specify request_body - it will be auto-detected from x_request_body parameter
-@openapi_metadata(
-    summary="Create a new item",
-    description="Create a new item with the given data",
-    tags=["Items"],
-    operation_id="createItem",
-    responses={
-        "201": {"description": "Item created successfully"},
-        "400": {"description": "Invalid request"},
-    },
-)
-def post(self, tenant_id: str, x_request_body: CreateItemRequest):
-    # Access the request body as a Pydantic model
-    name = x_request_body.name
-    price = x_request_body.price
+# Define a Pydantic model for the request
+class ItemRequest(BaseModel):
+    name: str = Field(..., description="Item name")
+    price: float = Field(..., description="Item price")
 
-    # Return the created item
-    return {"id": "123", "name": name, "price": price}, 201
-```
-
-### Using Special Parameter Prefixes with Auto-Detection
-
-The decorator automatically detects parameters with special prefixes and their types:
-
-- `x_request_body`: Automatically detected as the request body model based on its type annotation
-- `x_request_query`: Automatically detected as the query parameters model based on its type annotation
-- `x_request_path_<param_name>`: Automatically detected as a path parameter
-- `x_request_file`: Automatically detected as a file object
-
-You don't need to explicitly specify `request_body`, `query_model`, or `path_params` in the decorator - they will be automatically detected from your function parameters.
-
-```python
-# Define a Pydantic model for query parameters
-class ItemQueryParams(BaseModel):
-    """Query parameters for item operations."""
-    skip: int = Field(0, description="Number of items to skip")
-    limit: int = Field(100, description="Maximum number of items to return")
-
-# Use the decorator with query parameters
-# No need to specify query_model - it will be auto-detected from x_request_query parameter
-@openapi_metadata(
-    summary="Get items",
-    description="Get a list of items",
-    tags=["Items"],
-    operation_id="getItems",
-)
-def get(self, tenant_id: str, x_request_query: ItemQueryParams):
-    # Access the query parameters as a Pydantic model
-    skip = x_request_query.skip
-    limit = x_request_query.limit
-
-    # Return a list of items
-    return {
-        "items": [...],
-        "pagination": {
-            "skip": skip,
-            "limit": limit
-        }
-    }, 200
-```
-
-### Using Path Parameters with Auto-Detection
-
-Path parameters are automatically detected from function parameters with the `x_request_path_<param_name>` prefix:
-
-```python
-# No need to specify path_params - they will be auto-detected from x_request_path_item_id parameter
-@openapi_metadata(
-    summary="Get an item",
-    description="Get an item by ID",
-    tags=["Items"],
-    operation_id="getItem",
-)
-def get(self, tenant_id: str, item_id: str, x_request_path_item_id: str):
-    # Access the path parameter
-    item_id_from_path = x_request_path_item_id
-
-    # Return the item
-    return {"id": item_id_from_path, "name": "Example Item"}, 200
-```
-
-### Using File Objects with Auto-Detection
-
-File objects are automatically detected from function parameters with the `x_request_file` prefix:
-
-```python
-# No need to specify any special parameters - file objects are auto-detected
-@openapi_metadata(
-    summary="Upload a file",
-    description="Upload a file to the server",
-    tags=["Files"],
-    operation_id="uploadFile",
-)
-def post(self, tenant_id: str, x_request_file: Any):
-    # Access the file object
-    file_content = x_request_file.read()
-
-    # Return the file info
-    return {"size": len(file_content)}, 201
-```
-
-### Using BaseRespModel for Responses
-
-You can use `BaseRespModel` to create response models that are automatically converted to Flask-RESTful compatible responses:
-
-```python
-from flask_x_openapi_schema.models.base import BaseRespModel
-from pydantic import Field
-
-# Define a response model that extends BaseRespModel
-class ItemResponse(BaseRespModel):
-    """Response model for an item."""
-    id: str = Field(..., description="The ID of the item")
-    name: str = Field(..., description="The name of the item")
-    price: float = Field(..., description="The price of the item")
-
-# Use the decorator with BaseRespModel
-@openapi_metadata(
-    summary="Get an item",
-    description="Get an item by ID",
-    tags=["Items"],
-    operation_id="getItem",
-)
-def get(self, tenant_id: str, item_id: str):
-    # Return a response model instance
-    return ItemResponse(
-        id=item_id,
-        name="Example Item",
-        price=9.99,
+# Create a resource with OpenAPI metadata
+class ItemResource(Resource):
+    @openapi_metadata(
+        summary="Create a new item",
+        tags=["Items"],
+        operation_id="createItem"
     )
+    def post(self, x_request_body: ItemRequest):
+        # The request body is automatically parsed and validated
+        return {"id": "123", "name": x_request_body.name}, 201
 
-    # Or with a status code
-    # return ItemResponse(id=item_id, name="Example Item", price=9.99), 200
+# Register the resource
+api.add_resource(ItemResource, "/items")
+
+# Generate OpenAPI schema
+with open("openapi.yaml", "w") as f:
+    f.write(api.generate_openapi_schema(
+        title="Items API",
+        version="1.0.0"
+    ))
 ```
 
-### Using Response Schema Utility Functions
+See the [Usage Guide](./docs/usage_guide.md) for more detailed examples.
 
-You can use the response schema utility functions to simplify the definition of responses in the OpenAPI metadata:
+## 📋 Key Features
+
+### Auto-Detection of Parameters
+
+The library automatically detects parameters with special prefixes:
+
+- `x_request_body`: Request body from JSON
+- `x_request_query`: Query parameters
+- `x_request_path_<name>`: Path parameters
+- `x_request_file`: File uploads
+
+### Internationalization Support
 
 ```python
-from flask_x_openapi_schema import openapi_metadata, responses_schema, success_response
-from flask_x_openapi_schema.models.base import BaseRespModel
-from pydantic import Field
-
-# Define a response model that extends BaseRespModel
-class ItemResponse(BaseRespModel):
-    """Response model for an item."""
-    id: str = Field(..., description="The ID of the item")
-    name: str = Field(..., description="The name of the item")
-    price: float = Field(..., description="The price of the item")
-
-# Use the decorator with responses_schema
-@openapi_metadata(
-    summary="Get an item",
-    description="Get an item by ID",
-    tags=["Items"],
-    operation_id="getItem",
-    responses=responses_schema(
-        success_responses={
-            "200": success_response(
-                model=ItemResponse,
-                description="Item retrieved successfully",
-            ),
-        },
-        errors={
-            "404": "Item not found",
-        },
-    ),
-)
-def get(self, tenant_id: str, item_id: str):
-    # Return a response model instance
-    return ItemResponse(
-        id=item_id,
-        name="Example Item",
-        price=9.99,
-    )
-```
-
-### Using Multiple Success Responses
-
-You can define multiple success responses with different status codes and models:
-
-```python
-from flask_x_openapi_schema import openapi_metadata, responses_schema, success_response
-from flask_x_openapi_schema.models.base import BaseRespModel
-from pydantic import Field
-
-# Define response models that extend BaseRespModel
-class ItemResponse(BaseRespModel):
-    """Response model for an item."""
-    id: str = Field(..., description="The ID of the item")
-    name: str = Field(..., description="The name of the item")
-
-class ItemCreatedResponse(BaseRespModel):
-    """Response model for a created item."""
-    id: str = Field(..., description="The ID of the created item")
-    created_at: str = Field(..., description="The creation timestamp")
-
-# Use the decorator with multiple success responses
-@openapi_metadata(
-    summary="Get or create an item",
-    description="Get an existing item or create a new one if it doesn't exist",
-    tags=["Items"],
-    operation_id="getOrCreateItem",
-    responses=responses_schema(
-        # Multiple success responses with different status codes
-        success_responses={
-            "200": success_response(
-                model=ItemResponse,
-                description="Item retrieved successfully",
-            ),
-            "201": success_response(
-                model=ItemCreatedResponse,
-                description="Item created successfully",
-            ),
-        },
-        # Error responses
-        errors={
-            "400": "Invalid request",
-        },
-    ),
-)
-def post(self, tenant_id: str, item_id: str):
-    # Check if the item exists
-    item_exists = False  # In a real implementation, this would check the database
-
-    if item_exists:
-        # Return an existing item with 200 status code
-        return ItemResponse(
-            id=item_id,
-            name="Example Item",
-        ), 200
-    else:
-        # Create a new item and return with 201 status code
-        return ItemCreatedResponse(
-            id=item_id,
-            created_at="2023-01-01T12:00:00Z",
-        ), 201
-```
-
-### Generating OpenAPI Schemas
-
-Use the `generate-openapi` command to generate OpenAPI schemas:
-
-```bash
-# Generate OpenAPI schema for the service_api blueprint
-flask generate-openapi --blueprint service_api --output openapi.yaml
-
-# Generate OpenAPI schema in JSON format
-flask generate-openapi --blueprint service_api --output openapi.json --format json
-```
-
-## Components
-
-- `decorators.py`: Contains the `openapi_metadata` decorator for adding OpenAPI metadata to API endpoints
-- `schema_generator.py`: Contains the `OpenAPISchemaGenerator` class for generating OpenAPI schemas
-- `utils.py`: Contains utility functions for converting Pydantic models to OpenAPI schemas
-- `restful_utils.py`: Contains utility functions for integrating Pydantic models with Flask-RESTful
-- `methodview_utils.py`: Contains utility functions for integrating Pydantic models with Flask.MethodView
-- `mixins.py`: Contains the `OpenAPIIntegrationMixin` and `OpenAPIBlueprintMixin` classes for extending Flask-RESTful API and Flask Blueprint
-- `commands.py`: Contains the Flask CLI commands for generating OpenAPI schemas
-
-## Internationalization (i18n) Support
-
-The OpenAPI module provides support for internationalization in API documentation. You can define strings in multiple languages and automatically generate documentation in the appropriate language.
-
-### Using I18nString
-
-The `I18nString` class allows you to define strings in multiple languages:
-
-```python
-from flask_x_openapi_schema import I18nString, openapi_metadata
+from flask_x_openapi_schema import I18nString
 
 @openapi_metadata(
     summary=I18nString({
         "en-US": "Get an item",
-        "zh-Hans": "获取一个项目",
-        "ja-JP": "アイテムを取得する",
-    }),
-    description=I18nString({
-        "en-US": "Get an item by ID from the database",
-        "zh-Hans": "通过ID从数据库获取一个项目",
-        "ja-JP": "IDからデータベースからアイテムを取得する",
-    }),
-    # ...
+        "zh-Hans": "获取一个项目"
+    })
 )
-def get(self, tenant_id: str, item_id: str):
+def get(self, item_id):
     # ...
 ```
 
-### Using I18nBaseModel
-
-The `I18nBaseModel` class allows you to define Pydantic models with internationalized fields:
+### File Upload Support
 
 ```python
-from flask_x_openapi_schema import I18nBaseModel, I18nString
-from flask_x_openapi_schema.models.base import BaseRespModel
-from pydantic import Field
-
-class ItemI18nResponse(I18nBaseModel, BaseRespModel):
-    id: str = Field(..., description="The ID of the item")
-    name: str = Field(..., description="The name of the item")
-    description: I18nString = Field(
-        ...,
-        description="The description of the item (internationalized)"
-    )
-```
-
-### Setting the Current Language
-
-You can set the current language for the thread using the `set_current_language` function:
-
-```python
-from flask_x_openapi_schema import set_current_language
-
-# Set the language to Chinese
-set_current_language("zh-Hans")
-
-# Now all I18nString instances will return Chinese strings by default
-```
-
-### Handling File Uploads
-
-The `openapi_metadata` decorator supports file uploads through the `x_request_file` parameter prefix:
-
-```python
-from werkzeug.datastructures import FileStorage
-from flask_x_openapi_schema import openapi_metadata
-
-class FileUploadResource(Resource):
-    @openapi_metadata(
-        summary="Upload a file",
-        description="Upload a file to the server",
-        tags=["Files"],
-        # ... other metadata
-    )
-    def post(self, x_request_file: FileStorage):
-        # The file is automatically injected from request.files
-        filename = x_request_file.filename
-        # Process the file...
-        return {"filename": filename}
-```
-
-You can also handle multiple files with specific names:
-
-```python
-def post(self, x_request_file_document: FileStorage, x_request_file_image: FileStorage):
-    # x_request_file_document will contain the file named "document"
-    # x_request_file_image will contain the file named "image"
-    # ...
-```
-
-#### Using Pydantic Models for File Uploads
-
-For better type checking, validation, and IDE support, you can use Pydantic models for file uploads:
-
-```python
-from flask_x_openapi_schema import ImageUploadModel, openapi_metadata
-
-class ImageUploadResource(Resource):
-    @openapi_metadata(
-        summary="Upload an image",
-        description="Upload an image with validation",
-        tags=["Images"],
-        # ... other metadata
-    )
-    def post(self, x_request_file: ImageUploadModel):
-        # The file is automatically injected and validated
-        file = x_request_file.file
-        # Process the file...
-        return {"filename": file.filename}
-```
-
-The OpenAPI module provides several built-in models:
-
-- `FileUploadModel`: Base model for file uploads
-- `ImageUploadModel`: Model for image file uploads with validation
-- `DocumentUploadModel`: Model for document file uploads with validation
-- `MultipleFileUploadModel`: Model for multiple file uploads
-
-See the `examples/file_upload_example.py`, `examples/pydantic_file_upload_example.py`, and `examples/file_upload_readme.md` for more details.
-
-## Using with Flask.MethodView
-
-You can use the library with Flask.MethodView classes instead of Flask-RESTful resources:
-
-```python
-from flask import Flask, Blueprint
-from flask.views import MethodView
-from pydantic import BaseModel, Field
-
-from flask_x_openapi_schema import (
-    BaseRespModel,
-    OpenAPIBlueprintMixin,
-    OpenAPIMethodViewMixin,
-    openapi_metadata,
+@openapi_metadata(
+    summary="Upload an image"
 )
-
-# Define Pydantic models for request and response
-class ItemRequest(BaseModel):
-    name: str = Field(..., description="The name of the item")
-    price: float = Field(..., description="The price of the item")
-
-class ItemResponse(BaseRespModel):
-    id: str = Field(..., description="The ID of the item")
-    name: str = Field(..., description="The name of the item")
-    price: float = Field(..., description="The price of the item")
-
-# Create a custom Blueprint class with OpenAPI support
-class OpenAPIBlueprint(OpenAPIBlueprintMixin, Blueprint):
-    pass
-
-# Define a MethodView class with OpenAPI metadata
-class ItemView(OpenAPIMethodViewMixin, MethodView):
-    @openapi_metadata(
-        summary="Get an item",
-        description="Get an item by ID",
-        tags=["Items"],
-        operation_id="getItem",
-    )
-    def get(self, item_id: str):
-        """Get an item by ID."""
-        # In a real app, this would fetch from a database
-        response = ItemResponse(
-            id=item_id,
-            name="Test Item",
-            price=10.99,
-        )
-        return response
-
-    @openapi_metadata(
-        summary="Create an item",
-        description="Create a new item",
-        tags=["Items"],
-        operation_id="createItem",
-        request_body=ItemRequest,
-    )
-    def post(self, item_id: str, x_request_body: ItemRequest):
-        """Create a new item."""
-        # In a real app, this would save to a database
-        response = ItemResponse(
-            id=item_id,
-            name=x_request_body.name,
-            price=x_request_body.price,
-        )
-        return response, 201
-
-# Create a Flask app
-app = Flask(__name__)
-
-# Create a blueprint with OpenAPI support
-api_bp = OpenAPIBlueprint("api", __name__, url_prefix="/api")
-
-# Register the MethodView
-ItemView.register_to_blueprint(api_bp, "/items/<string:item_id>", endpoint="item")
-
-# Register the blueprint with the app
-app.register_blueprint(api_bp)
-
-# Add a route to get the OpenAPI schema
-@app.route("/openapi.yaml")
-def get_openapi_schema():
-    schema = api_bp.generate_openapi_schema(
-        title="Items API",
-        version="1.0.0",
-        description="API for managing items",
-    )
-    return schema
+def post(self, x_request_file: ImageUploadModel):
+    # File is automatically injected and validated
+    return {"filename": x_request_file.file.filename}
 ```
 
-## Examples
+## 📖 Documentation
 
-See the `examples` directory for complete examples of how to use the OpenAPI schema generator, including internationalization support, file uploads, and Flask.MethodView integration.
+- [Installation Guide](./docs/index.md#installation)
+- [Usage Guide](./docs/usage_guide.md)
+- [Core Components](./docs/core_components.md)
+- [Internationalization](./docs/internationalization.md)
+- [File Uploads](./docs/file_uploads.md)
+- [Examples](./examples/)
+
+## 🧩 Components
+
+- **Decorators**: `openapi_metadata` for adding metadata to endpoints
+- **Schema Generator**: Converts resources to OpenAPI schemas
+- **Integration Mixins**: Extends Flask-RESTful and Flask Blueprint
+- **Response Models**: Type-safe response handling
+- **Utility Functions**: Simplifies schema creation
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

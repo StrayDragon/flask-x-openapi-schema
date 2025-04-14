@@ -1,114 +1,147 @@
 # Flask-X-OpenAPI-Schema Documentation
 
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](../LICENSE)
+
 Welcome to the Flask-X-OpenAPI-Schema documentation! This library simplifies the generation of OpenAPI schemas from Flask-RESTful resources and Pydantic models, providing a seamless integration between Flask, Flask-RESTful, and Pydantic.
 
-## Table of Contents
+## 📋 Table of Contents
 
-1. [Project Overview](README.md)
-   - High-level overview of the project
-   - Core features
-   - Architecture diagrams
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Documentation](#documentation)
+  - [Project Overview](README.md)
+  - [Usage Guide](usage_guide.md)
+  - [Core Components](core_components.md)
+  - [Internationalization](internationalization.md)
+  - [File Uploads](file_uploads.md)
+- [Examples](#examples)
+- [API Reference](#api-reference)
 
-2. [Usage Guide](usage_guide.md)
-   - Installation instructions
-   - Basic setup
-   - Advanced usage patterns
-   - Best practices
-   - Troubleshooting
+## Installation
 
-3. [Core Components](core_components.md)
-   - Detailed explanation of core components
-   - How components work together
-   - Implementation details
+### Basic Installation
 
-4. [Internationalization Support](internationalization.md)
-   - Overview of i18n support
-   - Using I18nString and I18nBaseModel
-   - Language management
-   - Advanced i18n techniques
+```bash
+# Install from PyPI
+pip install flask-x-openapi-schema
 
-5. [File Upload Handling](file_uploads.md)
-   - Basic file uploads
-   - Multiple file uploads
-   - File upload models
-   - Validation and security
-   - Best practices
+# From the repository root
+pip install -e .
+```
+
+### Optional Dependencies
+
+By default, only Flask, Pydantic, and PyYAML are installed. For Flask-RESTful integration:
+
+```bash
+pip install flask-x-openapi-schema[restful]
+# or
+pip install -e .[restful]
+```
 
 ## Quick Start
 
 ```python
 from flask import Flask
-from flask_restful import Resource
-from flask_x_openapi_schema import (
-    OpenAPIIntegrationMixin,
-    openapi_metadata,
-    BaseRespModel,
-)
+from flask_restful import Resource, Api
 from pydantic import BaseModel, Field
+from flask_x_openapi_schema import openapi_metadata, OpenAPIIntegrationMixin, BaseRespModel
 
-# Create a Flask app
+# Create a Flask app with OpenAPI support
 app = Flask(__name__)
-
-# Create an OpenAPI-enabled API
 class OpenAPIApi(OpenAPIIntegrationMixin, Api):
     pass
-
-# Initialize the API
 api = OpenAPIApi(app)
 
 # Define request and response models
 class ItemRequest(BaseModel):
-    name: str = Field(..., description="The name of the item")
-    price: float = Field(..., description="The price of the item")
+    name: str = Field(..., description="Item name")
+    price: float = Field(..., description="Item price")
 
 class ItemResponse(BaseRespModel):
-    id: str = Field(..., description="The ID of the item")
-    name: str = Field(..., description="The name of the item")
-    price: float = Field(..., description="The price of the item")
+    id: str = Field(..., description="Item ID")
+    name: str = Field(..., description="Item name")
+    price: float = Field(..., description="Item price")
 
-# Define a resource
+# Create a resource with OpenAPI metadata
 class ItemResource(Resource):
     @openapi_metadata(
         summary="Create a new item",
-        description="Create a new item with the given data",
         tags=["Items"],
-        operation_id="createItem",
+        operation_id="createItem"
     )
     def post(self, x_request_body: ItemRequest):
-        # Create the item
-        item_id = "123"  # Example ID
-
-        # Return the created item
+        # The request body is automatically parsed and validated
         return ItemResponse(
-            id=item_id,
+            id="123",
             name=x_request_body.name,
-            price=x_request_body.price,
+            price=x_request_body.price
         ), 201
 
 # Register the resource
 api.add_resource(ItemResource, "/items")
 
 # Generate OpenAPI schema
-schema = api.generate_openapi_schema(
-    title="Items API",
-    version="1.0.0",
-    description="API for managing items",
-)
-
-# Save the schema to a file
 with open("openapi.yaml", "w") as f:
-    f.write(schema)
+    f.write(api.generate_openapi_schema(
+        title="Items API",
+        version="1.0.0",
+        description="API for managing items"
+    ))
 ```
 
-## Key Features
+## Documentation
 
-- **Automatic OpenAPI Schema Generation**: Generate OpenAPI schemas from Flask-RESTful resources
-- **Pydantic Integration**: Convert Pydantic models to OpenAPI schemas
-- **Parameter Auto-Detection**: Automatically detect and inject request parameters from function signatures
-- **Type Preservation**: Preserve type annotations from Pydantic models for better IDE support
-- **Multiple Output Formats**: Output schemas in YAML or JSON format
-- **Internationalization Support**: Support for i18n in API documentation
-- **File Upload Handling**: Simplified handling of file uploads with automatic parameter injection
+### [Project Overview](README.md)
+- High-level overview of the project
+- Core features and architecture
+- Component diagrams
+
+### [Usage Guide](usage_guide.md)
+- Basic setup and configuration
+- Advanced usage patterns
+- Best practices and troubleshooting
+
+### [Core Components](core_components.md)
+- Detailed explanation of components
+- How components work together
+- Implementation details
+
+### [Internationalization](internationalization.md)
+- Using I18nString and I18nBaseModel
+- Language management
+- Advanced i18n techniques
+
+### [File Uploads](file_uploads.md)
+- Basic and multiple file uploads
+- File validation and security
+- Best practices
+
+## Examples
+
+The [examples](../examples/) directory contains complete examples demonstrating various features:
+
+- Basic API with OpenAPI documentation
+- Internationalization support
+- File upload handling
+- Using with Flask.MethodView
+
+## API Reference
+
+### Core Classes
+
+- `openapi_metadata`: Decorator for adding OpenAPI metadata to API endpoints
+- `OpenAPISchemaGenerator`: Generates OpenAPI schemas from Flask resources
+- `OpenAPIIntegrationMixin`: Mixin for Flask-RESTful API integration
+- `OpenAPIBlueprintMixin`: Mixin for Flask Blueprint integration
+- `BaseRespModel`: Base model for API responses
+
+### Utility Functions
+
+- `responses_schema`: Creates response schemas for OpenAPI
+- `success_response`: Creates success response schemas
+- `error_response_schema`: Creates error response schemas
+- `pydantic_to_openapi_schema`: Converts Pydantic models to OpenAPI schemas
 
 ## Contributing
 
@@ -116,4 +149,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the terms of the license included in the repository.
+This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
