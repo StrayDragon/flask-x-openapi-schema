@@ -5,18 +5,23 @@ Performance tests for the flask_x_openapi_schema package.
 import cProfile
 import pstats
 import io
-import pytest
 import time
 import inspect
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
-from flask_x_openapi_schema.decorators import openapi_metadata, _detect_parameters, _generate_openapi_metadata, _extract_param_types
+from flask_x_openapi_schema.decorators import (
+    openapi_metadata,
+    _detect_parameters,
+    _generate_openapi_metadata,
+    _extract_param_types,
+)
 from flask_x_openapi_schema.models.base import BaseRespModel
 
 
 class TestRequestModel(BaseModel):
     """Test request model."""
+
     name: str = Field(..., description="The name")
     age: int = Field(..., description="The age")
     email: Optional[str] = Field(None, description="The email")
@@ -25,12 +30,14 @@ class TestRequestModel(BaseModel):
 
 class TestQueryModel(BaseModel):
     """Test query model."""
+
     sort: str = Field(None, description="Sort order")
     limit: int = Field(None, description="Limit results")
 
 
 class TestResponseModel(BaseRespModel):
     """Test response model."""
+
     id: str = Field(..., description="The ID")
     name: str = Field(..., description="The name")
     age: int = Field(..., description="The age")
@@ -39,6 +46,7 @@ class TestResponseModel(BaseRespModel):
 
 def test_decorator_performance():
     """Test the performance of the openapi_metadata decorator."""
+
     # Define a function with the decorator
     @openapi_metadata(
         summary="Test endpoint",
@@ -95,7 +103,7 @@ def test_decorator_performance():
 
     # Print the profiling results
     s = io.StringIO()
-    ps = pstats.Stats(pr, stream=s).sort_stats('cumulative')
+    ps = pstats.Stats(pr, stream=s).sort_stats("cumulative")
     ps.print_stats(20)  # Print top 20 functions by cumulative time
     print(s.getvalue())
 
@@ -105,6 +113,7 @@ def test_decorator_performance():
 
 def test_hot_path_performance():
     """Test the performance of the hot path functions in the decorator."""
+
     # Define a function with type annotations for testing
     def test_function(
         x_request_body: TestRequestModel,
@@ -130,7 +139,9 @@ def test_hot_path_performance():
     start_time = time.time()
     for i in range(1000):
         # Test _detect_parameters
-        detected_request_body, detected_query_model, detected_path_params = _detect_parameters(signature, type_hints)
+        detected_request_body, detected_query_model, detected_path_params = (
+            _detect_parameters(signature, type_hints)
+        )
 
         # Test _generate_openapi_metadata
         metadata = _generate_openapi_metadata(
@@ -160,7 +171,7 @@ def test_hot_path_performance():
 
     # Print the profiling results
     s = io.StringIO()
-    ps = pstats.Stats(pr, stream=s).sort_stats('cumulative')
+    ps = pstats.Stats(pr, stream=s).sort_stats("cumulative")
     ps.print_stats(20)  # Print top 20 functions by cumulative time
     print(s.getvalue())
 

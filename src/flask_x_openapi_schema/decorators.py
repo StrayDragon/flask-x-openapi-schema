@@ -97,14 +97,22 @@ def _detect_parameters(
         # Check for x_request_body parameter
         if param_name.startswith(REQUEST_BODY_PREFIX):
             param_type = type_hints.get(param_name)
-            if param_type and isinstance(param_type, type) and issubclass(param_type, BaseModel):
+            if (
+                param_type
+                and isinstance(param_type, type)
+                and issubclass(param_type, BaseModel)
+            ):
                 detected_request_body = param_type
                 continue
 
         # Check for x_request_query parameter
         if param_name.startswith(REQUEST_QUERY_PREFIX):
             param_type = type_hints.get(param_name)
-            if param_type and isinstance(param_type, type) and issubclass(param_type, BaseModel):
+            if (
+                param_type
+                and isinstance(param_type, type)
+                and issubclass(param_type, BaseModel)
+            ):
                 detected_query_model = param_type
                 continue
 
@@ -281,20 +289,29 @@ def _detect_file_parameters(
         # Check if the parameter is a Pydantic model with a file field
         file_description = f"File upload for {file_param_name}"
 
-        if param_type and isinstance(param_type, type) and issubclass(param_type, BaseModel):
-            if hasattr(param_type, "model_fields") and "file" in param_type.model_fields:
+        if (
+            param_type
+            and isinstance(param_type, type)
+            and issubclass(param_type, BaseModel)
+        ):
+            if (
+                hasattr(param_type, "model_fields")
+                and "file" in param_type.model_fields
+            ):
                 field_info = param_type.model_fields["file"]
                 if field_info.description:
                     file_description = field_info.description
 
         # Add file parameter to OpenAPI schema
-        file_params.append({
-            "name": file_param_name,
-            "in": "formData",
-            "required": True,
-            "type": "file",
-            "description": file_description,
-        })
+        file_params.append(
+            {
+                "name": file_param_name,
+                "in": "formData",
+                "required": True,
+                "type": "file",
+                "description": file_description,
+            }
+        )
 
     return file_params
 
@@ -316,18 +333,22 @@ def _extract_param_types(
     param_types = {}
 
     # Add types from request_body if it's a Pydantic model
-    if request_body_model and hasattr(request_body_model, 'model_fields'):
+    if request_body_model and hasattr(request_body_model, "model_fields"):
         # Get field types from the Pydantic model
         param_types.update(
-            {field_name: field.annotation
-             for field_name, field in request_body_model.model_fields.items()}
+            {
+                field_name: field.annotation
+                for field_name, field in request_body_model.model_fields.items()
+            }
         )
 
     # Add types from query_model if it's a Pydantic model
-    if query_model and hasattr(query_model, 'model_fields'):
+    if query_model and hasattr(query_model, "model_fields"):
         param_types.update(
-            {field_name: field.annotation
-             for field_name, field in query_model.model_fields.items()}
+            {
+                field_name: field.annotation
+                for field_name, field in query_model.model_fields.items()
+            }
         )
 
     return param_types
@@ -496,7 +517,11 @@ def openapi_metadata(
                 file_prefix_len = len(REQUEST_FILE_PREFIX) + 1  # +1 for the underscore
 
                 # Process request body parameters
-                if actual_request_body and isinstance(actual_request_body, type) and issubclass(actual_request_body, BaseModel):
+                if (
+                    actual_request_body
+                    and isinstance(actual_request_body, type)
+                    and issubclass(actual_request_body, BaseModel)
+                ):
                     for param_name in param_names:
                         if param_name in skip_params:
                             continue
@@ -524,14 +549,22 @@ def openapi_metadata(
 
                                 # Try to use model_validate first (better handling of complex types)
                                 try:
-                                    model_instance = actual_request_body.model_validate(body_data)
+                                    model_instance = actual_request_body.model_validate(
+                                        body_data
+                                    )
                                     kwargs[param_name] = model_instance
                                 except Exception:
                                     # Fallback to the old approach if model_validate fails
                                     # Filter body data to only include fields in the model
                                     model_fields = actual_request_body.model_fields
-                                    filtered_body_data = {k: v for k, v in body_data.items() if k in model_fields}
-                                    model_instance = actual_request_body(**filtered_body_data)
+                                    filtered_body_data = {
+                                        k: v
+                                        for k, v in body_data.items()
+                                        if k in model_fields
+                                    }
+                                    model_instance = actual_request_body(
+                                        **filtered_body_data
+                                    )
                                     kwargs[param_name] = model_instance
                             break  # Only process the first request body parameter
 
@@ -564,7 +597,9 @@ def openapi_metadata(
                                 model_fields = actual_query_model.model_fields
                                 for field_name in model_fields:
                                     if field_name in request.args:
-                                        query_data[field_name] = request.args.get(field_name)
+                                        query_data[field_name] = request.args.get(
+                                            field_name
+                                        )
 
                                 model_instance = actual_query_model(**query_data)
                                 kwargs[param_name] = model_instance
