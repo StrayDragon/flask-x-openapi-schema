@@ -144,7 +144,7 @@ def test_hot_path_performance():
         )
 
         # Test _generate_openapi_metadata
-        metadata = _generate_openapi_metadata(
+        _generate_openapi_metadata(
             summary="Test endpoint",
             description="Test description",
             tags=["test"],
@@ -161,7 +161,7 @@ def test_hot_path_performance():
         )
 
         # Test _extract_param_types
-        param_types = _extract_param_types(
+        _extract_param_types(
             request_body_model=detected_request_body,
             query_model=detected_query_model,
         )

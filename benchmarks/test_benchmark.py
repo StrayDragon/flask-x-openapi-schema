@@ -109,18 +109,16 @@ def create_standard_flask_app():
             return jsonify({"error": "tags must be a list"}), 400
 
         # Query parameters
-        include_inactive = (
-            request.args.get("include_inactive", "false").lower() == "true"
-        )
-        sort_by = request.args.get("sort_by", "username")
+        _ = request.args.get("include_inactive", "false").lower() == "true"
+        _ = request.args.get("sort_by", "username")
 
         try:
-            limit = int(request.args.get("limit", "10"))
+            _ = int(request.args.get("limit", "10"))
         except ValueError:
             return jsonify({"error": "limit must be an integer"}), 400
 
         try:
-            offset = int(request.args.get("offset", "0"))
+            _ = int(request.args.get("offset", "0"))
         except ValueError:
             return jsonify({"error": "offset must be an integer"}), 400
 
