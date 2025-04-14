@@ -1,6 +1,10 @@
 # Flask-X-OpenAPI-Schema
 
+[![Python](https://img.shields.io/badge/python-3.8%20%7C%203.10%20%7C%203.11-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Coverage](https://img.shields.io/badge/coverage-32%25-red.svg)](htmlcov/index.html)
+[![GitHub](https://img.shields.io/badge/github-flask--x--openapi--schema-lightgrey.svg)](https://github.com/StrayDragon/flask-x-openapi-schema)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 A powerful utility for automatically generating OpenAPI schemas from Flask-RESTful resources, Flask.MethodView classes, and Pydantic models. Simplify your API documentation with minimal effort.
 
@@ -15,7 +19,7 @@ Full documentation is available in the [docs](./docs) directory.
 pip install flask-x-openapi-schema
 
 # With Flask-RESTful support
-pip install flask-x-openapi-schema[restful]
+pip install flask-x-openapi-schema[flask-restful]
 ```
 
 ## ✨ Features
@@ -37,7 +41,10 @@ pip install flask-x-openapi-schema[restful]
 # Install from PyPI
 pip install flask-x-openapi-schema
 
-# From the repository root
+# From the repository root using uv (recommended)
+uv pip install -e .
+
+# Or using pip
 pip install -e .
 ```
 
@@ -46,9 +53,30 @@ pip install -e .
 By default, only Flask, Pydantic, and PyYAML are installed. For Flask-RESTful integration:
 
 ```bash
-pip install flask-x-openapi-schema[restful]
+# Using uv (recommended)
+uv pip install flask-x-openapi-schema[flask-restful]
+# or for development
+uv pip install -e .[flask-restful]
+
+# Using pip
+pip install flask-x-openapi-schema[flask-restful]
 # or
-pip install -e .[restful]
+pip install -e .[flask-restful]
+```
+
+### Development Setup
+
+This project uses `uv` for package management and `ruff` for linting and formatting:
+
+```bash
+# Install uv if you don't have it
+pip install uv
+
+# Install all dependencies including development ones
+uv sync --all-extras
+
+# Format and lint code
+just format-and-lintfix
 ```
 
 ## 🛠️ Basic Usage
@@ -129,6 +157,30 @@ def get(self, item_id):
 def post(self, x_request_file: ImageUploadModel):
     # File is automatically injected and validated
     return {"filename": x_request_file.file.filename}
+```
+
+## 🧪 Testing and Coverage
+
+This project uses `pytest` for testing and `pytest-cov` for coverage reporting:
+
+```bash
+# Run tests with coverage report
+just test
+
+# Or manually
+uv run pytest
+
+# View HTML coverage report
+# Open htmlcov/index.html in your browser
+```
+
+## 📊 Benchmarking
+
+The project includes benchmarking tools to measure performance:
+
+```bash
+# Run benchmarks and generate report
+just benchmark
 ```
 
 ## 📖 Documentation
