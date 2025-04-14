@@ -461,7 +461,7 @@ class TestDecoratorsCoverage:
                 file_storage = FileStorage(
                     stream=mock_file.stream,
                     filename=mock_file.filename,
-                    name="file"  # Default name used by the decorator
+                    name="file",  # Default name used by the decorator
                 )
 
                 # Set up the files in the request
@@ -487,7 +487,7 @@ class TestDecoratorsCoverage:
                 x_request_file_document = mock_file
             return {
                 "filename": x_request_file_document.filename,
-                "content": x_request_file_document.read().decode("utf-8")
+                "content": x_request_file_document.read().decode("utf-8"),
             }
 
         with flask_request_context() as app:
@@ -501,7 +501,7 @@ class TestDecoratorsCoverage:
                 file_storage = FileStorage(
                     stream=mock_file.stream,
                     filename=mock_file.filename,
-                    name="document"  # Parameter name extracted from x_request_file_document
+                    name="document",  # Parameter name extracted from x_request_file_document
                 )
 
                 # Set up the files in the request
