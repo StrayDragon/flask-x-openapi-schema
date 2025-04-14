@@ -82,32 +82,39 @@ def _detect_parameters(
     detected_query_model = None
     detected_path_params = []
 
+    # Precompute path prefix length to avoid repeated calculations
+    path_prefix_len = len(REQUEST_PATH_PREFIX) + 1  # +1 for the underscore
+
+    # Skip these parameter names
+    skip_params = {"self", "cls"}
+
     # Look for parameters with special prefixes
     for param_name in signature.parameters:
         # Skip 'self' and 'cls' parameters
-        if param_name in ("self", "cls"):
+        if param_name in skip_params:
             continue
 
         # Check for x_request_body parameter
-        if param_name.startswith(REQUEST_BODY_PREFIX) and param_name in type_hints:
-            param_type = type_hints[param_name]
-            if isinstance(param_type, type) and issubclass(param_type, BaseModel):
+        if param_name.startswith(REQUEST_BODY_PREFIX):
+            param_type = type_hints.get(param_name)
+            if param_type and isinstance(param_type, type) and issubclass(param_type, BaseModel):
                 detected_request_body = param_type
+                continue
 
         # Check for x_request_query parameter
-        elif param_name.startswith(REQUEST_QUERY_PREFIX) and param_name in type_hints:
-            param_type = type_hints[param_name]
-            if isinstance(param_type, type) and issubclass(param_type, BaseModel):
+        if param_name.startswith(REQUEST_QUERY_PREFIX):
+            param_type = type_hints.get(param_name)
+            if param_type and isinstance(param_type, type) and issubclass(param_type, BaseModel):
                 detected_query_model = param_type
+                continue
 
         # Check for x_request_path parameter
-        elif param_name.startswith(REQUEST_PATH_PREFIX):
+        if param_name.startswith(REQUEST_PATH_PREFIX):
             # Extract the path parameter name from the parameter name
             # Format: x_request_path_<param_name>
-            if "_" in param_name[len(REQUEST_PATH_PREFIX) + 1 :]:
-                path_param_name = param_name[len(REQUEST_PATH_PREFIX) + 1 :].split(
-                    "_", 1
-                )[1]
+            param_suffix = param_name[path_prefix_len:]
+            if "_" in param_suffix:
+                path_param_name = param_suffix.split("_", 1)[1]
                 detected_path_params.append(path_param_name)
 
     return detected_request_body, detected_query_model, detected_path_params
@@ -255,47 +262,39 @@ def _detect_file_parameters(
         List of file parameters for OpenAPI schema
     """
     file_params = []
+    file_prefix_len = len(REQUEST_FILE_PREFIX) + 1  # +1 for the underscore
 
     for param_name in param_names:
-        if param_name.startswith(REQUEST_FILE_PREFIX):
-            # Get the parameter type annotation
-            param_type = None
-            if param_name in func_annotations:
-                param_type = func_annotations[param_name]
+        if not param_name.startswith(REQUEST_FILE_PREFIX):
+            continue
 
-            # Extract the file parameter name
-            if "_" in param_name[len(REQUEST_FILE_PREFIX) + 1 :]:
-                file_param_name = param_name[len(REQUEST_FILE_PREFIX) + 1 :].split(
-                    "_", 1
-                )[1]
-            else:
-                file_param_name = "file"
+        # Get the parameter type annotation
+        param_type = func_annotations.get(param_name)
 
-            # Check if the parameter is a Pydantic model
-            is_pydantic_model = (
-                param_type
-                and isinstance(param_type, type)
-                and issubclass(param_type, BaseModel)
-                and hasattr(param_type, "model_fields")
-                and "file" in param_type.model_fields
-            )
+        # Extract the file parameter name
+        param_suffix = param_name[file_prefix_len:]
+        if "_" in param_suffix:
+            file_param_name = param_suffix.split("_", 1)[1]
+        else:
+            file_param_name = "file"
 
-            # Get description from Pydantic model if available
-            file_description = f"File upload for {file_param_name}"
-            if is_pydantic_model and "file" in param_type.model_fields:
+        # Check if the parameter is a Pydantic model with a file field
+        file_description = f"File upload for {file_param_name}"
+
+        if param_type and isinstance(param_type, type) and issubclass(param_type, BaseModel):
+            if hasattr(param_type, "model_fields") and "file" in param_type.model_fields:
                 field_info = param_type.model_fields["file"]
                 if field_info.description:
                     file_description = field_info.description
 
-            # Add file parameter to OpenAPI schema
-            file_param = {
-                "name": file_param_name,
-                "in": "formData",
-                "required": True,
-                "type": "file",
-                "description": file_description,
-            }
-            file_params.append(file_param)
+        # Add file parameter to OpenAPI schema
+        file_params.append({
+            "name": file_param_name,
+            "in": "formData",
+            "required": True,
+            "type": "file",
+            "description": file_description,
+        })
 
     return file_params
 
@@ -317,19 +316,19 @@ def _extract_param_types(
     param_types = {}
 
     # Add types from request_body if it's a Pydantic model
-    if (
-        request_body_model
-        and isinstance(request_body_model, type)
-        and issubclass(request_body_model, BaseModel)
-    ):
+    if request_body_model and hasattr(request_body_model, 'model_fields'):
         # Get field types from the Pydantic model
-        for field_name, field in request_body_model.model_fields.items():
-            param_types[field_name] = field.annotation
+        param_types.update(
+            {field_name: field.annotation
+             for field_name, field in request_body_model.model_fields.items()}
+        )
 
     # Add types from query_model if it's a Pydantic model
-    if query_model:
-        for field_name, field in query_model.model_fields.items():
-            param_types[field_name] = field.annotation
+    if query_model and hasattr(query_model, 'model_fields'):
+        param_types.update(
+            {field_name: field.annotation
+             for field_name, field in query_model.model_fields.items()}
+        )
 
     return param_types
 
@@ -479,122 +478,134 @@ def openapi_metadata(
             # Process request parameters based on whether Flask-RESTful is available
             parsed_args = None
 
-            # Always process special parameters regardless of request_body or query_model
-            # Check for parameters with special prefixes and bind accordingly
-            for param_name in param_names:
+            # Check if we're in a request context
+            has_request_context = False
+            try:
+                has_request_context = bool(request)
+            except RuntimeError:
+                # Not in a request context, skip request-dependent processing
+                pass
+
+            if has_request_context:
+                # Process special parameters that depend on request context
                 # Skip 'self' and 'cls' parameters
-                if param_name in ("self", "cls"):
-                    continue
+                skip_params = {"self", "cls"}
 
-                # Handle x_request_body parameter
-                if (
-                    param_name.startswith(REQUEST_BODY_PREFIX)
-                    and actual_request_body
-                    and isinstance(actual_request_body, type)
-                    and issubclass(actual_request_body, BaseModel)
-                ):
-                    if HAS_FLASK_RESTFUL:
-                        # Flask-RESTful approach using reqparse
-                        parser = create_reqparse_from_pydantic(
-                            body_model=actual_request_body, query_model=None
-                        )
-                        parsed_args = parser.parse_args()
+                # Precompute prefix lengths for path and file parameters
+                path_prefix_len = len(REQUEST_PATH_PREFIX) + 1  # +1 for the underscore
+                file_prefix_len = len(REQUEST_FILE_PREFIX) + 1  # +1 for the underscore
 
-                        # Create from parsed arguments
-                        body_data = {}
-                        for field_name in actual_request_body.model_fields:
-                            if field_name in parsed_args:
-                                body_data[field_name] = parsed_args[field_name]
-                        model_instance = actual_request_body(**body_data)
-                        kwargs[param_name] = model_instance
-                    else:
-                        # Direct Flask approach without reqparse
-                        if request.is_json:
-                            body_data = request.get_json(silent=True) or {}
-                            # Try to use model_validate first (better handling of complex types)
-                            try:
-                                model_instance = actual_request_body.model_validate(
-                                    body_data
+                # Process request body parameters
+                if actual_request_body and isinstance(actual_request_body, type) and issubclass(actual_request_body, BaseModel):
+                    for param_name in param_names:
+                        if param_name in skip_params:
+                            continue
+
+                        if param_name.startswith(REQUEST_BODY_PREFIX):
+                            if HAS_FLASK_RESTFUL:
+                                # Flask-RESTful approach using reqparse
+                                parser = create_reqparse_from_pydantic(
+                                    body_model=actual_request_body, query_model=None
                                 )
+                                parsed_args = parser.parse_args()
+
+                                # Create from parsed arguments
+                                body_data = {}
+                                model_fields = actual_request_body.model_fields
+                                for field_name in model_fields:
+                                    if field_name in parsed_args:
+                                        body_data[field_name] = parsed_args[field_name]
+
+                                model_instance = actual_request_body(**body_data)
                                 kwargs[param_name] = model_instance
-                            except Exception:
-                                # Fallback to the old approach if model_validate fails
-                                # Remove any keys that are not in the model to avoid unexpected keyword argument errors
-                                filtered_body_data = {}
-                                for field_name in actual_request_body.model_fields:
-                                    if field_name in body_data:
-                                        filtered_body_data[field_name] = body_data[
-                                            field_name
-                                        ]
-                                model_instance = actual_request_body(
-                                    **filtered_body_data
+                            elif request.is_json:
+                                # Direct Flask approach without reqparse
+                                body_data = request.get_json(silent=True) or {}
+
+                                # Try to use model_validate first (better handling of complex types)
+                                try:
+                                    model_instance = actual_request_body.model_validate(body_data)
+                                    kwargs[param_name] = model_instance
+                                except Exception:
+                                    # Fallback to the old approach if model_validate fails
+                                    # Filter body data to only include fields in the model
+                                    model_fields = actual_request_body.model_fields
+                                    filtered_body_data = {k: v for k, v in body_data.items() if k in model_fields}
+                                    model_instance = actual_request_body(**filtered_body_data)
+                                    kwargs[param_name] = model_instance
+                            break  # Only process the first request body parameter
+
+                # Process query parameters
+                if actual_query_model:
+                    for param_name in param_names:
+                        if param_name in skip_params:
+                            continue
+
+                        if param_name.startswith(REQUEST_QUERY_PREFIX):
+                            if HAS_FLASK_RESTFUL and not parsed_args:
+                                # Flask-RESTful approach using reqparse
+                                parser = create_reqparse_from_pydantic(
+                                    query_model=actual_query_model, body_model=None
                                 )
+                                parsed_args = parser.parse_args()
+
+                                # Create from parsed arguments
+                                query_data = {}
+                                model_fields = actual_query_model.model_fields
+                                for field_name in model_fields:
+                                    if field_name in parsed_args:
+                                        query_data[field_name] = parsed_args[field_name]
+
+                                model_instance = actual_query_model(**query_data)
                                 kwargs[param_name] = model_instance
+                            else:
+                                # Direct Flask approach without reqparse
+                                query_data = {}
+                                model_fields = actual_query_model.model_fields
+                                for field_name in model_fields:
+                                    if field_name in request.args:
+                                        query_data[field_name] = request.args.get(field_name)
 
-                # Handle x_request_query parameter
-                elif param_name.startswith(REQUEST_QUERY_PREFIX) and actual_query_model:
-                    if HAS_FLASK_RESTFUL and not parsed_args:
-                        # Flask-RESTful approach using reqparse
-                        parser = create_reqparse_from_pydantic(
-                            query_model=actual_query_model, body_model=None
+                                model_instance = actual_query_model(**query_data)
+                                kwargs[param_name] = model_instance
+                            break  # Only process the first query parameter
+
+                # Process path parameters
+                if actual_path_params:
+                    for param_name in param_names:
+                        if param_name in skip_params:
+                            continue
+
+                        if param_name.startswith(REQUEST_PATH_PREFIX):
+                            # Extract the path parameter name
+                            param_suffix = param_name[path_prefix_len:]
+                            if "_" in param_suffix:
+                                path_param_name = param_suffix.split("_", 1)[1]
+                                if path_param_name in kwargs:
+                                    kwargs[param_name] = kwargs[path_param_name]
+
+                # Process file parameters
+                for param_name in param_names:
+                    if param_name in skip_params:
+                        continue
+
+                    if param_name.startswith(REQUEST_FILE_PREFIX):
+                        # Get the parameter type annotation
+                        param_type = type_hints.get(param_name)
+
+                        # Check if the parameter is a Pydantic model
+                        is_pydantic_model = (
+                            param_type
+                            and isinstance(param_type, type)
+                            and issubclass(param_type, BaseModel)
+                            and hasattr(param_type, "model_fields")
+                            and "file" in param_type.model_fields
                         )
-                        parsed_args = parser.parse_args()
 
-                        # Create from parsed arguments
-                        query_data = {}
-                        for field_name in actual_query_model.model_fields:
-                            if field_name in parsed_args:
-                                query_data[field_name] = parsed_args[field_name]
-                        model_instance = actual_query_model(**query_data)
-                        kwargs[param_name] = model_instance
-                    else:
-                        # Direct Flask approach without reqparse
-                        query_data = {}
-                        for field_name in actual_query_model.model_fields:
-                            if field_name in request.args:
-                                query_data[field_name] = request.args.get(field_name)
-                        model_instance = actual_query_model(**query_data)
-                        kwargs[param_name] = model_instance
-
-                # Handle x_request_path parameter
-                elif param_name.startswith(REQUEST_PATH_PREFIX) and actual_path_params:
-                    # Extract the path parameter name from the parameter name
-                    # Format: x_request_path_<param_name>
-                    if "_" in param_name[len(REQUEST_PATH_PREFIX) + 1 :]:
-                        path_param_name = param_name[
-                            len(REQUEST_PATH_PREFIX) + 1 :
-                        ].split("_", 1)[1]
-                        if path_param_name in kwargs:
-                            kwargs[param_name] = kwargs[path_param_name]
-
-                # Handle x_request_file parameter
-                elif param_name.startswith(REQUEST_FILE_PREFIX):
-                    # Get the parameter type annotation
-                    param_type = type_hints.get(param_name)
-
-                    # Check if the parameter is a Pydantic model
-                    is_pydantic_model = (
-                        param_type
-                        and isinstance(param_type, type)
-                        and issubclass(param_type, BaseModel)
-                        and hasattr(param_type, "model_fields")
-                        and "file" in param_type.model_fields
-                    )
-
-                    # Check if we're in a request context
-                    try:
-                        has_request_context = bool(request)
-                    except RuntimeError:
-                        # Not in a request context, skip file handling
-                        has_request_context = False
-
-                    if has_request_context:
-                        # Extract the file parameter name from the parameter name
-                        # Format: x_request_file_<param_name>
-                        if "_" in param_name[len(REQUEST_FILE_PREFIX) + 1 :]:
-                            file_param_name = param_name[
-                                len(REQUEST_FILE_PREFIX) + 1 :
-                            ].split("_", 1)[1]
+                        # Extract the file parameter name
+                        param_suffix = param_name[file_prefix_len:]
+                        if "_" in param_suffix:
+                            file_param_name = param_suffix.split("_", 1)[1]
                             if file_param_name in request.files:
                                 file_obj = request.files[file_param_name]
                                 if is_pydantic_model:
@@ -623,18 +634,16 @@ def openapi_metadata(
                                     # Just pass the file directly
                                     kwargs[param_name] = file_obj
 
-            # Add all parsed arguments to kwargs for regular parameters
-            if HAS_FLASK_RESTFUL and parsed_args:
-                for arg_name, arg_value in parsed_args.items():
-                    if arg_name not in kwargs:
-                        kwargs[arg_name] = arg_value
+                # Add all parsed arguments to kwargs for regular parameters
+                if HAS_FLASK_RESTFUL and parsed_args:
+                    for arg_name, arg_value in parsed_args.items():
+                        if arg_name not in kwargs:
+                            kwargs[arg_name] = arg_value
 
             # Filter out any kwargs that are not in the function signature
-            signature = inspect.signature(func)
-            valid_kwargs = {}
-            for param_name in signature.parameters:
-                if param_name in kwargs:
-                    valid_kwargs[param_name] = kwargs[param_name]
+            # Get the function signature parameters once
+            sig_params = signature.parameters
+            valid_kwargs = {k: v for k, v in kwargs.items() if k in sig_params}
 
             # Call the original function with filtered kwargs
             result = func(*args, **valid_kwargs)
