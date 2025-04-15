@@ -17,14 +17,14 @@ from flask_x_openapi_schema.mixins import OpenAPIIntegrationMixin, OpenAPIBluepr
 
 
 # Define test models
-class TestRequestModel(BaseModel):
+class ConfigTestRequestModel(BaseModel):
     """Test request model."""
 
     name: str = Field(..., description="The name")
     age: int = Field(..., description="The age")
 
 
-class TestQueryModel(BaseModel):
+class ConfigTestQueryModel(BaseModel):
     """Test query model."""
 
     sort: Optional[str] = Field(None, description="Sort order")
@@ -77,7 +77,7 @@ def test_openapi_metadata_with_custom_prefixes():
 
         # Apply the decorator with custom config
         @openapi_metadata(summary="Test endpoint", prefix_config=custom_config)
-        def test_function(req_body: TestRequestModel, req_query: TestQueryModel):
+        def test_function(req_body: ConfigTestRequestModel, req_query: ConfigTestQueryModel):
             return {"message": "Success"}
 
         # Check metadata
@@ -91,7 +91,7 @@ def test_openapi_metadata_with_custom_prefixes():
         # Now use the correct parameter names with the custom prefixes
         @openapi_metadata(summary="Test endpoint", prefix_config=custom_config)
         def test_function_with_custom_prefixes(
-            req_body: TestRequestModel, req_query: TestQueryModel
+            req_body: ConfigTestRequestModel, req_query: ConfigTestQueryModel
         ):
             return {"message": "Success"}
 
@@ -102,7 +102,7 @@ def test_openapi_metadata_with_custom_prefixes():
         assert "requestBody" in metadata
         assert (
             metadata["requestBody"]["content"]["application/json"]["schema"]["$ref"]
-            == "#/components/schemas/TestRequestModel"
+            == "#/components/schemas/ConfigTestRequestModel"
         )
 
         # Check parameters
@@ -123,7 +123,7 @@ def test_openapi_metadata_with_per_function_config():
     )
 
     @openapi_metadata(summary="Test endpoint", prefix_config=custom_config)
-    def test_function(custom_body: TestRequestModel, custom_query: TestQueryModel):
+    def test_function(custom_body: ConfigTestRequestModel, custom_query: ConfigTestQueryModel):
         return {"message": "Success"}
 
     # Check metadata
@@ -133,7 +133,7 @@ def test_openapi_metadata_with_per_function_config():
     assert "requestBody" in metadata
     assert (
         metadata["requestBody"]["content"]["application/json"]["schema"]["$ref"]
-        == "#/components/schemas/TestRequestModel"
+        == "#/components/schemas/ConfigTestRequestModel"
     )
 
     # Check parameters
@@ -144,7 +144,7 @@ def test_openapi_metadata_with_per_function_config():
     # Define another function with default prefixes
     @openapi_metadata(summary="Test endpoint")
     def test_function_default(
-        x_request_body: TestRequestModel, x_request_query: TestQueryModel
+        x_request_body: ConfigTestRequestModel, x_request_query: ConfigTestQueryModel
     ):
         return {"message": "Success"}
 

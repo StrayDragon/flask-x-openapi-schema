@@ -19,7 +19,7 @@ from flask_x_openapi_schema.decorators import (
 from flask_x_openapi_schema.models.base import BaseRespModel
 
 
-class TestRequestModel(BaseModel):
+class PerfTestRequestModel(BaseModel):
     """Test request model."""
 
     name: str = Field(..., description="The name")
@@ -28,14 +28,14 @@ class TestRequestModel(BaseModel):
     tags: List[str] = Field(default_factory=list, description="Tags")
 
 
-class TestQueryModel(BaseModel):
+class PerfTestQueryModel(BaseModel):
     """Test query model."""
 
     sort: str = Field(None, description="Sort order")
     limit: int = Field(None, description="Limit results")
 
 
-class TestResponseModel(BaseRespModel):
+class PerfTestResponseModel(BaseRespModel):
     """Test response model."""
 
     id: str = Field(..., description="The ID")
@@ -52,8 +52,8 @@ def test_decorator_performance():
         summary="Test endpoint",
         description="Test description",
         tags=["test"],
-        request_body=TestRequestModel,
-        query_model=TestQueryModel,
+        request_body=PerfTestRequestModel,
+        query_model=PerfTestQueryModel,
         responses={
             "200": {
                 "description": "Successful response",
@@ -67,12 +67,12 @@ def test_decorator_performance():
         },
     )
     def test_function(
-        x_request_body: TestRequestModel,
-        x_request_query: TestQueryModel,
+        x_request_body: PerfTestRequestModel,
+        x_request_query: PerfTestQueryModel,
         user_id: str,
         x_request_path_user_id: str,
     ):
-        return TestResponseModel(
+        return PerfTestResponseModel(
             id=user_id,
             name=x_request_body.name,
             age=x_request_body.age,
@@ -90,12 +90,12 @@ def test_decorator_performance():
             summary=f"Test endpoint {i}",
             description="Test description",
             tags=["test"],
-            request_body=TestRequestModel,
-            query_model=TestQueryModel,
+            request_body=PerfTestRequestModel,
+            query_model=PerfTestQueryModel,
         )
         def dynamic_function(
-            x_request_body: TestRequestModel,
-            x_request_query: TestQueryModel,
+            x_request_body: PerfTestRequestModel,
+            x_request_query: PerfTestQueryModel,
         ):
             return {"result": "ok"}
 
@@ -116,8 +116,8 @@ def test_hot_path_performance():
 
     # Define a function with type annotations for testing
     def test_function(
-        x_request_body: TestRequestModel,
-        x_request_query: TestQueryModel,
+        x_request_body: PerfTestRequestModel,
+        x_request_query: PerfTestQueryModel,
         user_id: str,
         x_request_path_user_id: str,
     ):

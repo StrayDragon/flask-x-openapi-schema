@@ -270,5 +270,17 @@ class TestI18nModelCoverage:
 
     def test_model_json_schema_with_i18n_field(self):
         """Test the model_json_schema method with I18nString fields."""
-        # Skip this test since it requires complex mocking of Pydantic internals
-        pytest.skip("Skipping test that requires complex mocking of Pydantic internals")
+        # Skip this test for now as it requires complex handling of Pydantic's schema generation
+        # The I18nStr class needs a proper __get_pydantic_core_schema__ implementation
+        pytest.skip("Skipping test that requires proper schema generation for I18nStr")
+
+        # This is the ideal test, but it requires changes to I18nStr class:
+        # class TestModel(I18nBaseModel):
+        #     name: str = Field(description="The name")
+        #     description: I18nStr = Field(description="The description")
+        #     title: Optional[I18nStr] = Field(None, description="The title")
+        #
+        # schema = TestModel.model_json_schema()
+        #
+        # assert schema["properties"]["description"]["type"] == "string"
+        # assert "(Internationalized field)" in schema["properties"]["description"]["description"]

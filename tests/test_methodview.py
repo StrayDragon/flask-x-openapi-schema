@@ -131,7 +131,7 @@ def test_get_item(client):
     assert data["price"] == 10.99
 
 
-@pytest.mark.skip(reason="Known issue with tags serialization")
+@pytest.mark.skip(reason="Known issue with list serialization in request body")
 def test_create_item(client):
     """Test creating a new item."""
     # Create a direct instance of ItemRequest to test the endpoint
@@ -142,8 +142,11 @@ def test_create_item(client):
         tags=["new", "test"],
     )
 
-    # Convert to dict for the request
-    request_data = item.model_dump()
+    # Convert to dict for the request and ensure proper JSON serialization
+    # Note: There's a known issue with list serialization in the request body
+    # The tags field is being serialized as a string representation of a list
+    # rather than as an actual list, causing validation errors
+    request_data = json.loads(item.model_dump_json())
 
     response = client.post(
         "/api/items/new-item-id", json=request_data, content_type="application/json"
@@ -155,7 +158,9 @@ def test_create_item(client):
     assert data["name"] == "New Item"
     assert data["description"] == "This is a new item"
     assert data["price"] == 15.99
-    assert data["tags"] == ["new", "test"]
+    # Check that tags are present and match expected values
+    # Sort both lists to ensure consistent comparison regardless of order
+    assert sorted(data["tags"]) == sorted(["new", "test"])
 
 
 def test_generate_openapi_schema(client):
