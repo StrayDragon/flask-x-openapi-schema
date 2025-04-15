@@ -6,7 +6,7 @@ from typing import Any, ClassVar, Optional, TypeVar, get_type_hints
 
 from pydantic import BaseModel, ConfigDict, create_model, field_serializer
 
-from .i18n_string import I18nString, get_current_language
+from .i18n_string import I18nStr, get_current_language
 
 T = TypeVar("T", bound="I18nBaseModel")
 
@@ -35,7 +35,7 @@ class I18nBaseModel(BaseModel):
     # Serialize I18nString fields to strings
     @field_serializer("*")
     def serialize_i18n_string(self, v, _):
-        if isinstance(v, I18nString):
+        if isinstance(v, I18nStr):
             return str(v)
         return v
 
@@ -55,7 +55,7 @@ class I18nBaseModel(BaseModel):
         # Find fields that are annotated with I18nString
         i18n_fields = []
         for field_name, field_type in hints.items():
-            if field_type == I18nString:
+            if field_type == I18nStr:
                 i18n_fields.append(field_name)
 
         # Store the i18n field names in the class
@@ -79,7 +79,7 @@ class I18nBaseModel(BaseModel):
 
         # Convert I18nString fields to strings in the current language
         for field_name in self.__i18n_fields__:
-            if field_name in data and isinstance(data[field_name], I18nString):
+            if field_name in data and isinstance(data[field_name], I18nStr):
                 data[field_name] = str(data[field_name])
 
         return data

@@ -6,7 +6,7 @@ import pytest
 from flask import Flask
 from pydantic import BaseModel, Field
 
-from flask_x_openapi_schema.i18n.i18n_string import I18nString
+from flask_x_openapi_schema.i18n.i18n_string import I18nStr
 
 from tests.test_helpers import flask_request_context, create_mock_file
 
@@ -36,8 +36,8 @@ class TestDecoratorsCoverage:
     def test_openapi_metadata_i18n(self):
         """Test openapi_metadata with I18nString values."""
         # Create I18nString values
-        summary = I18nString({"en-US": "Test Summary", "zh-Hans": "测试摘要"})
-        description = I18nString({"en-US": "Test Description", "zh-Hans": "测试描述"})
+        summary = I18nStr({"en-US": "Test Summary", "zh-Hans": "测试摘要"})
+        description = I18nStr({"en-US": "Test Description", "zh-Hans": "测试描述"})
 
         # Set language to English
         set_current_language("en-US")
@@ -69,8 +69,8 @@ class TestDecoratorsCoverage:
     def test_openapi_metadata_with_language(self):
         """Test openapi_metadata with explicit language parameter."""
         # Create I18nString values
-        summary = I18nString({"en-US": "Test Summary", "zh-Hans": "测试摘要"})
-        description = I18nString({"en-US": "Test Description", "zh-Hans": "测试描述"})
+        summary = I18nStr({"en-US": "Test Summary", "zh-Hans": "测试摘要"})
+        description = I18nStr({"en-US": "Test Description", "zh-Hans": "测试描述"})
 
         # Create a decorated function with explicit language
         @openapi_metadata(summary=summary, description=description, language="zh-Hans")
@@ -553,8 +553,8 @@ class TestDecoratorsCoverage:
     def test_openapi_metadata_with_i18n_values(self):
         """Test openapi_metadata with I18nString values."""
         # Create a decorated function with I18nString values
-        summary = I18nString({"en-US": "Test summary", "zh-Hans": "测试摘要"})
-        description = I18nString({"en-US": "Test description", "zh-Hans": "测试描述"})
+        summary = I18nStr({"en-US": "Test summary", "zh-Hans": "测试摘要"})
+        description = I18nStr({"en-US": "Test description", "zh-Hans": "测试描述"})
 
         @openapi_metadata(summary=summary, description=description, tags=["test"])
         def test_func():
@@ -567,8 +567,8 @@ class TestDecoratorsCoverage:
     def test_openapi_metadata_with_i18n_in_responses(self):
         """Test openapi_metadata with I18nString values in responses."""
         # Create a decorated function with I18nString values in responses
-        success_desc = I18nString({"en-US": "Success", "zh-Hans": "成功"})
-        error_desc = I18nString({"en-US": "Error", "zh-Hans": "错误"})
+        success_desc = I18nStr({"en-US": "Success", "zh-Hans": "成功"})
+        error_desc = I18nStr({"en-US": "Error", "zh-Hans": "错误"})
 
         @openapi_metadata(
             responses={
@@ -588,8 +588,8 @@ class TestDecoratorsCoverage:
     def test_openapi_metadata_with_language_parameter(self):
         """Test openapi_metadata with language parameter."""
         # Create I18nString values
-        title = I18nString({"en-US": "Test API", "zh-Hans": "测试 API"})
-        description = I18nString({"en-US": "Test Description", "zh-Hans": "测试描述"})
+        title = I18nStr({"en-US": "Test API", "zh-Hans": "测试 API"})
+        description = I18nStr({"en-US": "Test Description", "zh-Hans": "测试描述"})
 
         # Create a decorated function with I18nString values and language parameter
         @openapi_metadata(summary=title, description=description, language="zh-Hans")
@@ -603,7 +603,7 @@ class TestDecoratorsCoverage:
     def test_openapi_metadata_with_i18n_in_parameters(self):
         """Test openapi_metadata with I18nString values in parameters."""
         # Create I18nString values for parameter descriptions
-        param_desc = I18nString(
+        param_desc = I18nStr(
             {"en-US": "Parameter Description", "zh-Hans": "参数描述"}
         )
 

@@ -8,7 +8,7 @@ from unittest.mock import patch
 from flask import Blueprint
 from flask.views import MethodView
 
-from flask_x_openapi_schema.i18n.i18n_string import I18nString, set_current_language
+from flask_x_openapi_schema.i18n.i18n_string import I18nStr, set_current_language
 from flask_x_openapi_schema.methodview_utils import OpenAPIMethodViewMixin
 from flask_x_openapi_schema.mixins import OpenAPIBlueprintMixin, OpenAPIIntegrationMixin
 
@@ -83,8 +83,8 @@ class TestMixinsCoverage:
         assert "Test API Description" in schema_yaml
 
         # Generate schema with I18nString title and description
-        title = I18nString({"en-US": "Test API", "zh-Hans": "测试 API"})
-        description = I18nString(
+        title = I18nStr({"en-US": "Test API", "zh-Hans": "测试 API"})
+        description = I18nStr(
             {"en-US": "Test API Description", "zh-Hans": "测试 API 描述"}
         )
 

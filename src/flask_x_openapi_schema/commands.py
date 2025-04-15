@@ -10,7 +10,7 @@ import click
 from flask import Flask
 from flask.cli import with_appcontext
 
-from .i18n import I18nString, set_current_language
+from .i18n import I18nStr, set_current_language
 from .mixins import OpenAPIIntegrationMixin
 
 
@@ -94,7 +94,7 @@ def generate_openapi_command(
         return
 
     # Create internationalized description
-    i18n_description = I18nString(dict.fromkeys(language, description))
+    i18n_description = I18nStr(dict.fromkeys(language, description))
 
     # Generate schema for each blueprint
     for name, bp in blueprints:
@@ -112,7 +112,7 @@ def generate_openapi_command(
 
         # Generate schema with internationalized strings
         schema = api.generate_openapi_schema(
-            title=I18nString(dict.fromkeys(language, f"{title} - {name}")),
+            title=I18nStr(dict.fromkeys(language, f"{title} - {name}")),
             version=version,
             description=i18n_description,
             output_format=format,
@@ -144,7 +144,7 @@ def generate_openapi_command(
 
                 # Generate a language-specific schema
                 api.generate_openapi_schema(
-                    title=I18nString(dict.fromkeys(language, f"{title} - {name}")),
+                    title=I18nStr(dict.fromkeys(language, f"{title} - {name}")),
                     version=version,
                     description=i18n_description,
                     output_format=format,

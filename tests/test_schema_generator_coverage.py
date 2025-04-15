@@ -8,7 +8,7 @@ from flask_restful import Resource  # type: ignore
 from pydantic import BaseModel, Field
 
 from flask_x_openapi_schema.i18n.i18n_model import I18nBaseModel
-from flask_x_openapi_schema.i18n.i18n_string import I18nString
+from flask_x_openapi_schema.i18n.i18n_string import I18nStr
 from flask_x_openapi_schema.schema_generator import OpenAPISchemaGenerator
 
 
@@ -217,8 +217,8 @@ class TestSchemaGeneratorCoverage:
         # Create an I18nBaseModel
         class TestI18nModel(I18nBaseModel):
             name: str
-            description: I18nString
-            title: I18nString
+            description: I18nStr
+            title: I18nStr
 
         # Register the model
         generator._register_model(TestI18nModel)
@@ -241,19 +241,19 @@ class TestSchemaGeneratorCoverage:
 
         # Create a nested dictionary with I18nString values
         data = {
-            "title": I18nString({"en-US": "Title", "zh-Hans": "标题"}),
+            "title": I18nStr({"en-US": "Title", "zh-Hans": "标题"}),
             "metadata": {
-                "description": I18nString({"en-US": "Description", "zh-Hans": "描述"}),
+                "description": I18nStr({"en-US": "Description", "zh-Hans": "描述"}),
                 "keywords": ["key1", "key2"],
-                "nested": {"label": I18nString({"en-US": "Label", "zh-Hans": "标签"})},
+                "nested": {"label": I18nStr({"en-US": "Label", "zh-Hans": "标签"})},
             },
             "items": [
                 {
-                    "name": I18nString({"en-US": "Item 1", "zh-Hans": "项目 1"}),
+                    "name": I18nStr({"en-US": "Item 1", "zh-Hans": "项目 1"}),
                     "tags": ["tag1", "tag2"],
                 },
                 {
-                    "name": I18nString({"en-US": "Item 2", "zh-Hans": "项目 2"}),
+                    "name": I18nStr({"en-US": "Item 2", "zh-Hans": "项目 2"}),
                     "tags": ["tag3", "tag4"],
                 },
             ],
@@ -280,19 +280,19 @@ class TestSchemaGeneratorCoverage:
         )
 
         # Test with an I18nString
-        value = I18nString({"en-US": "Value", "zh-Hans": "值"})
+        value = I18nStr({"en-US": "Value", "zh-Hans": "值"})
         result = generator._process_i18n_value(value)
         assert result == "值"
 
         # Test with a dictionary
-        value = {"key": I18nString({"en-US": "Value", "zh-Hans": "值"})}
+        value = {"key": I18nStr({"en-US": "Value", "zh-Hans": "值"})}
         result = generator._process_i18n_value(value)
         assert result == {"key": "值"}
 
         # Test with a list
         value = [
-            I18nString({"en-US": "Item 1", "zh-Hans": "项目 1"}),
-            I18nString({"en-US": "Item 2", "zh-Hans": "项目 2"}),
+            I18nStr({"en-US": "Item 1", "zh-Hans": "项目 1"}),
+            I18nStr({"en-US": "Item 2", "zh-Hans": "项目 2"}),
         ]
         result = generator._process_i18n_value(value)
         assert result == ["项目 1", "项目 2"]
@@ -300,8 +300,8 @@ class TestSchemaGeneratorCoverage:
         # Test with a nested structure
         value = [
             {
-                "name": I18nString({"en-US": "Name", "zh-Hans": "名称"}),
-                "items": [I18nString({"en-US": "Item", "zh-Hans": "项目"})],
+                "name": I18nStr({"en-US": "Name", "zh-Hans": "名称"}),
+                "items": [I18nStr({"en-US": "Item", "zh-Hans": "项目"})],
             }
         ]
         result = generator._process_i18n_value(value)
@@ -322,7 +322,7 @@ class TestSchemaGeneratorCoverage:
         )
 
         # Add a security scheme with I18nString description
-        description = I18nString(
+        description = I18nStr(
             {"en-US": "API Key Authentication", "zh-Hans": "API 密钥认证"}
         )
         scheme = {
@@ -350,8 +350,8 @@ class TestSchemaGeneratorCoverage:
         )
 
         # Add a tag with I18nString name and description
-        name = I18nString({"en-US": "Users", "zh-Hans": "用户"})
-        description = I18nString({"en-US": "User management", "zh-Hans": "用户管理"})
+        name = I18nStr({"en-US": "Users", "zh-Hans": "用户"})
+        description = I18nStr({"en-US": "User management", "zh-Hans": "用户管理"})
         generator.add_tag(name=name, description=description)
 
         # Check that the tag was added with the correct name and description
@@ -390,8 +390,8 @@ class TestSchemaGeneratorCoverage:
         # Create a dictionary with a list containing I18nString values
         data = {
             "items": [
-                I18nString({"en-US": "Item 1", "zh-Hans": "项目 1"}),
-                I18nString({"en-US": "Item 2", "zh-Hans": "项目 2"}),
+                I18nStr({"en-US": "Item 1", "zh-Hans": "项目 1"}),
+                I18nStr({"en-US": "Item 2", "zh-Hans": "项目 2"}),
                 "Regular string",
             ]
         }

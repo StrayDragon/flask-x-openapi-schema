@@ -13,7 +13,7 @@ from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
 from flask_x_openapi_schema import (
-    I18nString,
+    I18nStr,
     OpenAPIIntegrationMixin,
     openapi_metadata,
     responses_schema,
@@ -37,14 +37,14 @@ api = OpenAPIApi(app)
 # Define a resource for file uploads
 class FileUploadResource(Resource):
     @openapi_metadata(
-        summary=I18nString(
+        summary=I18nStr(
             {
                 "en-US": "Upload a file",
                 "zh-Hans": "上传文件",
                 "ja-JP": "ファイルをアップロードする",
             }
         ),
-        description=I18nString(
+        description=I18nStr(
             {
                 "en-US": "Upload a file to the server",
                 "zh-Hans": "将文件上传到服务器",
@@ -56,7 +56,7 @@ class FileUploadResource(Resource):
         responses=responses_schema(
             success_responses={
                 "200": {
-                    "description": I18nString(
+                    "description": I18nStr(
                         {
                             "en-US": "File uploaded successfully",
                             "zh-Hans": "文件上传成功",
@@ -78,7 +78,7 @@ class FileUploadResource(Resource):
                 },
             },
             errors={
-                "400": I18nString(
+                "400": I18nStr(
                     {
                         "en-US": "No file provided",
                         "zh-Hans": "未提供文件",
@@ -119,14 +119,14 @@ class FileUploadResource(Resource):
 # Define a resource for multiple file uploads
 class MultipleFileUploadResource(Resource):
     @openapi_metadata(
-        summary=I18nString(
+        summary=I18nStr(
             {
                 "en-US": "Upload multiple files",
                 "zh-Hans": "上传多个文件",
                 "ja-JP": "複数のファイルをアップロードする",
             }
         ),
-        description=I18nString(
+        description=I18nStr(
             {
                 "en-US": "Upload multiple files to the server",
                 "zh-Hans": "将多个文件上传到服务器",
@@ -138,7 +138,7 @@ class MultipleFileUploadResource(Resource):
         responses=responses_schema(
             success_responses={
                 "200": {
-                    "description": I18nString(
+                    "description": I18nStr(
                         {
                             "en-US": "Files uploaded successfully",
                             "zh-Hans": "文件上传成功",
@@ -168,7 +168,7 @@ class MultipleFileUploadResource(Resource):
                 },
             },
             errors={
-                "400": I18nString(
+                "400": I18nStr(
                     {
                         "en-US": "No files provided",
                         "zh-Hans": "未提供文件",

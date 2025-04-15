@@ -3,7 +3,7 @@ Tests for the i18n_string module to improve coverage.
 """
 
 from flask_x_openapi_schema.i18n.i18n_string import (
-    I18nString,
+    I18nStr,
     set_current_language,
 )
 
@@ -14,7 +14,7 @@ class TestI18nStringCoverage:
     def test_create_class_method(self):
         """Test the create class method."""
         # Create an I18nString using the create method
-        i18n_str = I18nString.create(en_US="Hello", zh_Hans="你好", ja_JP="こんにちは")
+        i18n_str = I18nStr.create(en_US="Hello", zh_Hans="你好", ja_JP="こんにちは")
 
         # Check that the string was created correctly
         assert i18n_str.strings == {
@@ -31,10 +31,10 @@ class TestI18nStringCoverage:
     def test_eq_with_different_types(self):
         """Test the __eq__ method with different types."""
         # Create an I18nString
-        i18n_str = I18nString({"en-US": "Hello", "zh-Hans": "你好"})
+        i18n_str = I18nStr({"en-US": "Hello", "zh-Hans": "你好"})
 
         # Test equality with another I18nString
-        other_str = I18nString({"en-US": "Hello", "zh-Hans": "你好"})
+        other_str = I18nStr({"en-US": "Hello", "zh-Hans": "你好"})
         assert i18n_str == other_str
 
         # Test equality with a string
@@ -55,7 +55,7 @@ class TestI18nStringCoverage:
     def test_language_fallback_complex(self):
         """Test complex language fallback scenarios."""
         # Create an I18nString with multiple languages
-        i18n_str = I18nString(
+        i18n_str = I18nStr(
             {
                 "en-US": "Hello",
                 "en-GB": "Hello (UK)",
@@ -75,7 +75,7 @@ class TestI18nStringCoverage:
         assert i18n_str.get("ja-JP") == "Hello"  # Falls back to default (en-US)
 
         # Test with a different default language
-        i18n_str = I18nString(
+        i18n_str = I18nStr(
             {"en-US": "Hello", "zh-Hans": "你好", "fr-FR": "Bonjour"},
             default_language="fr-FR",
         )
@@ -83,25 +83,25 @@ class TestI18nStringCoverage:
         assert i18n_str.get("de-DE") == "Bonjour"  # Falls back to default (fr-FR)
 
         # Test with empty strings dictionary
-        i18n_str = I18nString({})
+        i18n_str = I18nStr({})
         assert i18n_str.get("en-US") == ""  # Empty default
 
         # Test with a single string and no default language
-        i18n_str = I18nString("Hello")
+        i18n_str = I18nStr("Hello")
         assert i18n_str.get("en-US") == "Hello"
         assert i18n_str.get("zh-Hans") == "Hello"  # Falls back to default (en-US)
 
     def test_init_with_empty_dict(self):
         """Test initializing I18nString with an empty dictionary."""
         # Create an I18nString with an empty dictionary
-        i18n_str = I18nString({})
+        i18n_str = I18nStr({})
 
         # Check that the default language was set with an empty string
         assert i18n_str.strings["en-US"] == ""
         assert i18n_str.get() == ""
 
         # Create an I18nString with a non-empty dictionary but missing default language
-        i18n_str = I18nString({"zh-Hans": "你好"})
+        i18n_str = I18nStr({"zh-Hans": "你好"})
 
         # Check that the default language was set with the first available language
         assert i18n_str.strings["en-US"] == "你好"

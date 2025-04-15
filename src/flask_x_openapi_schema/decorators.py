@@ -28,7 +28,7 @@ except ImportError:
 from pydantic import BaseModel
 from flask import request
 
-from .i18n.i18n_string import I18nString, get_current_language
+from .i18n.i18n_string import I18nStr, get_current_language
 from .models.base import BaseRespModel
 
 # Import Flask-RESTful utilities if available
@@ -129,7 +129,7 @@ def _detect_parameters(
 
 
 def _process_i18n_value(
-    value: Optional[Union[str, I18nString]], language: Optional[str]
+    value: Optional[Union[str, I18nStr]], language: Optional[str]
 ) -> Optional[str]:
     """
     Process an I18nString value to get the string for the current language.
@@ -146,14 +146,14 @@ def _process_i18n_value(
 
     current_lang = language or get_current_language()
 
-    if isinstance(value, I18nString):
+    if isinstance(value, I18nStr):
         return value.get(current_lang)
     return value
 
 
 def _generate_openapi_metadata(
-    summary: Optional[Union[str, I18nString]],
-    description: Optional[Union[str, I18nString]],
+    summary: Optional[Union[str, I18nStr]],
+    description: Optional[Union[str, I18nStr]],
     tags: Optional[List[str]],
     operation_id: Optional[str],
     deprecated: bool,
@@ -356,8 +356,8 @@ def _extract_param_types(
 
 def openapi_metadata(
     *,
-    summary: Optional[Union[str, I18nString]] = None,
-    description: Optional[Union[str, I18nString]] = None,
+    summary: Optional[Union[str, I18nStr]] = None,
+    description: Optional[Union[str, I18nStr]] = None,
     tags: Optional[List[str]] = None,
     operation_id: Optional[str] = None,
     request_body: Optional[Union[Type[BaseModel], Dict[str, Any]]] = None,

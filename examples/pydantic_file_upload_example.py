@@ -15,7 +15,7 @@ from werkzeug.utils import secure_filename
 from flask_x_openapi_schema import (
     DocumentUploadModel,
     FileUploadModel,
-    I18nString,
+    I18nStr,
     ImageUploadModel,
     OpenAPIIntegrationMixin,
     openapi_metadata,
@@ -48,14 +48,14 @@ class CustomImageUploadModel(ImageUploadModel):
 # Define a resource for file uploads using Pydantic models
 class FileUploadResource(Resource):
     @openapi_metadata(
-        summary=I18nString(
+        summary=I18nStr(
             {
                 "en-US": "Upload a file",
                 "zh-Hans": "上传文件",
                 "ja-JP": "ファイルをアップロードする",
             }
         ),
-        description=I18nString(
+        description=I18nStr(
             {
                 "en-US": "Upload a file to the server with validation",
                 "zh-Hans": "将文件上传到服务器并进行验证",
@@ -67,7 +67,7 @@ class FileUploadResource(Resource):
         responses=responses_schema(
             success_responses={
                 "200": {
-                    "description": I18nString(
+                    "description": I18nStr(
                         {
                             "en-US": "File uploaded successfully",
                             "zh-Hans": "文件上传成功",
@@ -89,7 +89,7 @@ class FileUploadResource(Resource):
                 },
             },
             errors={
-                "400": I18nString(
+                "400": I18nStr(
                     {
                         "en-US": "Invalid file or validation failed",
                         "zh-Hans": "无效的文件或验证失败",
@@ -130,14 +130,14 @@ class FileUploadResource(Resource):
 # Define a resource for image uploads with validation
 class ImageUploadResource(Resource):
     @openapi_metadata(
-        summary=I18nString(
+        summary=I18nStr(
             {
                 "en-US": "Upload an image",
                 "zh-Hans": "上传图片",
                 "ja-JP": "画像をアップロードする",
             }
         ),
-        description=I18nString(
+        description=I18nStr(
             {
                 "en-US": "Upload an image with validation for file type and size",
                 "zh-Hans": "上传图片并验证文件类型和大小",
@@ -149,7 +149,7 @@ class ImageUploadResource(Resource):
         responses=responses_schema(
             success_responses={
                 "200": {
-                    "description": I18nString(
+                    "description": I18nStr(
                         {
                             "en-US": "Image uploaded successfully",
                             "zh-Hans": "图片上传成功",
@@ -178,7 +178,7 @@ class ImageUploadResource(Resource):
                 },
             },
             errors={
-                "400": I18nString(
+                "400": I18nStr(
                     {
                         "en-US": "Invalid image or validation failed",
                         "zh-Hans": "无效的图片或验证失败",
@@ -230,14 +230,14 @@ class ImageUploadResource(Resource):
 # Define a resource for document uploads
 class DocumentUploadResource(Resource):
     @openapi_metadata(
-        summary=I18nString(
+        summary=I18nStr(
             {
                 "en-US": "Upload a document",
                 "zh-Hans": "上传文档",
                 "ja-JP": "文書をアップロードする",
             }
         ),
-        description=I18nString(
+        description=I18nStr(
             {
                 "en-US": "Upload a document with validation for file type and size",
                 "zh-Hans": "上传文档并验证文件类型和大小",
@@ -249,7 +249,7 @@ class DocumentUploadResource(Resource):
         responses=responses_schema(
             success_responses={
                 "200": {
-                    "description": I18nString(
+                    "description": I18nStr(
                         {
                             "en-US": "Document uploaded successfully",
                             "zh-Hans": "文档上传成功",
@@ -271,7 +271,7 @@ class DocumentUploadResource(Resource):
                 },
             },
             errors={
-                "400": I18nString(
+                "400": I18nStr(
                     {
                         "en-US": "Invalid document or validation failed",
                         "zh-Hans": "无效的文档或验证失败",

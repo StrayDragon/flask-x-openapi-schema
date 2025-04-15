@@ -31,7 +31,7 @@ def set_current_language(language: str) -> None:
     _current_language.set(language)
 
 
-class I18nString:
+class I18nStr:
     """
     A string class that supports internationalization.
 
@@ -169,14 +169,14 @@ class I18nString:
         Returns:
             True if the objects are equal, False otherwise
         """
-        if isinstance(other, I18nString):
+        if isinstance(other, I18nStr):
             return self.strings == other.strings
         elif isinstance(other, str):
             return str(self) == other
         return False
 
     @classmethod
-    def create(cls, **kwargs) -> "I18nString":
+    def create(cls, **kwargs) -> "I18nStr":
         """
         Create an I18nString from keyword arguments.
 

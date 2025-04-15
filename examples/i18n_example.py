@@ -8,14 +8,14 @@ from pydantic import Field
 
 from flask_x_openapi_schema import (
     I18nBaseModel,
-    I18nString,
+    I18nStr,
     get_current_language,
     openapi_metadata,
     responses_schema,
     set_current_language,
     success_response,
 )
-from ..models.base import BaseRespModel
+from flask_x_openapi_schema.models.base import BaseRespModel
 
 
 # Define a model with internationalized fields
@@ -24,10 +24,10 @@ class ItemI18nResponse(I18nBaseModel, BaseRespModel):
 
     id: str = Field(..., description="The ID of the item")
     name: str = Field(..., description="The name of the item")
-    description: I18nString = Field(
+    description: I18nStr = Field(
         ..., description="The description of the item (internationalized)"
     )
-    category: Optional[I18nString] = Field(
+    category: Optional[I18nStr] = Field(
         None, description="The category of the item (internationalized)"
     )
 
@@ -37,14 +37,14 @@ class ItemsApiExample:
     """Example API resource using internationalized OpenAPI metadata."""
 
     @openapi_metadata(
-        summary=I18nString(
+        summary=I18nStr(
             {
                 "en-US": "Get an item",
                 "zh-Hans": "获取一个项目",
                 "ja-JP": "アイテムを取得する",
             }
         ),
-        description=I18nString(
+        description=I18nStr(
             {
                 "en-US": "Get an item by ID from the database",
                 "zh-Hans": "通过ID从数据库获取一个项目",
@@ -57,7 +57,7 @@ class ItemsApiExample:
             success_responses={
                 "200": success_response(
                     model=ItemI18nResponse,
-                    description=I18nString(
+                    description=I18nStr(
                         {
                             "en-US": "Item retrieved successfully",
                             "zh-Hans": "项目检索成功",
@@ -67,7 +67,7 @@ class ItemsApiExample:
                 ),
             },
             errors={
-                "404": I18nString(
+                "404": I18nStr(
                     {
                         "en-US": "Item not found",
                         "zh-Hans": "找不到项目",
@@ -87,14 +87,14 @@ class ItemsApiExample:
         return ItemI18nResponse(
             id=item_id,
             name="Example Item",
-            description=I18nString(
+            description=I18nStr(
                 {
                     "en-US": "This is an example item",
                     "zh-Hans": "这是一个示例项目",
                     "ja-JP": "これはサンプルアイテムです",
                 }
             ),
-            category=I18nString(
+            category=I18nStr(
                 {
                     "en-US": "Examples",
                     "zh-Hans": "示例",

@@ -12,7 +12,7 @@ from flask_restful import Resource  # type: ignore
 from pydantic import BaseModel
 
 from .i18n.i18n_model import I18nBaseModel
-from .i18n.i18n_string import I18nString, get_current_language
+from .i18n.i18n_string import I18nStr, get_current_language
 from .utils import pydantic_to_openapi_schema
 
 
@@ -41,11 +41,11 @@ class OpenAPISchemaGenerator:
             language: The language to use for internationalized strings (default: current language)
         """
         # Handle I18nString for title and description
-        self.title = title.get(language) if isinstance(title, I18nString) else title
+        self.title = title.get(language) if isinstance(title, I18nStr) else title
         self.version = version
         self.description = (
             description.get(language)
-            if isinstance(description, I18nString)
+            if isinstance(description, I18nStr)
             else description
         )
         self.language = language or get_current_language()
@@ -211,7 +211,7 @@ class OpenAPISchemaGenerator:
 
         # Process metadata, handling I18nString values
         for key, value in metadata.items():
-            if isinstance(value, I18nString):
+            if isinstance(value, I18nStr):
                 operation[key] = value.get(self.language)
             elif isinstance(value, dict):
                 # Handle nested dictionaries that might contain I18nString values
@@ -344,7 +344,7 @@ class OpenAPISchemaGenerator:
         """
         result = {}
         for key, value in data.items():
-            if isinstance(value, I18nString):
+            if isinstance(value, I18nStr):
                 result[key] = value.get(self.language)
             elif isinstance(value, dict):
                 result[key] = self._process_i18n_dict(value)
@@ -364,7 +364,7 @@ class OpenAPISchemaGenerator:
         Returns:
             The processed value
         """
-        if isinstance(value, I18nString):
+        if isinstance(value, I18nStr):
             return value.get(self.language)
         elif isinstance(value, dict):
             return self._process_i18n_dict(value)

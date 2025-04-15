@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from flask_x_openapi_schema import (
     I18nBaseModel,
-    I18nString,
+    I18nStr,
     get_current_language,
     openapi_metadata,
     responses_schema,
@@ -30,7 +30,7 @@ class ServiceI18nResponse(I18nBaseModel, BaseRespModel):
 
     id: UUID = Field(..., description="The ID of the service")
     name: str = Field(..., description="The name of the service")
-    description: I18nString = Field(
+    description: I18nStr = Field(
         ..., description="The description of the service (internationalized)"
     )
     status: str = Field(..., description="The status of the service")
@@ -56,14 +56,14 @@ class ServiceApiExample(Resource):
     """Example API resource using internationalized OpenAPI metadata."""
 
     @openapi_metadata(
-        summary=I18nString(
+        summary=I18nStr(
             {
                 "en-US": "Create a service",
                 "zh-Hans": "创建服务",
                 "ja-JP": "サービスを作成する",
             }
         ),
-        description=I18nString(
+        description=I18nStr(
             {
                 "en-US": "Create a new service with the provided information",
                 "zh-Hans": "使用提供的信息创建新服务",
@@ -76,7 +76,7 @@ class ServiceApiExample(Resource):
             success_responses={
                 "201": success_response(
                     model=ServiceI18nResponse,
-                    description=I18nString(
+                    description=I18nStr(
                         {
                             "en-US": "Service created successfully",
                             "zh-Hans": "服务创建成功",
@@ -86,14 +86,14 @@ class ServiceApiExample(Resource):
                 ),
             },
             errors={
-                "400": I18nString(
+                "400": I18nStr(
                     {
                         "en-US": "Invalid request",
                         "zh-Hans": "无效请求",
                         "ja-JP": "無効なリクエスト",
                     }
                 ),
-                "403": I18nString(
+                "403": I18nStr(
                     {
                         "en-US": "Permission denied",
                         "zh-Hans": "权限被拒绝",
@@ -113,7 +113,7 @@ class ServiceApiExample(Resource):
         return ServiceI18nResponse(
             id=UUID("00000000-0000-0000-0000-000000000001"),
             name=x_request_body.name,
-            description=I18nString(
+            description=I18nStr(
                 {
                     "en-US": x_request_body.description,
                     "zh-Hans": f"[中文] {x_request_body.description}",
@@ -126,14 +126,14 @@ class ServiceApiExample(Resource):
         ), 201
 
     @openapi_metadata(
-        summary=I18nString(
+        summary=I18nStr(
             {
                 "en-US": "Get services",
                 "zh-Hans": "获取服务列表",
                 "ja-JP": "サービス一覧を取得する",
             }
         ),
-        description=I18nString(
+        description=I18nStr(
             {
                 "en-US": "Get a list of all services",
                 "zh-Hans": "获取所有服务的列表",
@@ -146,7 +146,7 @@ class ServiceApiExample(Resource):
             success_responses={
                 "200": success_response(
                     model=ServiceListResponse,
-                    description=I18nString(
+                    description=I18nStr(
                         {
                             "en-US": "List of services",
                             "zh-Hans": "服务列表",
@@ -156,7 +156,7 @@ class ServiceApiExample(Resource):
                 ),
             },
             errors={
-                "403": I18nString(
+                "403": I18nStr(
                     {
                         "en-US": "Permission denied",
                         "zh-Hans": "权限被拒绝",
@@ -178,7 +178,7 @@ class ServiceApiExample(Resource):
                 ServiceI18nResponse(
                     id=UUID("00000000-0000-0000-0000-000000000001"),
                     name="Service 1",
-                    description=I18nString(
+                    description=I18nStr(
                         {
                             "en-US": "This is service 1",
                             "zh-Hans": "这是服务1",
@@ -192,7 +192,7 @@ class ServiceApiExample(Resource):
                 ServiceI18nResponse(
                     id=UUID("00000000-0000-0000-0000-000000000002"),
                     name="Service 2",
-                    description=I18nString(
+                    description=I18nStr(
                         {
                             "en-US": "This is service 2",
                             "zh-Hans": "这是服务2",

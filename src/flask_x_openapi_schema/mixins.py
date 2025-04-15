@@ -18,7 +18,7 @@ except ImportError:
         pass
 
 
-from .i18n.i18n_string import I18nString, get_current_language
+from .i18n.i18n_string import I18nStr, get_current_language
 from .methodview_utils import MethodViewOpenAPISchemaGenerator
 from .schema_generator import OpenAPISchemaGenerator
 
@@ -30,9 +30,9 @@ class OpenAPIIntegrationMixin(Api):
 
     def generate_openapi_schema(
         self,
-        title: Union[str, I18nString],
+        title: Union[str, I18nStr],
         version: str,
-        description: Union[str, I18nString] = "",
+        description: Union[str, I18nStr] = "",
         output_format: Literal["json", "yaml"] = "yaml",
         language: Optional[str] = None,
     ) -> Any:
@@ -79,9 +79,9 @@ class OpenAPIBlueprintMixin:
 
     def generate_openapi_schema(
         self,
-        title: Union[str, I18nString],
+        title: Union[str, I18nStr],
         version: str,
-        description: Union[str, I18nString] = "",
+        description: Union[str, I18nStr] = "",
         output_format: Literal["json", "yaml"] = "yaml",
         language: Optional[str] = None,
     ) -> Any:

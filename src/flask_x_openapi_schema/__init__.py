@@ -5,7 +5,7 @@ from .decorators import (
     REQUEST_QUERY_PREFIX,
     openapi_metadata,
 )
-from .i18n import I18nString, get_current_language, set_current_language
+from .i18n import I18nStr, get_current_language, set_current_language
 from .i18n.i18n_model import I18nBaseModel
 from .mixins import OpenAPIIntegrationMixin, OpenAPIBlueprintMixin
 from .methodview_utils import OpenAPIMethodViewMixin
@@ -41,7 +41,7 @@ __all__ = [
     "DocumentUploadModel",
     "MultipleFileUploadModel",
     # Internationalization support
-    "I18nString",
+    "I18nStr",
     # Core OpenAPI functionality
     "OpenAPIIntegrationMixin",
     "OpenAPIBlueprintMixin",

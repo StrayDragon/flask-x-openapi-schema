@@ -7,7 +7,7 @@ This module tests the i18n functionality of the library without using the openap
 import pytest
 
 from flask_x_openapi_schema import (
-    I18nString,
+    I18nStr,
     get_current_language,
     set_current_language,
 )
@@ -45,7 +45,7 @@ def reset_language():
 def test_i18n_string():
     """Test the I18nString class."""
     # Create an I18nString
-    i18n_text = I18nString(
+    i18n_text = I18nStr(
         {
             "en-US": "Hello",
             "zh-Hans": "你好",
@@ -82,14 +82,14 @@ def test_i18n_model():
     product = ProductI18n(
         id="prod-1",
         name="Example Product",
-        description=I18nString(
+        description=I18nStr(
             {
                 "en-US": "This is an example product with internationalized description",
                 "zh-Hans": "这是一个具有国际化描述的示例产品",
                 "ja-JP": "これは国際化された説明を持つサンプル製品です",
             }
         ),
-        category=I18nString(
+        category=I18nStr(
             {
                 "en-US": "Examples",
                 "zh-Hans": "示例",

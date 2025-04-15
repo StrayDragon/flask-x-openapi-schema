@@ -8,7 +8,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 from flask_x_openapi_schema.i18n.i18n_model import I18nBaseModel
-from flask_x_openapi_schema.i18n.i18n_string import I18nString, set_current_language
+from flask_x_openapi_schema.i18n.i18n_string import I18nStr, set_current_language
 
 
 class TestI18nModelCoverage:
@@ -20,7 +20,7 @@ class TestI18nModelCoverage:
         # Define a subclass with I18nString fields
         class TestModel(I18nBaseModel):
             name: str
-            description: I18nString
+            description: I18nStr
             tags: list[str] = []
 
         # Check that __i18n_fields__ was populated correctly
@@ -31,12 +31,12 @@ class TestI18nModelCoverage:
         # Create an instance
         model = TestModel(
             name="Test",
-            description=I18nString({"en-US": "Description", "zh-Hans": "描述"}),
+            description=I18nStr({"en-US": "Description", "zh-Hans": "描述"}),
         )
 
         # Check that the instance has the correct fields
         assert model.name == "Test"
-        assert isinstance(model.description, I18nString)
+        assert isinstance(model.description, I18nStr)
         assert model.tags == []
 
     def test_model_dump(self):
@@ -45,14 +45,14 @@ class TestI18nModelCoverage:
         # Define a model with I18nString fields
         class TestModel(I18nBaseModel):
             name: str
-            description: I18nString
-            title: Optional[I18nString] = None
+            description: I18nStr
+            title: Optional[I18nStr] = None
 
         # Create an instance
         model = TestModel(
             name="Test",
-            description=I18nString({"en-US": "Description", "zh-Hans": "描述"}),
-            title=I18nString({"en-US": "Title", "zh-Hans": "标题"}),
+            description=I18nStr({"en-US": "Description", "zh-Hans": "描述"}),
+            title=I18nStr({"en-US": "Title", "zh-Hans": "标题"}),
         )
 
         # Set language to English
@@ -123,20 +123,20 @@ class TestI18nModelCoverage:
         # Define a model with I18nString fields
         class TestModel(I18nBaseModel):
             name: str
-            description: I18nString
-            title: Optional[I18nString] = None
+            description: I18nStr
+            title: Optional[I18nStr] = None
 
         # Create an instance
         model = TestModel(
             name="Test",
-            description=I18nString(
+            description=I18nStr(
                 {
                     "en-US": "Description",
                     "zh-Hans": "描述",
                     "fr-FR": "Description en français",
                 }
             ),
-            title=I18nString({"en-US": "Title", "zh-Hans": "标题", "fr-FR": "Titre"}),
+            title=I18nStr({"en-US": "Title", "zh-Hans": "标题", "fr-FR": "Titre"}),
         )
 
         # Create language-specific models
@@ -169,12 +169,12 @@ class TestI18nModelCoverage:
         # Define a model with I18nString fields
         class TestModel(I18nBaseModel):
             name: str
-            description: I18nString
+            description: I18nStr
 
         # Create an instance
         model = TestModel(
             name="Test",
-            description=I18nString({"en-US": "Description", "zh-Hans": "描述"}),
+            description=I18nStr({"en-US": "Description", "zh-Hans": "描述"}),
         )
 
         # Set current language
@@ -200,7 +200,7 @@ class TestI18nModelCoverage:
         """Test the for_language method with nested models."""
 
         class NestedModel(I18nBaseModel):
-            label: I18nString
+            label: I18nStr
 
         class TestModel(I18nBaseModel):
             name: str
