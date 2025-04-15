@@ -6,6 +6,8 @@ This is an improved version with simplified logic and better maintainability.
 import inspect
 from collections.abc import Callable
 from functools import wraps
+from dataclasses import dataclass
+
 from typing import (
     Any,
     Optional,
@@ -58,15 +60,73 @@ P = ParamSpec("P")
 R = TypeVar("R")
 F = TypeVar("F", bound=Callable[..., Any])
 
-# Special parameter prefixes for binding
-REQUEST_BODY_PREFIX = "x_request_body"
-REQUEST_QUERY_PREFIX = "x_request_query"
-REQUEST_PATH_PREFIX = "x_request_path"
-REQUEST_FILE_PREFIX = "x_request_file"
+
+@dataclass
+class ConventionalPrefixConfig:
+    """Configuration class for OpenAPI parameter prefixes.
+
+    This class holds configuration settings for parameter prefixes used in
+    binding request data to function parameters.
+
+    Attributes:
+        request_body_prefix: Prefix for request body parameters
+        request_query_prefix: Prefix for query parameters
+        request_path_prefix: Prefix for path parameters
+        request_file_prefix: Prefix for file parameters
+    """
+
+    request_body_prefix: str = "x_request_body"
+    request_query_prefix: str = "x_request_query"
+    request_path_prefix: str = "x_request_path"
+    request_file_prefix: str = "x_request_file"
+
+
+# Default parameter prefixes
+DEFAULT_BODY_PREFIX = "x_request_body"
+DEFAULT_QUERY_PREFIX = "x_request_query"
+DEFAULT_PATH_PREFIX = "x_request_path"
+DEFAULT_FILE_PREFIX = "x_request_file"
+
+# Global configuration instance
+GLOBAL_CONFIG = ConventionalPrefixConfig(
+    request_body_prefix=DEFAULT_BODY_PREFIX,
+    request_query_prefix=DEFAULT_QUERY_PREFIX,
+    request_path_prefix=DEFAULT_PATH_PREFIX,
+    request_file_prefix=DEFAULT_FILE_PREFIX,
+)
+
+
+def configure_prefixes(config: ConventionalPrefixConfig) -> None:
+    """Configure global parameter prefixes.
+
+    Args:
+        config: Configuration object with parameter prefixes
+    """
+    global GLOBAL_CONFIG
+    # Create a new instance to avoid reference issues
+    GLOBAL_CONFIG = ConventionalPrefixConfig(
+        request_body_prefix=config.request_body_prefix,
+        request_query_prefix=config.request_query_prefix,
+        request_path_prefix=config.request_path_prefix,
+        request_file_prefix=config.request_file_prefix,
+    )
+
+
+def reset_prefixes() -> None:
+    """Reset parameter prefixes to default values."""
+    global GLOBAL_CONFIG
+    GLOBAL_CONFIG = ConventionalPrefixConfig(
+        request_body_prefix=DEFAULT_BODY_PREFIX,
+        request_query_prefix=DEFAULT_QUERY_PREFIX,
+        request_path_prefix=DEFAULT_PATH_PREFIX,
+        request_file_prefix=DEFAULT_FILE_PREFIX,
+    )
 
 
 def _detect_parameters(
-    signature: inspect.Signature, type_hints: Dict[str, Any]
+    signature: inspect.Signature,
+    type_hints: Dict[str, Any],
+    config: Optional[ConventionalPrefixConfig] = None,
 ) -> Tuple[Optional[Type[BaseModel]], Optional[Type[BaseModel]], List[str]]:
     """
     Detect request parameters from function signature.
@@ -74,6 +134,7 @@ def _detect_parameters(
     Args:
         signature: Function signature
         type_hints: Function type hints
+        config: Optional configuration object with custom prefixes
 
     Returns:
         Tuple of (detected_request_body, detected_query_model, detected_path_params)
@@ -82,8 +143,14 @@ def _detect_parameters(
     detected_query_model = None
     detected_path_params = []
 
+    # Use custom prefixes if provided, otherwise use defaults
+    prefix_config = config or GLOBAL_CONFIG
+    body_prefix = prefix_config.request_body_prefix
+    query_prefix = prefix_config.request_query_prefix
+    path_prefix = prefix_config.request_path_prefix
+
     # Precompute path prefix length to avoid repeated calculations
-    path_prefix_len = len(REQUEST_PATH_PREFIX) + 1  # +1 for the underscore
+    path_prefix_len = len(path_prefix) + 1  # +1 for the underscore
 
     # Skip these parameter names
     skip_params = {"self", "cls"}
@@ -94,8 +161,8 @@ def _detect_parameters(
         if param_name in skip_params:
             continue
 
-        # Check for x_request_body parameter
-        if param_name.startswith(REQUEST_BODY_PREFIX):
+        # Check for request_body parameter
+        if param_name.startswith(body_prefix):
             param_type = type_hints.get(param_name)
             if (
                 param_type
@@ -105,8 +172,8 @@ def _detect_parameters(
                 detected_request_body = param_type
                 continue
 
-        # Check for x_request_query parameter
-        if param_name.startswith(REQUEST_QUERY_PREFIX):
+        # Check for request_query parameter
+        if param_name.startswith(query_prefix):
             param_type = type_hints.get(param_name)
             if (
                 param_type
@@ -116,8 +183,8 @@ def _detect_parameters(
                 detected_query_model = param_type
                 continue
 
-        # Check for x_request_path parameter
-        if param_name.startswith(REQUEST_PATH_PREFIX):
+        # Check for request_path parameter
+        if param_name.startswith(path_prefix):
             # Extract the path parameter name from the parameter name
             # Format: x_request_path_<param_name>
             param_suffix = param_name[path_prefix_len:]
@@ -257,7 +324,9 @@ def _handle_response(result: Any) -> Any:
 
 
 def _detect_file_parameters(
-    param_names: List[str], func_annotations: Dict[str, Any]
+    param_names: List[str],
+    func_annotations: Dict[str, Any],
+    config: Optional[ConventionalPrefixConfig] = None,
 ) -> List[Dict[str, Any]]:
     """
     Detect file parameters from function signature.
@@ -265,15 +334,20 @@ def _detect_file_parameters(
     Args:
         param_names: List of parameter names
         func_annotations: Function type annotations
+        config: Optional configuration object with custom prefixes
 
     Returns:
         List of file parameters for OpenAPI schema
     """
     file_params = []
-    file_prefix_len = len(REQUEST_FILE_PREFIX) + 1  # +1 for the underscore
+
+    # Use custom prefix if provided, otherwise use default
+    prefix_config = config or GLOBAL_CONFIG
+    file_prefix = prefix_config.request_file_prefix
+    file_prefix_len = len(file_prefix) + 1  # +1 for the underscore
 
     for param_name in param_names:
-        if not param_name.startswith(REQUEST_FILE_PREFIX):
+        if not param_name.startswith(file_prefix):
             continue
 
         # Get the parameter type annotation
@@ -371,6 +445,7 @@ def openapi_metadata(
     # The following parameters are optional and can be automatically detected from the function signature
     auto_detect_params: bool = True,
     language: Optional[str] = None,
+    prefix_config: Optional[ConventionalPrefixConfig] = None,
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """
     Decorator to add OpenAPI metadata to an API endpoint.
@@ -387,6 +462,8 @@ def openapi_metadata(
     - x_request_path_<param_name>: Binds a path parameter (auto-detected from parameter name)
     - x_request_file: Binds a file object (auto-detected from parameter name)
 
+    These prefixes can be configured using OpenAPIConfig.configure() method or the config parameter.
+
     Args:
         summary: A short summary of what the operation does
         description: A verbose explanation of the operation behavior
@@ -402,6 +479,11 @@ def openapi_metadata(
         path_params: List of path parameter names (optional if auto-detected)
         auto_detect_params: Whether to automatically detect parameters from function signature
         language: Language code to use for I18nString values (default: current language)
+        prefix_config: Configuration object for parameter prefixes with attributes:
+            - request_body_prefix: Prefix for request body parameters
+            - request_query_prefix: Prefix for query parameters
+            - request_path_prefix: Prefix for path parameters
+            - request_file_prefix: Prefix for file parameters
 
     Returns:
         The decorated function with OpenAPI metadata attached and type annotations preserved
@@ -423,7 +505,7 @@ def openapi_metadata(
         if auto_detect_params:
             # Use helper function to detect parameters
             detected_request_body, detected_query_model, detected_path_params = (
-                _detect_parameters(signature, type_hints)
+                _detect_parameters(signature, type_hints, prefix_config)
             )
 
         # Use detected parameters if not explicitly provided
@@ -471,7 +553,9 @@ def openapi_metadata(
         if auto_detect_params:
             # Get function annotations
             func_annotations = get_type_hints(func)
-            file_params = _detect_file_parameters(param_names, func_annotations)
+            file_params = _detect_file_parameters(
+                param_names, func_annotations, prefix_config
+            )
 
         # If we have file parameters, set the consumes property to multipart/form-data
         if file_params:
@@ -512,9 +596,16 @@ def openapi_metadata(
                 # Skip 'self' and 'cls' parameters
                 skip_params = {"self", "cls"}
 
+                # Use custom prefixes if provided, otherwise use defaults
+                prefix_config_to_use = prefix_config or GLOBAL_CONFIG
+                body_prefix = prefix_config_to_use.request_body_prefix
+                query_prefix = prefix_config_to_use.request_query_prefix
+                path_prefix = prefix_config_to_use.request_path_prefix
+                file_prefix = prefix_config_to_use.request_file_prefix
+
                 # Precompute prefix lengths for path and file parameters
-                path_prefix_len = len(REQUEST_PATH_PREFIX) + 1  # +1 for the underscore
-                file_prefix_len = len(REQUEST_FILE_PREFIX) + 1  # +1 for the underscore
+                path_prefix_len = len(path_prefix) + 1  # +1 for the underscore
+                file_prefix_len = len(file_prefix) + 1  # +1 for the underscore
 
                 # Process request body parameters
                 if (
@@ -526,7 +617,7 @@ def openapi_metadata(
                         if param_name in skip_params:
                             continue
 
-                        if param_name.startswith(REQUEST_BODY_PREFIX):
+                        if param_name.startswith(body_prefix):
                             if HAS_FLASK_RESTFUL:
                                 # Flask-RESTful approach using reqparse
                                 parser = create_reqparse_from_pydantic(
@@ -574,7 +665,7 @@ def openapi_metadata(
                         if param_name in skip_params:
                             continue
 
-                        if param_name.startswith(REQUEST_QUERY_PREFIX):
+                        if param_name.startswith(query_prefix):
                             if HAS_FLASK_RESTFUL and not parsed_args:
                                 # Flask-RESTful approach using reqparse
                                 parser = create_reqparse_from_pydantic(
@@ -611,7 +702,7 @@ def openapi_metadata(
                         if param_name in skip_params:
                             continue
 
-                        if param_name.startswith(REQUEST_PATH_PREFIX):
+                        if param_name.startswith(path_prefix):
                             # Extract the path parameter name
                             param_suffix = param_name[path_prefix_len:]
                             if "_" in param_suffix:
@@ -624,7 +715,7 @@ def openapi_metadata(
                     if param_name in skip_params:
                         continue
 
-                    if param_name.startswith(REQUEST_FILE_PREFIX):
+                    if param_name.startswith(file_prefix):
                         # Get the parameter type annotation
                         param_type = type_hints.get(param_name)
 

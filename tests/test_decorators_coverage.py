@@ -603,9 +603,7 @@ class TestDecoratorsCoverage:
     def test_openapi_metadata_with_i18n_in_parameters(self):
         """Test openapi_metadata with I18nString values in parameters."""
         # Create I18nString values for parameter descriptions
-        param_desc = I18nStr(
-            {"en-US": "Parameter Description", "zh-Hans": "参数描述"}
-        )
+        param_desc = I18nStr({"en-US": "Parameter Description", "zh-Hans": "参数描述"})
 
         # Create a decorated function with I18nString values in parameters
         @openapi_metadata(

@@ -74,7 +74,9 @@ if __name__ == "__main__":
     )
 
     # Wait for the server to start and show output
-    console.print("[cyan]Starting Flask server and waiting for it to be ready...[/cyan]")
+    console.print(
+        "[cyan]Starting Flask server and waiting for it to be ready...[/cyan]"
+    )
 
     # Monitor server output for a few seconds
     start_time = time.time()
@@ -110,7 +112,9 @@ if __name__ == "__main__":
 
     # If we didn't see the server start message, assume it's running anyway
     if not server_started:
-        console.print("[yellow]Did not see server start message, but continuing anyway...[/yellow]")
+        console.print(
+            "[yellow]Did not see server start message, but continuing anyway...[/yellow]"
+        )
 
     # Give the server a moment to fully initialize
     console.print("[cyan]Waiting a moment for the server to fully initialize...[/cyan]")
@@ -129,13 +133,19 @@ def run_locust_benchmark() -> Tuple[str, str, str, str]:
     # Run locust in headless mode with a shorter duration and fewer users
     locust_cmd = [
         "locust",
-        "-f", "benchmarks/locustfile.py",
+        "-f",
+        "benchmarks/locustfile.py",
         "--headless",
-        "-u", "20",  # Number of users (reduced from 50)
-        "-r", "5",   # Spawn rate (reduced from 10)
-        "-t", "10s", # Run time (reduced from 20s)
-        "--csv", results_prefix,
-        "--host", "http://localhost:5000",  # Explicitly set the host
+        "-u",
+        "20",  # Number of users (reduced from 50)
+        "-r",
+        "5",  # Spawn rate (reduced from 10)
+        "-t",
+        "10s",  # Run time (reduced from 20s)
+        "--csv",
+        results_prefix,
+        "--host",
+        "http://localhost:5000",  # Explicitly set the host
     ]
 
     # Run locust
@@ -162,7 +172,9 @@ def run_locust_benchmark() -> Tuple[str, str, str, str]:
                 if stdout_line:
                     console.print(f"[dim]Locust: {stdout_line.strip()}[/dim]")
                 if stderr_line:
-                    console.print(f"[yellow]Locust error: {stderr_line.strip()}[/yellow]")
+                    console.print(
+                        f"[yellow]Locust error: {stderr_line.strip()}[/yellow]"
+                    )
 
                 time.sleep(0.1)
 
@@ -178,13 +190,19 @@ def run_locust_benchmark() -> Tuple[str, str, str, str]:
 
             # Check if the process was successful
             if return_code != 0:
-                console.print(f"[bold red]Locust exited with code {return_code}[/bold red]")
-                console.print("[yellow]Continuing anyway to analyze available results...[/yellow]")
+                console.print(
+                    f"[bold red]Locust exited with code {return_code}[/bold red]"
+                )
+                console.print(
+                    "[yellow]Continuing anyway to analyze available results...[/yellow]"
+                )
 
             progress.update(task, completed=True)
         except Exception as e:
             console.print(f"[bold red]Error running Locust:[/bold red] {e}")
-            console.print("[yellow]Continuing anyway to analyze available results...[/yellow]")
+            console.print(
+                "[yellow]Continuing anyway to analyze available results...[/yellow]"
+            )
 
     # Return the paths to the result files
     return (
@@ -198,8 +216,22 @@ def run_locust_benchmark() -> Tuple[str, str, str, str]:
 def parse_locust_results(stats_file: str) -> Dict:
     """Parse the Locust stats CSV file and return the results."""
     results = {
-        "standard": {"requests": 0, "failures": 0, "median_response_time": 0, "avg_response_time": 0, "min_response_time": 0, "max_response_time": 0},
-        "openapi": {"requests": 0, "failures": 0, "median_response_time": 0, "avg_response_time": 0, "min_response_time": 0, "max_response_time": 0},
+        "standard": {
+            "requests": 0,
+            "failures": 0,
+            "median_response_time": 0,
+            "avg_response_time": 0,
+            "min_response_time": 0,
+            "max_response_time": 0,
+        },
+        "openapi": {
+            "requests": 0,
+            "failures": 0,
+            "median_response_time": 0,
+            "avg_response_time": 0,
+            "min_response_time": 0,
+            "max_response_time": 0,
+        },
     }
 
     # Check if the file exists
@@ -215,7 +247,9 @@ def parse_locust_results(stats_file: str) -> Dict:
             # Check if the file is empty or has no rows
             rows = list(reader)
             if not rows:
-                console.print("[bold yellow]Results file is empty or has no data rows.[/bold yellow]")
+                console.print(
+                    "[bold yellow]Results file is empty or has no data rows.[/bold yellow]"
+                )
                 return results
 
             for row in rows:
@@ -272,7 +306,10 @@ def parse_locust_results(stats_file: str) -> Dict:
                 try:
                     # Update min response time
                     min_time = float(row.get("Min Response Time", 0))
-                    if results[category]["min_response_time"] == 0 or min_time < results[category]["min_response_time"]:
+                    if (
+                        results[category]["min_response_time"] == 0
+                        or min_time < results[category]["min_response_time"]
+                    ):
                         results[category]["min_response_time"] = min_time
                 except (ValueError, TypeError):
                     pass
@@ -357,7 +394,10 @@ def display_results(results: Dict) -> None:
     # Calculate and display overhead
     if results["standard"]["avg_response_time"] > 0:
         overhead = (
-            (results["openapi"]["avg_response_time"] - results["standard"]["avg_response_time"])
+            (
+                results["openapi"]["avg_response_time"]
+                - results["standard"]["avg_response_time"]
+            )
             / results["standard"]["avg_response_time"]
             * 100
         )

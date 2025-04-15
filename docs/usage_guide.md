@@ -126,6 +126,11 @@ with open("openapi.yaml", "w") as f:
 
 The `openapi_metadata` decorator automatically detects parameters with special prefixes:
 
+- `x_request_body`: Binds the entire request body object
+- `x_request_query`: Binds the entire query parameters object
+- `x_request_path_<param_name>`: Binds a path parameter
+- `x_request_file`: Binds a file object
+
 ```python
 # Query parameters
 class ItemQueryParams(BaseModel):
@@ -143,7 +148,7 @@ def get(self, x_request_query: ItemQueryParams):
     # Access the query parameters as a Pydantic model
     skip = x_request_query.skip
     limit = x_request_query.limit
-    
+
     # Return a list of items
     return {
         "items": [...],
@@ -163,7 +168,7 @@ def get(self, x_request_query: ItemQueryParams):
 def get(self, item_id: str, x_request_path_item_id: str):
     # Access the path parameter
     item_id_from_path = x_request_path_item_id
-    
+
     # Return the item
     return {"id": item_id_from_path, "name": "Example Item"}, 200
 ```
@@ -382,6 +387,56 @@ def handle_error(error_code: int, message: str) -> tuple:
 5. **Issue**: Response models not being converted properly.
    **Solution**: Make sure your response models extend `BaseRespModel` and that you're returning them correctly from your resource methods.
 
+### Configurable Parameter Prefixes
+
+You can customize the parameter prefixes used for auto-detection using the `ConventionalPrefixConfig` class:
+
+```python
+from flask_x_openapi_schema import ConventionalPrefixConfig, configure_prefixes, reset_prefixes, GLOBAL_CONFIG
+
+# Create a custom configuration
+custom_config = ConventionalPrefixConfig(
+    request_body_prefix="req_body",
+    request_query_prefix="req_query",
+    request_path_prefix="req_path",
+    request_file_prefix="req_file"
+)
+
+# Configure globally
+configure_prefixes(custom_config)
+
+# Reset to default prefixes if needed
+reset_prefixes()
+
+# Configure at the API level
+api = OpenAPIApi(app)
+api.configure_openapi(prefix_config=custom_config)
+
+# Or using keyword arguments (for backward compatibility)
+api.configure_openapi(
+    request_body_prefix="req_body",
+    request_query_prefix="req_query"
+)
+
+# Configure at the Blueprint level
+blueprint = OpenAPIBlueprint('api', __name__)
+blueprint.configure_openapi(prefix_config=custom_config)
+
+# Configure per-function (recommended approach)
+@openapi_metadata(
+    summary="Test endpoint",
+    prefix_config=ConventionalPrefixConfig(
+        request_body_prefix="req_body",
+        request_query_prefix="req_query"
+    )
+)
+def my_function(req_body: MyModel, req_query: QueryModel):
+    # Use custom prefixes
+    return {"message": "Success"}
+```
+
+The per-function configuration is recommended as it only affects that specific function and doesn't change the global configuration. If you need to modify the global configuration, make sure to reset it to the default values when you're done to avoid affecting other parts of your application.
+
 ## Advanced Topics
 
 ### Custom Schema Generation
@@ -395,7 +450,7 @@ class CustomSchemaGenerator(OpenAPISchemaGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Add custom initialization
-    
+
     def generate_schema(self):
         schema = super().generate_schema()
         # Customize the schema
@@ -412,20 +467,20 @@ class ApiResponse(BaseRespModel):
     success: bool = Field(..., description="Whether the request was successful")
     data: Optional[dict] = Field(None, description="Response data")
     error: Optional[str] = Field(None, description="Error message")
-    
+
     def to_response(self, status_code: int = 200):
         # Custom response formatting
         response_data = {
             "success": self.success,
             "timestamp": datetime.now().isoformat(),
         }
-        
+
         if self.data:
             response_data["data"] = self.data
-        
+
         if self.error:
             response_data["error"] = self.error
-        
+
         return response_data, status_code
 ```
 

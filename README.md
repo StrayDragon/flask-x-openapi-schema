@@ -26,7 +26,7 @@ pip install flask-x-openapi-schema[flask-restful]
 
 - **Auto-Generation**: Generate OpenAPI schemas from Flask-RESTful resources and Flask.MethodView classes
 - **Pydantic Integration**: Seamlessly convert Pydantic models to OpenAPI schemas
-- **Smart Parameter Handling**: Automatically inject request parameters from Pydantic models
+- **Smart Parameter Handling**: Automatically inject request parameters from Pydantic models with configurable prefixes
 - **Type Safety**: Preserve type annotations for better IDE support and validation
 - **Multiple Formats**: Output schemas in YAML or JSON format
 - **Internationalization**: Built-in i18n support for API documentation

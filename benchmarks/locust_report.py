@@ -10,7 +10,7 @@ This script:
 
 import csv
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict
 
 from rich.console import Console
 from rich.table import Table
@@ -24,31 +24,47 @@ console = Console()
 def parse_locust_results(stats_file: str) -> Dict:
     """Parse the Locust stats CSV file and return the results."""
     results = {
-        "standard": {"requests": 0, "failures": 0, "median_response_time": 0, "avg_response_time": 0, "min_response_time": 0, "max_response_time": 0},
-        "openapi": {"requests": 0, "failures": 0, "median_response_time": 0, "avg_response_time": 0, "min_response_time": 0, "max_response_time": 0},
+        "standard": {
+            "requests": 0,
+            "failures": 0,
+            "median_response_time": 0,
+            "avg_response_time": 0,
+            "min_response_time": 0,
+            "max_response_time": 0,
+        },
+        "openapi": {
+            "requests": 0,
+            "failures": 0,
+            "median_response_time": 0,
+            "avg_response_time": 0,
+            "min_response_time": 0,
+            "max_response_time": 0,
+        },
     }
-    
+
     # Check if the file exists
     if not Path(stats_file).exists():
         console.print(f"[bold red]Results file not found:[/bold red] {stats_file}")
         console.print("[yellow]Using default values for benchmark results.[/yellow]")
         return results
-    
+
     try:
         with open(stats_file, newline="") as csvfile:
             reader = csv.DictReader(csvfile)
-            
+
             # Check if the file is empty or has no rows
             rows = list(reader)
             if not rows:
-                console.print("[bold yellow]Results file is empty or has no data rows.[/bold yellow]")
+                console.print(
+                    "[bold yellow]Results file is empty or has no data rows.[/bold yellow]"
+                )
                 return results
-            
+
             for row in rows:
                 # Skip the aggregated row
                 if row.get("Name", "") == "Aggregated":
                     continue
-                
+
                 # Determine if this is a standard or openapi request
                 name = row.get("Name", "")
                 if "standard" in name.lower():
@@ -57,18 +73,18 @@ def parse_locust_results(stats_file: str) -> Dict:
                     category = "openapi"
                 else:
                     continue
-                
+
                 # Update the results, handling missing or invalid values
                 try:
                     results[category]["requests"] += int(row.get("Request Count", 0))
                 except (ValueError, TypeError):
                     pass
-                
+
                 try:
                     results[category]["failures"] += int(row.get("Failure Count", 0))
                 except (ValueError, TypeError):
                     pass
-                
+
                 # Always update response times, even if there are failures
                 # This gives us performance data even when endpoints are failing
                 try:
@@ -82,7 +98,7 @@ def parse_locust_results(stats_file: str) -> Dict:
                         ) / 2
                 except (ValueError, TypeError):
                     pass
-                
+
                 try:
                     # Update average response time (weighted average if multiple endpoints)
                     avg_time = float(row.get("Average Response Time", 0))
@@ -94,15 +110,18 @@ def parse_locust_results(stats_file: str) -> Dict:
                         ) / 2
                 except (ValueError, TypeError):
                     pass
-                
+
                 try:
                     # Update min response time
                     min_time = float(row.get("Min Response Time", 0))
-                    if results[category]["min_response_time"] == 0 or min_time < results[category]["min_response_time"]:
+                    if (
+                        results[category]["min_response_time"] == 0
+                        or min_time < results[category]["min_response_time"]
+                    ):
                         results[category]["min_response_time"] = min_time
                 except (ValueError, TypeError):
                     pass
-                
+
                 try:
                     # Update max response time
                     max_time = float(row.get("Max Response Time", 0))
@@ -113,7 +132,7 @@ def parse_locust_results(stats_file: str) -> Dict:
     except Exception as e:
         console.print(f"[bold red]Error parsing Locust results:[/bold red] {e}")
         console.print("[yellow]Using available data for benchmark results.[/yellow]")
-    
+
     return results
 
 
@@ -125,7 +144,7 @@ def display_results(results: Dict) -> None:
     table.add_column("Standard Flask", style="yellow")
     table.add_column("Flask-X-OpenAPI-Schema", style="green")
     table.add_column("Difference", style="magenta")
-    
+
     # Add rows for each metric
     metrics = [
         ("Requests", "requests", ""),
@@ -135,11 +154,11 @@ def display_results(results: Dict) -> None:
         ("Min Response Time", "min_response_time", "ms"),
         ("Max Response Time", "max_response_time", "ms"),
     ]
-    
+
     for display_name, key, unit in metrics:
         standard_value = results["standard"][key]
         openapi_value = results["openapi"][key]
-        
+
         # Calculate difference and percentage
         if key in ["requests", "failures"]:
             diff = openapi_value - standard_value
@@ -159,13 +178,13 @@ def display_results(results: Dict) -> None:
                 f"{openapi_value:.2f}{unit}",
                 f"{diff:.2f}{unit} ({diff_percent:.2f}%)",
             )
-    
+
     console.print(table)
-    
+
     # Check if there were failures
     standard_failures = results["standard"]["failures"]
     openapi_failures = results["openapi"]["failures"]
-    
+
     if openapi_failures > 0 or standard_failures > 0:
         console.print(
             Panel(
@@ -179,15 +198,18 @@ def display_results(results: Dict) -> None:
                 padding=(1, 2),
             )
         )
-    
+
     # Calculate and display overhead
     if results["standard"]["avg_response_time"] > 0:
         overhead = (
-            (results["openapi"]["avg_response_time"] - results["standard"]["avg_response_time"])
+            (
+                results["openapi"]["avg_response_time"]
+                - results["standard"]["avg_response_time"]
+            )
             / results["standard"]["avg_response_time"]
             * 100
         )
-        
+
         console.print(
             Panel(
                 f"[bold]Flask-X-OpenAPI-Schema adds a [red]{overhead:.2f}%[/red] overhead compared to standard Flask.[/bold]\n\n"
@@ -204,7 +226,7 @@ def display_results(results: Dict) -> None:
                 padding=(1, 2),
             )
         )
-    
+
     # Display benefits
     console.print(
         Panel(
@@ -236,15 +258,17 @@ def main() -> None:
             padding=(1, 2),
         )
     )
-    
+
     try:
         # Parse the results
         results = parse_locust_results("benchmarks/results_stats.csv")
-        
+
         # Display the results
         display_results(results)
     except KeyboardInterrupt:
-        console.print("[bold yellow]Report generation interrupted by user.[/bold yellow]")
+        console.print(
+            "[bold yellow]Report generation interrupted by user.[/bold yellow]"
+        )
     except Exception as e:
         console.print(f"[bold red]Error generating report:[/bold red] {e}")
 

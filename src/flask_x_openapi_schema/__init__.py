@@ -1,8 +1,8 @@
 from .decorators import (
-    REQUEST_BODY_PREFIX,
-    REQUEST_FILE_PREFIX,
-    REQUEST_PATH_PREFIX,
-    REQUEST_QUERY_PREFIX,
+    ConventionalPrefixConfig,
+    configure_prefixes,
+    reset_prefixes,
+    GLOBAL_CONFIG,
     openapi_metadata,
 )
 from .i18n import I18nStr, get_current_language, set_current_language
@@ -27,11 +27,11 @@ from .utils import (
 )
 
 __all__ = [
-    # Request parameter prefixes
-    "REQUEST_BODY_PREFIX",
-    "REQUEST_FILE_PREFIX",
-    "REQUEST_PATH_PREFIX",
-    "REQUEST_QUERY_PREFIX",
+    # Configuration
+    "ConventionalPrefixConfig",
+    "configure_prefixes",
+    "reset_prefixes",
+    "GLOBAL_CONFIG",
     # Base models
     "BaseRespModel",
     "I18nBaseModel",

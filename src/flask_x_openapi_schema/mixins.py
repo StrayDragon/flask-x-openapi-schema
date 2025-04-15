@@ -18,6 +18,7 @@ except ImportError:
         pass
 
 
+from .decorators import ConventionalPrefixConfig, configure_prefixes, GLOBAL_CONFIG
 from .i18n.i18n_string import I18nStr, get_current_language
 from .methodview_utils import MethodViewOpenAPISchemaGenerator
 from .schema_generator import OpenAPISchemaGenerator
@@ -27,6 +28,36 @@ class OpenAPIIntegrationMixin(Api):
     """
     A mixin class for the flask-restful Api to collect OpenAPI metadata.
     """
+
+    def configure_openapi(
+        self, *, prefix_config: ConventionalPrefixConfig = None, **kwargs
+    ):
+        """
+        Configure OpenAPI settings for this API instance.
+
+        Args:
+            prefix_config: Configuration object with parameter prefixes
+            **kwargs: For backward compatibility - will be used to create a config object if prefix_config is None
+        """
+        if prefix_config is not None:
+            configure_prefixes(prefix_config)
+        elif kwargs:
+            # Create a new config with the provided values
+            new_config = ConventionalPrefixConfig(
+                request_body_prefix=kwargs.get(
+                    "request_body_prefix", GLOBAL_CONFIG.request_body_prefix
+                ),
+                request_query_prefix=kwargs.get(
+                    "request_query_prefix", GLOBAL_CONFIG.request_query_prefix
+                ),
+                request_path_prefix=kwargs.get(
+                    "request_path_prefix", GLOBAL_CONFIG.request_path_prefix
+                ),
+                request_file_prefix=kwargs.get(
+                    "request_file_prefix", GLOBAL_CONFIG.request_file_prefix
+                ),
+            )
+            configure_prefixes(new_config)
 
     def generate_openapi_schema(
         self,
@@ -71,6 +102,36 @@ class OpenAPIBlueprintMixin:
     """
     A mixin class for Flask Blueprint to collect OpenAPI metadata from MethodView classes.
     """
+
+    def configure_openapi(
+        self, *, prefix_config: ConventionalPrefixConfig = None, **kwargs
+    ):
+        """
+        Configure OpenAPI settings for this Blueprint instance.
+
+        Args:
+            prefix_config: Configuration object with parameter prefixes
+            **kwargs: For backward compatibility - will be used to create a config object if prefix_config is None
+        """
+        if prefix_config is not None:
+            configure_prefixes(prefix_config)
+        elif kwargs:
+            # Create a new config with the provided values
+            new_config = ConventionalPrefixConfig(
+                request_body_prefix=kwargs.get(
+                    "request_body_prefix", GLOBAL_CONFIG.request_body_prefix
+                ),
+                request_query_prefix=kwargs.get(
+                    "request_query_prefix", GLOBAL_CONFIG.request_query_prefix
+                ),
+                request_path_prefix=kwargs.get(
+                    "request_path_prefix", GLOBAL_CONFIG.request_path_prefix
+                ),
+                request_file_prefix=kwargs.get(
+                    "request_file_prefix", GLOBAL_CONFIG.request_file_prefix
+                ),
+            )
+            configure_prefixes(new_config)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -82,6 +82,7 @@ class OpenAPIFlaskUser(HttpUser):
 # Server implementation for the load test
 app = Flask("load_test_server")
 
+
 # Standard Flask implementation
 @app.route("/standard/api/users/<user_id>", methods=["POST"])
 def standard_create_user(user_id):
@@ -145,6 +146,7 @@ def standard_create_user(user_id):
 
     return jsonify(response), 201
 
+
 # OpenAPI Flask implementation
 @app.route("/openapi/api/users/<user_id>", methods=["POST"])
 @openapi_metadata(
@@ -179,7 +181,7 @@ def openapi_create_user(user_id: str):
             full_name=data["full_name"],
             age=data["age"],
             is_active=data.get("is_active", True),
-            tags=data.get("tags", [])
+            tags=data.get("tags", []),
         )
 
         # Create response
@@ -200,6 +202,7 @@ def openapi_create_user(user_id: str):
         # Log the error for debugging
         print(f"Error in openapi_create_user: {e}")
         return jsonify({"error": str(e)}), 400
+
 
 # Run the server if this file is executed directly
 if __name__ == "__main__":
