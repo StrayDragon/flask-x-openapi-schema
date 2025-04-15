@@ -1,27 +1,22 @@
 """
-Benchmark tests for flask_x_openapi_schema.
-
-This file contains benchmarks that compare the performance of using flask_x_openapi_schema
-versus a standard Flask application without it.
+Profile script to identify performance bottlenecks in flask_x_openapi_schema.
 """
 
+import cProfile
 import json
+import pstats
+import io
+from urllib.parse import urlencode
+from flask import Flask, jsonify, request
+from pydantic import BaseModel, Field
 from typing import List, Optional
 
-import pytest
-from flask import Flask, request, jsonify
-from pydantic import BaseModel, Field
-
 from flask_x_openapi_schema.decorators import openapi_metadata
-
-# Import models directly
 from flask_x_openapi_schema.models.base import BaseRespModel
 
-
-# Define models inline for benchmarking
+# Define models for testing
 class UserRequest(BaseModel):
     """User request model."""
-
     username: str = Field(..., description="The username")
     email: str = Field(..., description="The email address")
     full_name: str = Field(..., description="The full name")
@@ -29,19 +24,15 @@ class UserRequest(BaseModel):
     is_active: bool = Field(True, description="Whether the user is active")
     tags: List[str] = Field(default_factory=list, description="User tags")
 
-
 class UserQueryParams(BaseModel):
     """User query parameters."""
-
     include_inactive: bool = Field(False, description="Include inactive users")
     sort_by: str = Field("username", description="Field to sort by")
     limit: int = Field(10, description="Maximum number of results")
     offset: int = Field(0, description="Offset for pagination")
 
-
 class UserResponse(BaseRespModel):
     """User response model."""
-
     id: str = Field(..., description="The user ID")
     username: str = Field(..., description="The username")
     email: str = Field(..., description="The email address")
@@ -51,7 +42,6 @@ class UserResponse(BaseRespModel):
     tags: List[str] = Field(..., description="User tags")
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: Optional[str] = Field(None, description="Last update timestamp")
-
 
 # Sample data for testing
 SAMPLE_USER_DATA = {
@@ -69,7 +59,6 @@ SAMPLE_QUERY_PARAMS = {
     "limit": "10",
     "offset": "0",
 }
-
 
 def create_standard_flask_app():
     """Create a standard Flask app without flask_x_openapi_schema."""
@@ -139,7 +128,6 @@ def create_standard_flask_app():
 
     return app
 
-
 def create_openapi_flask_app():
     """Create a Flask app with flask_x_openapi_schema."""
     app = Flask("openapi_flask")
@@ -163,27 +151,16 @@ def create_openapi_flask_app():
             "400": {"description": "Bad request"},
         },
     )
-    def create_user(user_id: str):
-        # Manual handling to avoid potential issues with the decorator's automatic binding
+    def create_user(user_id):
+        # Manual handling to avoid the decorator's automatic binding
+        # which seems to have an issue with the tags field
         if not request.is_json:
             return jsonify({"error": "Request must be JSON"}), 400
 
         data = request.get_json()
-
-        # Process the tags field to ensure it's a list
-        if "tags" in data and not isinstance(data["tags"], list):
-            try:
-                if isinstance(data["tags"], str) and data["tags"].startswith('[') and data["tags"].endswith(']'):
-                    data["tags"] = json.loads(data["tags"])
-                else:
-                    data["tags"] = [data["tags"]]
-            except Exception:
-                pass
-
         try:
-            # Create the request model
             user_request = UserRequest(**data)
-
+            
             # Create response
             response = UserResponse(
                 id=user_id,
@@ -196,64 +173,98 @@ def create_openapi_flask_app():
                 created_at="2023-01-01T00:00:00Z",
                 updated_at=None,
             )
-
+            
             return response.to_response(201)
         except Exception as e:
             return jsonify({"error": str(e)}), 400
 
     return app
 
-
-@pytest.fixture
-def standard_client():
-    """Flask test client for standard app."""
-    app = create_standard_flask_app()
-    with app.test_client() as client:
-        yield client
-
-
-@pytest.fixture
-def openapi_client():
-    """Flask test client for OpenAPI app."""
+def profile_decorator_creation():
+    """Profile the creation of a decorated function."""
+    pr = cProfile.Profile()
+    pr.enable()
+    
+    # Create the app with decorated function
     app = create_openapi_flask_app()
-    with app.test_client() as client:
-        yield client
+    
+    pr.disable()
+    s = io.StringIO()
+    ps = pstats.Stats(pr, stream=s).sort_stats('cumulative')
+    ps.print_stats(20)  # Print top 20 functions by cumulative time
+    print("Profile of decorator creation:")
+    print(s.getvalue())
+    
+    return app
 
+def profile_standard_app_request():
+    """Profile a standard Flask app request."""
+    app = create_standard_flask_app()
+    client = app.test_client()
+    
+    # Prepare the request
+    url = f"/api/users/test-user-id?{urlencode(SAMPLE_QUERY_PARAMS)}"
+    
+    # Profile the request handling
+    pr = cProfile.Profile()
+    pr.enable()
+    
+    # Make the request
+    response = client.post(
+        url,
+        json=SAMPLE_USER_DATA,
+        content_type="application/json",
+    )
+    
+    pr.disable()
+    s = io.StringIO()
+    ps = pstats.Stats(pr, stream=s).sort_stats('cumulative')
+    ps.print_stats(20)  # Print top 20 functions by cumulative time
+    print("\nProfile of standard Flask request handling:")
+    print(s.getvalue())
+    
+    # Print response status and data
+    print(f"\nStandard Flask response status: {response.status_code}")
+    if response.status_code == 201:
+        print(f"Response data: {json.loads(response.data)}")
+    else:
+        print(f"Response error: {response.data}")
 
-def test_standard_flask(benchmark, standard_client):
-    """Benchmark standard Flask implementation."""
+def profile_openapi_app_request():
+    """Profile an OpenAPI Flask app request."""
+    app = create_openapi_flask_app()
+    client = app.test_client()
+    
+    # Prepare the request
+    url = f"/api/users/test-user-id?{urlencode(SAMPLE_QUERY_PARAMS)}"
+    
+    # Profile the request handling
+    pr = cProfile.Profile()
+    pr.enable()
+    
+    # Make the request
+    response = client.post(
+        url,
+        json=SAMPLE_USER_DATA,
+        content_type="application/json",
+    )
+    
+    pr.disable()
+    s = io.StringIO()
+    ps = pstats.Stats(pr, stream=s).sort_stats('cumulative')
+    ps.print_stats(20)  # Print top 20 functions by cumulative time
+    print("\nProfile of OpenAPI Flask request handling:")
+    print(s.getvalue())
+    
+    # Print response status and data
+    print(f"\nOpenAPI Flask response status: {response.status_code}")
+    if response.status_code == 201:
+        print(f"Response data: {json.loads(response.data)}")
+    else:
+        print(f"Response error: {response.data}")
 
-    def run():
-        response = standard_client.post(
-            f"/api/users/test-user-id?{urlencode(SAMPLE_QUERY_PARAMS)}",
-            json=SAMPLE_USER_DATA,
-            content_type="application/json",
-        )
-        assert response.status_code == 201
-        data = json.loads(response.data)
-        assert data["id"] == "test-user-id"
-        assert data["username"] == SAMPLE_USER_DATA["username"]
-
-    benchmark(run)
-
-
-def test_openapi_flask(benchmark, openapi_client):
-    """Benchmark flask_x_openapi_schema implementation."""
-
-    def run():
-        response = openapi_client.post(
-            f"/api/users/test-user-id?{urlencode(SAMPLE_QUERY_PARAMS)}",
-            json=SAMPLE_USER_DATA,
-            content_type="application/json",
-        )
-        assert response.status_code == 201
-        data = json.loads(response.data)
-        assert data["id"] == "test-user-id"
-        assert data["username"] == SAMPLE_USER_DATA["username"]
-
-    benchmark(run)
-
-
-def urlencode(params):
-    """Simple URL parameter encoder."""
-    return "&".join(f"{k}={v}" for k, v in params.items())
+if __name__ == "__main__":
+    print("Profiling flask_x_openapi_schema performance...")
+    profile_decorator_creation()
+    profile_standard_app_request()
+    profile_openapi_app_request()
