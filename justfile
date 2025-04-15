@@ -11,5 +11,8 @@ test:
 benchmark-report:
 	uv run python benchmarks/locust_report.py
 
-benchmark: && benchmark-report
+benchmark-test:
+	uv run pytest benchmarks/test_benchmark.py -v
+
+benchmark: benchmark-test && benchmark-report
 	uv run bash benchmarks/run_benchmark.sh
