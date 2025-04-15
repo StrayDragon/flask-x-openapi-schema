@@ -4,8 +4,9 @@ This is an improved version with simplified logic and better maintainability.
 """
 
 import inspect
+import threading
 from collections.abc import Callable
-from functools import wraps
+from functools import wraps, lru_cache
 from dataclasses import dataclass
 
 from typing import (
@@ -43,12 +44,12 @@ try:
     HAS_FLASK_RESTFUL = True
 except ImportError:
     # Define placeholder functions for when Flask-RESTful is not available
-    def create_reqparse_from_pydantic(*args, **kwargs):
+    def create_reqparse_from_pydantic(*_args, **_kwargs):
         raise ImportError(
             "Flask-RESTful is not installed. Install with 'pip install flask-x-openapi-schema[restful]'"
         )
 
-    def extract_openapi_parameters_from_pydantic(*args, **kwargs):
+    def extract_openapi_parameters_from_pydantic(*_args, **_kwargs):
         raise ImportError(
             "Flask-RESTful is not installed. Install with 'pip install flask-x-openapi-schema[restful]'"
         )
@@ -87,13 +88,51 @@ DEFAULT_QUERY_PREFIX = "x_request_query"
 DEFAULT_PATH_PREFIX = "x_request_path"
 DEFAULT_FILE_PREFIX = "x_request_file"
 
-# Global configuration instance
-GLOBAL_CONFIG = ConventionalPrefixConfig(
-    request_body_prefix=DEFAULT_BODY_PREFIX,
-    request_query_prefix=DEFAULT_QUERY_PREFIX,
-    request_path_prefix=DEFAULT_PATH_PREFIX,
-    request_file_prefix=DEFAULT_FILE_PREFIX,
-)
+# Global configuration instance with thread safety
+class ThreadSafeConfig:
+    """Thread-safe configuration holder."""
+
+    def __init__(self):
+        self._config = ConventionalPrefixConfig(
+            request_body_prefix=DEFAULT_BODY_PREFIX,
+            request_query_prefix=DEFAULT_QUERY_PREFIX,
+            request_path_prefix=DEFAULT_PATH_PREFIX,
+            request_file_prefix=DEFAULT_FILE_PREFIX,
+        )
+        self._lock = threading.RLock()
+
+    def get(self) -> ConventionalPrefixConfig:
+        """Get the current configuration."""
+        with self._lock:
+            return ConventionalPrefixConfig(
+                request_body_prefix=self._config.request_body_prefix,
+                request_query_prefix=self._config.request_query_prefix,
+                request_path_prefix=self._config.request_path_prefix,
+                request_file_prefix=self._config.request_file_prefix,
+            )
+
+    def set(self, config: ConventionalPrefixConfig) -> None:
+        """Set a new configuration."""
+        with self._lock:
+            self._config = ConventionalPrefixConfig(
+                request_body_prefix=config.request_body_prefix,
+                request_query_prefix=config.request_query_prefix,
+                request_path_prefix=config.request_path_prefix,
+                request_file_prefix=config.request_file_prefix,
+            )
+
+    def reset(self) -> None:
+        """Reset to default configuration."""
+        with self._lock:
+            self._config = ConventionalPrefixConfig(
+                request_body_prefix=DEFAULT_BODY_PREFIX,
+                request_query_prefix=DEFAULT_QUERY_PREFIX,
+                request_path_prefix=DEFAULT_PATH_PREFIX,
+                request_file_prefix=DEFAULT_FILE_PREFIX,
+            )
+
+# Create a singleton instance
+GLOBAL_CONFIG_HOLDER = ThreadSafeConfig()
 
 
 def configure_prefixes(config: ConventionalPrefixConfig) -> None:
@@ -102,24 +141,39 @@ def configure_prefixes(config: ConventionalPrefixConfig) -> None:
     Args:
         config: Configuration object with parameter prefixes
     """
-    global GLOBAL_CONFIG
-    # Create a new instance to avoid reference issues
-    GLOBAL_CONFIG = ConventionalPrefixConfig(
-        request_body_prefix=config.request_body_prefix,
-        request_query_prefix=config.request_query_prefix,
-        request_path_prefix=config.request_path_prefix,
-        request_file_prefix=config.request_file_prefix,
-    )
+    # Update the configuration in a thread-safe manner
+    GLOBAL_CONFIG_HOLDER.set(config)
+
+    # Clear the parameter prefix cache to ensure fresh values
+    _get_parameter_prefixes.cache_clear()
 
 
 def reset_prefixes() -> None:
     """Reset parameter prefixes to default values."""
-    global GLOBAL_CONFIG
-    GLOBAL_CONFIG = ConventionalPrefixConfig(
-        request_body_prefix=DEFAULT_BODY_PREFIX,
-        request_query_prefix=DEFAULT_QUERY_PREFIX,
-        request_path_prefix=DEFAULT_PATH_PREFIX,
-        request_file_prefix=DEFAULT_FILE_PREFIX,
+    # Reset the configuration in a thread-safe manner
+    GLOBAL_CONFIG_HOLDER.reset()
+
+    # Clear the parameter prefix cache to ensure fresh values
+    _get_parameter_prefixes.cache_clear()
+
+
+@lru_cache(maxsize=128)
+def _get_parameter_prefixes(config: Optional[ConventionalPrefixConfig] = None) -> Tuple[str, str, str, str]:
+    """
+    Get parameter prefixes from config or global defaults.
+
+    Args:
+        config: Optional configuration object with custom prefixes
+
+    Returns:
+        Tuple of (body_prefix, query_prefix, path_prefix, file_prefix)
+    """
+    prefix_config = config or GLOBAL_CONFIG_HOLDER.get()
+    return (
+        prefix_config.request_body_prefix,
+        prefix_config.request_query_prefix,
+        prefix_config.request_path_prefix,
+        prefix_config.request_file_prefix
     )
 
 
@@ -143,11 +197,8 @@ def _detect_parameters(
     detected_query_model = None
     detected_path_params = []
 
-    # Use custom prefixes if provided, otherwise use defaults
-    prefix_config = config or GLOBAL_CONFIG
-    body_prefix = prefix_config.request_body_prefix
-    query_prefix = prefix_config.request_query_prefix
-    path_prefix = prefix_config.request_path_prefix
+    # Get parameter prefixes (cached)
+    body_prefix, query_prefix, path_prefix, _ = _get_parameter_prefixes(config)
 
     # Precompute path prefix length to avoid repeated calculations
     path_prefix_len = len(path_prefix) + 1  # +1 for the underscore
@@ -228,9 +279,9 @@ def _generate_openapi_metadata(
     external_docs: Optional[Dict[str, str]],
     actual_request_body: Optional[Union[Type[BaseModel], Dict[str, Any]]],
     responses: Optional[Dict[str, Any]],
-    parameters: Optional[List[Dict[str, Any]]],
-    actual_query_model: Optional[Type[BaseModel]],
-    actual_path_params: Optional[List[str]],
+    _parameters: Optional[List[Dict[str, Any]]],
+    _actual_query_model: Optional[Type[BaseModel]],
+    _actual_path_params: Optional[List[str]],
     language: Optional[str],
 ) -> Dict[str, Any]:
     """
@@ -342,7 +393,7 @@ def _detect_file_parameters(
     file_params = []
 
     # Use custom prefix if provided, otherwise use default
-    prefix_config = config or GLOBAL_CONFIG
+    prefix_config = config or GLOBAL_CONFIG_HOLDER.get()
     file_prefix = prefix_config.request_file_prefix
     file_prefix_len = len(file_prefix) + 1  # +1 for the underscore
 
@@ -388,6 +439,64 @@ def _detect_file_parameters(
         )
 
     return file_params
+
+
+def _preprocess_request_data(data: Dict[str, Any], model: Type[BaseModel]) -> Dict[str, Any]:
+    """
+    Pre-process request data to handle list fields and other complex types correctly.
+
+    Args:
+        data: The request data to process
+        model: The Pydantic model to use for type information
+
+    Returns:
+        Processed data that can be validated by Pydantic
+    """
+    if not hasattr(model, "model_fields"):
+        return data
+
+    result = {}
+
+    # Process each field based on its type annotation
+    for field_name, field_info in model.model_fields.items():
+        if field_name not in data:
+            continue
+
+        field_value = data[field_name]
+        field_type = field_info.annotation
+
+        # Handle list fields
+        origin = getattr(field_type, "__origin__", None)
+        if origin is list or origin is List:
+            # If the value is a string that looks like a JSON array, parse it
+            if isinstance(field_value, str) and field_value.startswith('[') and field_value.endswith(']'):
+                try:
+                    import json
+                    result[field_name] = json.loads(field_value)
+                    continue
+                except json.JSONDecodeError:
+                    pass
+
+            # If it's already a list, use it as is
+            if isinstance(field_value, list):
+                result[field_name] = field_value
+            else:
+                # Try to convert to a list if possible
+                try:
+                    result[field_name] = [field_value]
+                except Exception:
+                    # If conversion fails, keep the original value
+                    result[field_name] = field_value
+        else:
+            # For non-list fields, keep the original value
+            result[field_name] = field_value
+
+    # Add any fields from the original data that weren't processed
+    for key, value in data.items():
+        if key not in result:
+            result[key] = value
+
+    return result
 
 
 def _extract_param_types(
@@ -532,9 +641,9 @@ def openapi_metadata(
             external_docs=external_docs,
             actual_request_body=actual_request_body,
             responses=responses,
-            parameters=parameters,
-            actual_query_model=actual_query_model,
-            actual_path_params=actual_path_params,
+            _parameters=parameters,
+            _actual_query_model=actual_query_model,
+            _actual_path_params=actual_path_params,
             language=language,
         )
 
@@ -596,12 +705,8 @@ def openapi_metadata(
                 # Skip 'self' and 'cls' parameters
                 skip_params = {"self", "cls"}
 
-                # Use custom prefixes if provided, otherwise use defaults
-                prefix_config_to_use = prefix_config or GLOBAL_CONFIG
-                body_prefix = prefix_config_to_use.request_body_prefix
-                query_prefix = prefix_config_to_use.request_query_prefix
-                path_prefix = prefix_config_to_use.request_path_prefix
-                file_prefix = prefix_config_to_use.request_file_prefix
+                # Get parameter prefixes (cached)
+                body_prefix, query_prefix, path_prefix, file_prefix = _get_parameter_prefixes(prefix_config)
 
                 # Precompute prefix lengths for path and file parameters
                 path_prefix_len = len(path_prefix) + 1  # +1 for the underscore
@@ -638,19 +743,28 @@ def openapi_metadata(
                                 # Direct Flask approach without reqparse
                                 body_data = request.get_json(silent=True) or {}
 
+                                # Pre-process the body data to handle list fields correctly
+                                processed_body_data = _preprocess_request_data(body_data, actual_request_body)
+
                                 # Try to use model_validate first (better handling of complex types)
                                 try:
                                     model_instance = actual_request_body.model_validate(
-                                        body_data
+                                        processed_body_data
                                     )
                                     kwargs[param_name] = model_instance
-                                except Exception:
+                                except Exception as e:
+                                    # Log the validation error for debugging
+                                    import logging
+                                    logging.getLogger(__name__).debug(
+                                        f"Validation error: {e}. Falling back to manual construction."
+                                    )
+
                                     # Fallback to the old approach if model_validate fails
                                     # Filter body data to only include fields in the model
                                     model_fields = actual_request_body.model_fields
                                     filtered_body_data = {
                                         k: v
-                                        for k, v in body_data.items()
+                                        for k, v in processed_body_data.items()
                                         if k in model_fields
                                     }
                                     model_instance = actual_request_body(

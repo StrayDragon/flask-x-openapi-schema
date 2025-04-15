@@ -3,12 +3,41 @@ Utility functions for OpenAPI schema generation.
 """
 
 import inspect
+import threading
 from datetime import date, datetime, time
 from enum import Enum
-from typing import Any, Optional, Union
+from functools import lru_cache
+from typing import Any, Dict, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel
+
+
+# Thread-safe cache for model schemas
+class ThreadSafeModelSchemaCache:
+    """Thread-safe cache for model schemas."""
+
+    def __init__(self):
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._lock = threading.RLock()
+
+    def get(self, key: str) -> Optional[Dict[str, Any]]:
+        """Get a schema from the cache."""
+        with self._lock:
+            return self._cache.get(key)
+
+    def set(self, key: str, value: Dict[str, Any]) -> None:
+        """Set a schema in the cache."""
+        with self._lock:
+            self._cache[key] = value
+
+    def contains(self, key: str) -> bool:
+        """Check if a key exists in the cache."""
+        with self._lock:
+            return key in self._cache
+
+# Create a singleton instance
+_MODEL_SCHEMA_CACHE = ThreadSafeModelSchemaCache()
 
 
 def pydantic_to_openapi_schema(model: type[BaseModel]) -> dict[str, Any]:
@@ -21,6 +50,12 @@ def pydantic_to_openapi_schema(model: type[BaseModel]) -> dict[str, Any]:
     Returns:
         The OpenAPI schema for the model
     """
+    # Check if schema is already in cache
+    model_key = f"{model.__module__}.{model.__name__}"
+    cached_schema = _MODEL_SCHEMA_CACHE.get(model_key)
+    if cached_schema is not None:
+        return cached_schema
+
     schema: dict[str, Any] = {"type": "object", "properties": {}, "required": []}
 
     # Get model schema from Pydantic
@@ -37,9 +72,13 @@ def pydantic_to_openapi_schema(model: type[BaseModel]) -> dict[str, Any]:
     if model.__doc__:
         schema["description"] = model.__doc__.strip()
 
+    # Cache the schema
+    _MODEL_SCHEMA_CACHE.set(model_key, schema)
+
     return schema
 
 
+@lru_cache(maxsize=128)
 def python_type_to_openapi_type(python_type: Any) -> dict[str, Any]:
     """
     Convert a Python type to an OpenAPI type.

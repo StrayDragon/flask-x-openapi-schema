@@ -2,7 +2,7 @@ from .decorators import (
     ConventionalPrefixConfig,
     configure_prefixes,
     reset_prefixes,
-    GLOBAL_CONFIG,
+    GLOBAL_CONFIG_HOLDER,
     openapi_metadata,
 )
 from .i18n import I18nStr, get_current_language, set_current_language
@@ -31,7 +31,7 @@ __all__ = [
     "ConventionalPrefixConfig",
     "configure_prefixes",
     "reset_prefixes",
-    "GLOBAL_CONFIG",
+    "GLOBAL_CONFIG_HOLDER",
     # Base models
     "BaseRespModel",
     "I18nBaseModel",

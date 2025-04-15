@@ -5,7 +5,9 @@ This module provides the main class for generating OpenAPI schemas from Flask-RE
 """
 
 import re
-from typing import Any, Optional, get_type_hints
+import threading
+from functools import lru_cache
+from typing import Any, Dict, Optional, Set, Tuple, get_type_hints
 
 from flask import Blueprint
 from flask_restful import Resource  # type: ignore
@@ -55,7 +57,13 @@ class OpenAPISchemaGenerator:
             "securitySchemes": {},
         }
         self.tags: list[dict[str, str]] = []
-        self._registered_models: set[type[BaseModel]] = set()
+        self._registered_models: Set[type[BaseModel]] = set()
+
+        # Thread safety locks
+        self._paths_lock = threading.RLock()
+        self._components_lock = threading.RLock()
+        self._tags_lock = threading.RLock()
+        self._models_lock = threading.RLock()
 
     def add_security_scheme(self, name: str, scheme: dict[str, Any]) -> None:
         """
@@ -65,7 +73,8 @@ class OpenAPISchemaGenerator:
             name: The name of the security scheme
             scheme: The security scheme definition
         """
-        self.components["securitySchemes"][name] = scheme
+        with self._components_lock:
+            self.components["securitySchemes"][name] = scheme
 
     def add_tag(self, name: str, description: str = "") -> None:
         """
@@ -75,7 +84,8 @@ class OpenAPISchemaGenerator:
             name: The name of the tag
             description: The description of the tag
         """
-        self.tags.append({"name": name, "description": description})
+        with self._tags_lock:
+            self.tags.append({"name": name, "description": description})
 
     def scan_blueprint(self, blueprint: Blueprint) -> None:
         """
@@ -88,7 +98,7 @@ class OpenAPISchemaGenerator:
         if not hasattr(blueprint, "resources"):
             return
 
-        for resource, urls, kwargs in blueprint.resources:
+        for resource, urls, _ in blueprint.resources:
             self._process_resource(resource, urls, blueprint.url_prefix)
 
     def _process_resource(
@@ -107,12 +117,8 @@ class OpenAPISchemaGenerator:
             # Convert Flask URL parameters to OpenAPI parameters
             openapi_path = self._convert_flask_path_to_openapi_path(full_url)
 
-            # Initialize path item if it doesn't exist
-            if openapi_path not in self.paths:
-                self.paths[openapi_path] = {}
-
-            # Process HTTP methods
-            for method_name in [
+            # Process HTTP methods and build operations
+            http_methods = [
                 "get",
                 "post",
                 "put",
@@ -120,7 +126,10 @@ class OpenAPISchemaGenerator:
                 "patch",
                 "head",
                 "options",
-            ]:
+            ]
+
+            operations = {}
+            for method_name in http_methods:
                 if hasattr(resource, method_name):
                     method = getattr(resource, method_name)
                     operation = self._build_operation_from_method(method, resource)
@@ -132,6 +141,16 @@ class OpenAPISchemaGenerator:
                             operation["parameters"] = []
                         operation["parameters"].extend(path_params)
 
+                    operations[method_name] = operation
+
+            # Update paths in a thread-safe manner
+            with self._paths_lock:
+                # Initialize path item if it doesn't exist
+                if openapi_path not in self.paths:
+                    self.paths[openapi_path] = {}
+
+                # Add all operations at once
+                for method_name, operation in operations.items():
                     self.paths[openapi_path][method_name] = operation
 
     def _convert_flask_path_to_openapi_path(self, flask_path: str) -> str:
@@ -191,6 +210,11 @@ class OpenAPISchemaGenerator:
         }
         return converter_map.get(converter, {"type": "string"})
 
+    @lru_cache(maxsize=128)
+    def _get_operation_id(self, resource_name: str, method_name: str) -> str:
+        """Generate a cached operation ID for a resource method."""
+        return f"{resource_name}_{method_name}"
+
     def _build_operation_from_method(
         self, method: Any, resource_cls: type[Resource]
     ) -> dict[str, Any]:
@@ -231,7 +255,9 @@ class OpenAPISchemaGenerator:
 
         # Get operation ID
         if "operationId" not in operation:
-            operation["operationId"] = f"{resource_cls.__name__}_{method.__name__}"
+            operation["operationId"] = self._get_operation_id(
+                resource_cls.__name__, method.__name__
+            )
 
         # Extract request and response schemas from type annotations
         self._add_request_schema(method, operation)
@@ -315,24 +341,61 @@ class OpenAPISchemaGenerator:
         Args:
             model: The Pydantic model to register
         """
-        if model in self._registered_models:
-            return
+        with self._models_lock:
+            # Skip if already registered
+            if model in self._registered_models:
+                return
 
-        self._registered_models.add(model)
+            # Add to registered models set
+            self._registered_models.add(model)
 
-        # Handle I18nBaseModel by creating a language-specific version
+        # Generate schema (thread-safe via utils.py caching)
         if issubclass(model, I18nBaseModel):
             # Create a language-specific version of the model
             language_model = model.for_language(self.language)
-            self.components["schemas"][model.__name__] = pydantic_to_openapi_schema(
-                language_model
-            )
+            schema = pydantic_to_openapi_schema(language_model)
         else:
-            self.components["schemas"][model.__name__] = pydantic_to_openapi_schema(
-                model
-            )
+            # Use the cached version from utils.py
+            schema = pydantic_to_openapi_schema(model)
 
-    def _process_i18n_dict(self, data: dict[str, Any]) -> dict[str, Any]:
+        # Update components in a thread-safe manner
+        with self._components_lock:
+            self.components["schemas"][model.__name__] = schema
+
+        # Register nested models
+        self._register_nested_models(model)
+
+    def _register_nested_models(self, model: type[BaseModel]) -> None:
+        """
+        Register nested Pydantic models found in fields of the given model.
+
+        Args:
+            model: The Pydantic model to scan for nested models
+        """
+        # Get model fields
+        if not hasattr(model, "model_fields"):
+            return
+
+        # Check each field for nested models
+        for _, field_info in model.model_fields.items():
+            field_type = field_info.annotation
+
+            # Handle direct BaseModel references
+            if isinstance(field_type, type) and issubclass(field_type, BaseModel):
+                self._register_model(field_type)
+                continue
+
+            # Handle List[BaseModel] and similar container types
+            origin = getattr(field_type, "__origin__", None)
+            args = getattr(field_type, "__args__", [])
+
+            if origin and args:
+                for arg in args:
+                    if isinstance(arg, type) and issubclass(arg, BaseModel):
+                        self._register_model(arg)
+
+    @lru_cache(maxsize=64)
+    def _process_i18n_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Process a dictionary that might contain I18nString values.
 
@@ -342,8 +405,22 @@ class OpenAPISchemaGenerator:
         Returns:
             A new dictionary with I18nString values converted to strings
         """
+        # Convert dict to tuple of items for hashability in lru_cache
+        items = tuple(sorted(data.items()))
+        return self._process_i18n_dict_items(items)
+
+    def _process_i18n_dict_items(self, items: Tuple[Tuple[str, Any], ...]) -> Dict[str, Any]:
+        """
+        Process dictionary items that might contain I18nString values.
+
+        Args:
+            items: Tuple of key-value pairs
+
+        Returns:
+            A new dictionary with I18nString values converted to strings
+        """
         result = {}
-        for key, value in data.items():
+        for key, value in items:
             if isinstance(value, I18nStr):
                 result[key] = value.get(self.language)
             elif isinstance(value, dict):
