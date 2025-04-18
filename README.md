@@ -1,8 +1,8 @@
 # Flask-X-OpenAPI-Schema
 
-[![Python](https://img.shields.io/badge/python-3.8%20%7C%203.10%20%7C%203.11-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Coverage](https://img.shields.io/badge/coverage-32%25-red.svg)](htmlcov/index.html)
+[![Coverage](https://img.shields.io/badge/coverage-needs%20improvement-yellow.svg)](htmlcov/index.html)
 [![GitHub](https://img.shields.io/badge/github-flask--x--openapi--schema-lightgrey.svg)](https://github.com/StrayDragon/flask-x-openapi-schema)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
