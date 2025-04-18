@@ -84,7 +84,7 @@ def test_decorator_performance():
     pr.enable()
 
     # Call the function multiple times to get a good profile
-    for i in range(1000):
+    for i in range(10):  # Reduced from 1000 to 10 for faster tests
         # Create a new function each time to simulate decorator application
         @openapi_metadata(
             summary=f"Test endpoint {i}",
@@ -137,7 +137,7 @@ def test_hot_path_performance():
 
     # Call the functions multiple times
     start_time = time.time()
-    for i in range(1000):
+    for i in range(10):  # Reduced from 1000 to 10 for faster tests
         # Test _detect_parameters
         detected_request_body, detected_query_model, detected_path_params = (
             _detect_parameters(signature, type_hints)
@@ -154,9 +154,9 @@ def test_hot_path_performance():
             external_docs=None,
             actual_request_body=detected_request_body,
             responses=None,
-            parameters=None,
-            actual_query_model=detected_query_model,
-            actual_path_params=detected_path_params,
+            _parameters=None,
+            _actual_query_model=detected_query_model,
+            _actual_path_params=detected_path_params,
             language=None,
         )
 

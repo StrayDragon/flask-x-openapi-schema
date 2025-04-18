@@ -9,7 +9,7 @@ from typing import Optional
 
 from flask_x_openapi_schema.decorators import (
     ConventionalPrefixConfig,
-    GLOBAL_CONFIG,
+    GLOBAL_CONFIG_HOLDER,
     configure_prefixes,
     openapi_metadata,
 )
@@ -34,10 +34,11 @@ class ConfigTestQueryModel(BaseModel):
 def test_openapi_config_defaults():
     """Test the default values of ConventionalPrefixConfig."""
     # Test the default global config
-    assert GLOBAL_CONFIG.request_body_prefix == "x_request_body"
-    assert GLOBAL_CONFIG.request_query_prefix == "x_request_query"
-    assert GLOBAL_CONFIG.request_path_prefix == "x_request_path"
-    assert GLOBAL_CONFIG.request_file_prefix == "x_request_file"
+    global_config = GLOBAL_CONFIG_HOLDER.get()
+    assert global_config.request_body_prefix == "x_request_body"
+    assert global_config.request_query_prefix == "x_request_query"
+    assert global_config.request_path_prefix == "x_request_path"
+    assert global_config.request_file_prefix == "x_request_file"
 
     # Test creating a new config with defaults
     config = ConventionalPrefixConfig()
@@ -67,7 +68,7 @@ def test_openapi_config_configure():
 def test_openapi_metadata_with_custom_prefixes():
     """Test openapi_metadata decorator with custom parameter prefixes."""
     # Save original global config
-    original_config = GLOBAL_CONFIG
+    original_config = GLOBAL_CONFIG_HOLDER.get()
 
     try:
         # Create a custom config
