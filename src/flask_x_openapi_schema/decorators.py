@@ -62,7 +62,7 @@ R = TypeVar("R")
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-@dataclass
+@dataclass(frozen=True)
 class ConventionalPrefixConfig:
     """Configuration class for OpenAPI parameter prefixes.
 

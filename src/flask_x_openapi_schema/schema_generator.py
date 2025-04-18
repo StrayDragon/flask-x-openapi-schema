@@ -7,7 +7,7 @@ This module provides the main class for generating OpenAPI schemas from Flask-RE
 import re
 import threading
 from functools import lru_cache
-from typing import Any, Dict, Optional, Set, Tuple, get_type_hints
+from typing import Any, Dict, Optional, Set, get_type_hints
 
 from flask import Blueprint
 from flask_restful import Resource  # type: ignore
@@ -394,7 +394,6 @@ class OpenAPISchemaGenerator:
                     if isinstance(arg, type) and issubclass(arg, BaseModel):
                         self._register_model(arg)
 
-    @lru_cache(maxsize=64)
     def _process_i18n_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Process a dictionary that might contain I18nString values.
@@ -405,22 +404,8 @@ class OpenAPISchemaGenerator:
         Returns:
             A new dictionary with I18nString values converted to strings
         """
-        # Convert dict to tuple of items for hashability in lru_cache
-        items = tuple(sorted(data.items()))
-        return self._process_i18n_dict_items(items)
-
-    def _process_i18n_dict_items(self, items: Tuple[Tuple[str, Any], ...]) -> Dict[str, Any]:
-        """
-        Process dictionary items that might contain I18nString values.
-
-        Args:
-            items: Tuple of key-value pairs
-
-        Returns:
-            A new dictionary with I18nString values converted to strings
-        """
         result = {}
-        for key, value in items:
+        for key, value in data.items():
             if isinstance(value, I18nStr):
                 result[key] = value.get(self.language)
             elif isinstance(value, dict):
@@ -430,6 +415,8 @@ class OpenAPISchemaGenerator:
             else:
                 result[key] = value
         return result
+
+
 
     def _process_i18n_value(self, value: Any) -> Any:
         """
