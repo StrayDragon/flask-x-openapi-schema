@@ -29,7 +29,7 @@ from .mixins import OpenAPIIntegrationMixin
 )
 @click.option(
     "--title",
-    default="Dify API",
+    default="API",
     help="API title",
 )
 @click.option(
@@ -39,7 +39,7 @@ from .mixins import OpenAPIIntegrationMixin
 )
 @click.option(
     "--description",
-    default="Dify API Documentation",
+    default="API Documentation",
     help="API description",
 )
 @click.option(
@@ -48,16 +48,6 @@ from .mixins import OpenAPIIntegrationMixin
     default="yaml",
     type=click.Choice(["yaml", "json"]),
     help="Output format (yaml or json)",
-)
-@click.option(
-    "--mdx",
-    is_flag=True,
-    help="Generate MDX documentation",
-)
-@click.option(
-    "--mdx-output-dir",
-    default="web/app/components/develop/template",
-    help="Output directory for MDX documentation",
 )
 @click.option(
     "--language",
@@ -74,8 +64,6 @@ def generate_openapi_command(
     version: str,
     description: str,
     format: Literal["yaml", "json"],
-    mdx: bool,
-    mdx_output_dir: str,
     language: list[str],
 ) -> None:
     """Generate OpenAPI schema and documentation."""
@@ -136,23 +124,7 @@ def generate_openapi_command(
 
         click.echo(f"Generated OpenAPI schema for {name} blueprint: {blueprint_output}")
 
-        # Generate MDX documentation if requested
-        if mdx:
-            for lang in language:
-                # Set the current language for this iteration
-                set_current_language(lang)
 
-                # Generate a language-specific schema
-                api.generate_openapi_schema(
-                    title=I18nStr(dict.fromkeys(language, f"{title} - {name}")),
-                    version=version,
-                    description=i18n_description,
-                    output_format=format,
-                    language=lang,
-                )
-
-                mdx_dir = os.path.join(mdx_output_dir, lang)
-                os.makedirs(mdx_dir, exist_ok=True)
 
 
 def register_commands(app: Flask) -> None:
