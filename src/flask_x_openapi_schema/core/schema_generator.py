@@ -1,5 +1,5 @@
 """
-OpenAPI Schema Generator for Dify API.
+OpenAPI Schema Generator for API documentation.
 
 This module provides the main class for generating OpenAPI schemas from Flask-RESTful resources.
 """
@@ -13,8 +13,8 @@ from flask import Blueprint
 from flask_restful import Resource  # type: ignore
 from pydantic import BaseModel
 
-from .i18n.i18n_model import I18nBaseModel
-from .i18n.i18n_string import I18nStr, get_current_language
+from ..i18n.i18n_model import I18nBaseModel
+from ..i18n.i18n_string import I18nStr, get_current_language
 from .utils import pydantic_to_openapi_schema
 
 

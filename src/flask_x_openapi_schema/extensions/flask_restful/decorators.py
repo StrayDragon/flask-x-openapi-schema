@@ -2,12 +2,12 @@
 Decorators for adding OpenAPI metadata to Flask-RESTful Resource endpoints.
 """
 
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, Union
 
 from pydantic import BaseModel
-import pytest
 
-from .base import OpenAPIDecoratorBase, extract_openapi_parameters_from_pydantic
+from ...core.config import ConventionalPrefixConfig
+from ...i18n.i18n_string import I18nStr
 
 # Cache for reqparse objects
 _REQPARSE_CACHE = {}
@@ -15,36 +15,124 @@ _REQPARSE_CACHE = {}
 # Cache for model instances
 _MODEL_INSTANCE_CACHE = {}
 
-# Check if Flask-RESTful is available
-try:
-    import flask_restful  # type: ignore
-except ImportError:
-    pytest.skip("Flask-RESTful not installed")
 
-
-from flask_x_openapi_schema.restful_utils import create_reqparse_from_pydantic
-
-
-class FlaskRestfulOpenAPIDecorator(OpenAPIDecoratorBase):
+class FlaskRestfulOpenAPIDecorator:
     """OpenAPI metadata decorator for Flask-RESTful Resource."""
 
-    def __init__(self, *args, **kwargs):
-        """Initialize the decorator and check if Flask-RESTful is available."""
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        summary: Optional[Union[str, I18nStr]] = None,
+        description: Optional[Union[str, I18nStr]] = None,
+        tags: Optional[List[str]] = None,
+        operation_id: Optional[str] = None,
+        request_body: Optional[Union[Type[BaseModel], Dict[str, Any]]] = None,
+        responses: Optional[Dict[str, Any]] = None,
+        parameters: Optional[List[Dict[str, Any]]] = None,
+        deprecated: bool = False,
+        security: Optional[List[Dict[str, List[str]]]] = None,
+        external_docs: Optional[Dict[str, str]] = None,
+        query_model: Optional[Type[BaseModel]] = None,
+        path_params: Optional[List[str]] = None,
+        auto_detect_params: bool = True,
+        language: Optional[str] = None,
+        prefix_config: Optional[ConventionalPrefixConfig] = None,
+    ):
+        """Initialize the decorator with OpenAPI metadata parameters."""
+        # Store parameters for later use
+        self.summary = summary
+        self.description = description
+        self.tags = tags
+        self.operation_id = operation_id
+        self.request_body = request_body
+        self.responses = responses
+        self.parameters = parameters
+        self.deprecated = deprecated
+        self.security = security
+        self.external_docs = external_docs
+        self.query_model = query_model
+        self.path_params = path_params
+        self.auto_detect_params = auto_detect_params
+        self.language = language
+        self.prefix_config = prefix_config
+        self.framework = "flask_restful"
+
+        # We'll initialize the base decorator when needed
+        self.base_decorator = None
         self.parsed_args = None
+
+    def __call__(self, func):
+        """Apply the decorator to the function."""
+        # Initialize the base decorator if needed
+        if self.base_decorator is None:
+            # Import here to avoid circular imports
+            from ...core.decorator_base import OpenAPIDecoratorBase
+            self.base_decorator = OpenAPIDecoratorBase(
+                summary=self.summary,
+                description=self.description,
+                tags=self.tags,
+                operation_id=self.operation_id,
+                request_body=self.request_body,
+                responses=self.responses,
+                parameters=self.parameters,
+                deprecated=self.deprecated,
+                security=self.security,
+                external_docs=self.external_docs,
+                query_model=self.query_model,
+                path_params=self.path_params,
+                auto_detect_params=self.auto_detect_params,
+                language=self.language,
+                prefix_config=self.prefix_config,
+                framework=self.framework,
+            )
+        return self.base_decorator(func)
 
     def extract_parameters_from_models(
         self, query_model: Optional[Type[BaseModel]], path_params: Optional[List[str]]
     ) -> List[Dict[str, Any]]:
         """Extract OpenAPI parameters from models."""
-        return extract_openapi_parameters_from_pydantic(
-            query_model=query_model, path_params=path_params
-        )
+        # Create parameters for OpenAPI schema
+        parameters = []
+
+        # Add path parameters
+        if path_params:
+            for param in path_params:
+                parameters.append(
+                    {
+                        "name": param,
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string"},
+                    }
+                )
+
+        # Add query parameters
+        if query_model:
+            schema = query_model.model_json_schema()
+            properties = schema.get("properties", {})
+            required = schema.get("required", [])
+
+            for field_name, field_schema in properties.items():
+                param = {
+                    "name": field_name,
+                    "in": "query",
+                    "required": field_name in required,
+                    "schema": field_schema,
+                }
+
+                # Add description if available
+                if "description" in field_schema:
+                    param["description"] = field_schema["description"]
+
+                parameters.append(param)
+
+        return parameters
 
     def process_request_body(
         self, param_name: str, model: Type[BaseModel], kwargs: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Process request body parameters for Flask-RESTful."""
+        from ..flask_restful.utils import create_reqparse_from_pydantic
+
         # Check if we've already created a reqparse for this model
         if id(model) in _REQPARSE_CACHE:
             parser = _REQPARSE_CACHE[model]
@@ -88,6 +176,8 @@ class FlaskRestfulOpenAPIDecorator(OpenAPIDecoratorBase):
         self, param_name: str, model: Type[BaseModel], kwargs: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Process query parameters for Flask-RESTful."""
+        from ..flask_restful.utils import create_reqparse_from_pydantic
+
         if not self.parsed_args:
             # Check if we've already created a reqparse for this model
             if id(model) in _REQPARSE_CACHE:

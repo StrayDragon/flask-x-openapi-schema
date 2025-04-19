@@ -6,14 +6,11 @@ from flask import Blueprint
 from flask.views import MethodView
 from pydantic import BaseModel
 
+from flask_x_openapi_schema import OpenAPIMethodViewMixin
+from flask_x_openapi_schema.extensions.flask.views import extract_openapi_parameters_from_methodview, extract_pydantic_data
+from flask_x_openapi_schema.extensions.flask_restful.resources import MethodViewOpenAPISchemaGenerator
 from tests.test_helpers import flask_request_context
 
-from flask_x_openapi_schema.methodview_utils import (
-    MethodViewOpenAPISchemaGenerator,
-    OpenAPIMethodViewMixin,
-    extract_openapi_parameters_from_methodview,
-    extract_pydantic_data,
-)
 
 
 class TestMethodViewUtilsCoverage:

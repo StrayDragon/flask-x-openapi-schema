@@ -10,8 +10,8 @@ import click
 from flask import Flask
 from flask.cli import with_appcontext
 
-from .i18n import I18nStr, set_current_language
-from .mixins import OpenAPIIntegrationMixin
+from ..i18n import I18nStr, set_current_language
+from ..extensions.flask_restful import OpenAPIIntegrationMixin
 
 
 @click.command("generate-openapi")

@@ -10,12 +10,8 @@ import inspect
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
-from flask_x_openapi_schema.decorators.flask import openapi_metadata
-from flask_x_openapi_schema.decorators.base import (
-    _detect_parameters,
-    _generate_openapi_metadata,
-    _extract_param_types,
-)
+from flask_x_openapi_schema import openapi_metadata
+from flask_x_openapi_schema.core.decorator_base import _detect_parameters, _generate_openapi_metadata
 from flask_x_openapi_schema.models.base import BaseRespModel
 
 
@@ -158,12 +154,6 @@ def test_hot_path_performance():
             _actual_query_model=detected_query_model,
             _actual_path_params=detected_path_params,
             language=None,
-        )
-
-        # Test _extract_param_types
-        _extract_param_types(
-            request_body_model=detected_request_body,
-            query_model=detected_query_model,
         )
 
     end_time = time.time()

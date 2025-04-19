@@ -17,7 +17,7 @@ from flask_x_openapi_schema import (
     OpenAPIBlueprintMixin,
     OpenAPIMethodViewMixin,
 )
-from flask_x_openapi_schema.decorators.flask import openapi_metadata
+from flask_x_openapi_schema.extensions.flask import openapi_metadata
 
 
 # Define Pydantic models for request and response

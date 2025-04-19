@@ -3,7 +3,6 @@ Utility functions for OpenAPI schema generation.
 """
 
 import inspect
-import threading
 from datetime import date, datetime, time
 from enum import Enum
 from functools import lru_cache
@@ -12,33 +11,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-
-# Thread-safe cache for model schemas
-class ThreadSafeModelSchemaCache:
-    """Thread-safe cache for model schemas."""
-
-    def __init__(self):
-        self._cache: Dict[str, Dict[str, Any]] = {}
-        self._lock = threading.RLock()
-
-    def get(self, key: str) -> Optional[Dict[str, Any]]:
-        """Get a schema from the cache."""
-        with self._lock:
-            return self._cache.get(key)
-
-    def set(self, key: str, value: Dict[str, Any]) -> None:
-        """Set a schema in the cache."""
-        with self._lock:
-            self._cache[key] = value
-
-    def contains(self, key: str) -> bool:
-        """Check if a key exists in the cache."""
-        with self._lock:
-            return key in self._cache
-
-
-# Create a singleton instance
-_MODEL_SCHEMA_CACHE = ThreadSafeModelSchemaCache()
+from .cache import MODEL_SCHEMA_CACHE
 
 
 def pydantic_to_openapi_schema(model: type[BaseModel]) -> dict[str, Any]:
@@ -53,7 +26,7 @@ def pydantic_to_openapi_schema(model: type[BaseModel]) -> dict[str, Any]:
     """
     # Check if schema is already in cache
     model_key = f"{model.__module__}.{model.__name__}"
-    cached_schema = _MODEL_SCHEMA_CACHE.get(model_key)
+    cached_schema = MODEL_SCHEMA_CACHE.get(model_key)
     if cached_schema is not None:
         return cached_schema
 
@@ -74,7 +47,7 @@ def pydantic_to_openapi_schema(model: type[BaseModel]) -> dict[str, Any]:
         schema["description"] = model.__doc__.strip()
 
     # Cache the schema
-    _MODEL_SCHEMA_CACHE.set(model_key, schema)
+    MODEL_SCHEMA_CACHE.set(model_key, schema)
 
     return schema
 
@@ -220,3 +193,52 @@ def responses_schema(
             responses.update(error_response_schema(description, status_code))
 
     return responses
+
+
+def process_i18n_value(value: Any, language: str) -> Any:
+    """
+    Process a value that might be an I18nString or contain I18nString values.
+
+    Args:
+        value: The value to process
+        language: The language to use
+
+    Returns:
+        The processed value
+    """
+    from ..i18n.i18n_string import I18nStr
+
+    if isinstance(value, I18nStr):
+        return value.get(language)
+    elif isinstance(value, dict):
+        return process_i18n_dict(value, language)
+    elif isinstance(value, list):
+        return [process_i18n_value(item, language) for item in value]
+    else:
+        return value
+
+
+def process_i18n_dict(data: Dict[str, Any], language: str) -> Dict[str, Any]:
+    """
+    Process a dictionary that might contain I18nString values.
+
+    Args:
+        data: The dictionary to process
+        language: The language to use
+
+    Returns:
+        A new dictionary with I18nString values converted to strings
+    """
+    from ..i18n.i18n_string import I18nStr
+
+    result = {}
+    for key, value in data.items():
+        if isinstance(value, I18nStr):
+            result[key] = value.get(language)
+        elif isinstance(value, dict):
+            result[key] = process_i18n_dict(value, language)
+        elif isinstance(value, list):
+            result[key] = [process_i18n_value(item, language) for item in value]
+        else:
+            result[key] = value
+    return result

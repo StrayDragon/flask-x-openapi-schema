@@ -8,7 +8,7 @@ from flask import request
 from flask.views import MethodView
 from pydantic import BaseModel
 
-from .schema_generator import OpenAPISchemaGenerator
+from ...core.schema_generator import OpenAPISchemaGenerator
 
 
 class OpenAPIMethodViewMixin:

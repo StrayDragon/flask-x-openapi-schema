@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Any
 from uuid import UUID
 from pydantic import BaseModel, Field
 
-from flask_x_openapi_schema.utils import (
+from flask_x_openapi_schema.core.utils import (
     pydantic_to_openapi_schema,
     python_type_to_openapi_type,
     response_schema,

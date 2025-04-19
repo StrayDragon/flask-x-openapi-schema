@@ -7,13 +7,13 @@ This module tests the configurable parameter prefixes.
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from flask_x_openapi_schema.decorators import (
+from flask_x_openapi_schema.core.config import (
     ConventionalPrefixConfig,
     GLOBAL_CONFIG_HOLDER,
     configure_prefixes,
 )
-from flask_x_openapi_schema.decorators.flask import openapi_metadata
-from flask_x_openapi_schema.mixins import OpenAPIIntegrationMixin, OpenAPIBlueprintMixin
+from flask_x_openapi_schema.extensions.flask import openapi_metadata
+from flask_x_openapi_schema.extensions.flask_restful.resources import OpenAPIIntegrationMixin, OpenAPIBlueprintMixin
 
 
 # Define test models

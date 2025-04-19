@@ -1,5 +1,5 @@
 """
-Extension for the ExternalApi class to collect OpenAPI metadata.
+Extension for the Flask-RESTful Api class to collect OpenAPI metadata.
 """
 
 from typing import Any, Literal, Optional, Union
@@ -18,14 +18,10 @@ except ImportError:
         pass
 
 
-from .decorators import (
-    ConventionalPrefixConfig,
-    configure_prefixes,
-    GLOBAL_CONFIG_HOLDER,
-)
-from .i18n.i18n_string import I18nStr, get_current_language
-from .methodview_utils import MethodViewOpenAPISchemaGenerator
-from .schema_generator import OpenAPISchemaGenerator
+from ...core.config import ConventionalPrefixConfig, configure_prefixes, GLOBAL_CONFIG_HOLDER
+from ...core.schema_generator import OpenAPISchemaGenerator
+from ...i18n.i18n_string import I18nStr, get_current_language
+from ..flask.views import MethodViewOpenAPISchemaGenerator
 
 
 class OpenAPIIntegrationMixin(Api):

@@ -8,14 +8,7 @@ from enum import Enum
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
-from flask_x_openapi_schema.decorators.base import (
-    extract_openapi_parameters_from_pydantic,
-)
-from flask_x_openapi_schema.restful_utils import (
-    pydantic_model_to_reqparse,
-    create_reqparse_from_pydantic,
-    _get_field_type,
-)
+from flask_x_openapi_schema.extensions.flask_restful.utils import _get_field_type, create_reqparse_from_pydantic, pydantic_model_to_reqparse
 
 
 class SampleEnum(Enum):
@@ -212,56 +205,3 @@ def test_create_reqparse_from_pydantic():
 
     username_arg = next((arg for arg in parser.args if arg.name == "username"), None)
     assert username_arg.location == "form"
-
-
-def test_extract_openapi_parameters_from_pydantic():
-    """Test extracting OpenAPI parameters from a Pydantic model."""
-    # Test with path parameters only
-    parameters = extract_openapi_parameters_from_pydantic(path_params=["id", "user_id"])
-    assert len(parameters) == 2
-
-    id_param = next((p for p in parameters if p["name"] == "id"), None)
-    assert id_param is not None
-    assert id_param["in"] == "path"
-    assert id_param["required"] is True
-    assert id_param["schema"]["type"] == "string"
-
-    # Test with query model only
-    parameters = extract_openapi_parameters_from_pydantic(query_model=SampleQueryModel)
-    assert len(parameters) == 3
-
-    sort_param = next((p for p in parameters if p["name"] == "sort"), None)
-    assert sort_param is not None
-    assert sort_param["in"] == "query"
-    assert sort_param["required"] is False
-    assert (
-        "anyOf" in sort_param["schema"]
-        or "type" in sort_param["schema"]
-        or "$ref" in sort_param["schema"]
-    )
-    assert sort_param["description"] == "Sort order"
-
-    limit_param = next((p for p in parameters if p["name"] == "limit"), None)
-    assert limit_param is not None
-    assert limit_param["in"] == "query"
-    assert limit_param["required"] is False
-    assert (
-        "anyOf" in limit_param["schema"]
-        or "type" in limit_param["schema"]
-        or "$ref" in limit_param["schema"]
-    )
-    assert limit_param["description"] == "Limit results"
-
-    # Test with both path parameters and query model
-    parameters = extract_openapi_parameters_from_pydantic(
-        query_model=SampleQueryModel, path_params=["id", "user_id"]
-    )
-    assert len(parameters) == 5
-
-    id_param = next((p for p in parameters if p["name"] == "id"), None)
-    assert id_param is not None
-    assert id_param["in"] == "path"
-
-    sort_param = next((p for p in parameters if p["name"] == "sort"), None)
-    assert sort_param is not None
-    assert sort_param["in"] == "query"
