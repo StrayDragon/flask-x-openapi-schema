@@ -1,14 +1,19 @@
 """
-Pytest configuration file.
+Shared fixtures and test helpers for flask-x-openapi-schema tests.
 """
 
 import pytest
+from flask import Flask
 
-from flask_x_openapi_schema import reset_prefixes
+
+@pytest.fixture
+def app():
+    """Create a Flask app for testing."""
+    app = Flask(__name__)
+    return app
 
 
-@pytest.fixture(autouse=True)
-def reset_parameter_prefixes():
-    """Reset parameter prefixes before each test."""
-    reset_prefixes()
-    yield
+@pytest.fixture
+def client(app):
+    """Create a test client for the app."""
+    return app.test_client()
