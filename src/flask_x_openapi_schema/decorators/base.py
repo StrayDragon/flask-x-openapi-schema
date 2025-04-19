@@ -1,26 +1,17 @@
 """
-Decorators for adding OpenAPI metadata to API endpoints with auto-detection of parameters.
-This is an improved version with simplified logic and better maintainability.
+Base classes and utilities for OpenAPI metadata decorators.
 """
 
 import inspect
 import threading
+from abc import ABC, abstractmethod
 from collections.abc import Callable
-from functools import wraps, lru_cache
 from dataclasses import dataclass
+from functools import lru_cache, wraps
+from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast, get_type_hints
 
-from typing import (
-    Any,
-    Optional,
-    TypeVar,
-    Union,
-    cast,
-    get_type_hints,
-    Dict,
-    List,
-    Tuple,
-    Type,
-)
+from flask import request
+from pydantic import BaseModel
 
 # For Python 3.10+, use typing directly; for older versions, use typing_extensions
 try:
@@ -28,38 +19,12 @@ try:
 except ImportError:
     from typing_extensions import ParamSpec  # Python < 3.10
 
-from pydantic import BaseModel
-from flask import request
-
-from .i18n.i18n_string import I18nStr, get_current_language
-from .models.base import BaseRespModel
-
-# Import Flask-RESTful utilities if available
-try:
-    from .restful_utils import (
-        create_reqparse_from_pydantic,
-        extract_openapi_parameters_from_pydantic,
-    )
-
-    HAS_FLASK_RESTFUL = True
-except ImportError:
-    # Define placeholder functions for when Flask-RESTful is not available
-    def create_reqparse_from_pydantic(*_args, **_kwargs):
-        raise ImportError(
-            "Flask-RESTful is not installed. Install with 'pip install flask-x-openapi-schema[restful]'"
-        )
-
-    def extract_openapi_parameters_from_pydantic(*_args, **_kwargs):
-        raise ImportError(
-            "Flask-RESTful is not installed. Install with 'pip install flask-x-openapi-schema[restful]'"
-        )
-
-    HAS_FLASK_RESTFUL = False
+from ..i18n.i18n_string import I18nStr, get_current_language
+from ..models.base import BaseRespModel
 
 # Type variables for function parameters and return type
 P = ParamSpec("P")
 R = TypeVar("R")
-F = TypeVar("F", bound=Callable[..., Any])
 
 
 @dataclass(frozen=True)
@@ -130,6 +95,7 @@ class ThreadSafeConfig:
                 request_path_prefix=DEFAULT_PATH_PREFIX,
                 request_file_prefix=DEFAULT_FILE_PREFIX,
             )
+
 
 # Create a singleton instance
 GLOBAL_CONFIG_HOLDER = ThreadSafeConfig()
@@ -537,68 +503,46 @@ def _extract_param_types(
     return param_types
 
 
-def openapi_metadata(
-    *,
-    summary: Optional[Union[str, I18nStr]] = None,
-    description: Optional[Union[str, I18nStr]] = None,
-    tags: Optional[List[str]] = None,
-    operation_id: Optional[str] = None,
-    request_body: Optional[Union[Type[BaseModel], Dict[str, Any]]] = None,
-    responses: Optional[Dict[str, Any]] = None,
-    parameters: Optional[List[Dict[str, Any]]] = None,
-    deprecated: bool = False,
-    security: Optional[List[Dict[str, List[str]]]] = None,
-    external_docs: Optional[Dict[str, str]] = None,
-    query_model: Optional[Type[BaseModel]] = None,
-    path_params: Optional[List[str]] = None,
-    # The following parameters are optional and can be automatically detected from the function signature
-    auto_detect_params: bool = True,
-    language: Optional[str] = None,
-    prefix_config: Optional[ConventionalPrefixConfig] = None,
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
-    """
-    Decorator to add OpenAPI metadata to an API endpoint.
+class OpenAPIDecoratorBase(ABC):
+    """Base class for OpenAPI metadata decorators."""
 
-    This decorator does the following:
-    1. Adds OpenAPI metadata to the function for documentation generation
-    2. Automatically detects and binds request parameters to function parameters with special prefixes
-    3. Preserves type annotations from Pydantic models for better IDE support
-    4. Automatically converts BaseRespModel responses to Flask-RESTful compatible responses
+    def __init__(
+        self,
+        summary: Optional[Union[str, I18nStr]] = None,
+        description: Optional[Union[str, I18nStr]] = None,
+        tags: Optional[List[str]] = None,
+        operation_id: Optional[str] = None,
+        request_body: Optional[Union[Type[BaseModel], Dict[str, Any]]] = None,
+        responses: Optional[Dict[str, Any]] = None,
+        parameters: Optional[List[Dict[str, Any]]] = None,
+        deprecated: bool = False,
+        security: Optional[List[Dict[str, List[str]]]] = None,
+        external_docs: Optional[Dict[str, str]] = None,
+        query_model: Optional[Type[BaseModel]] = None,
+        path_params: Optional[List[str]] = None,
+        auto_detect_params: bool = True,
+        language: Optional[str] = None,
+        prefix_config: Optional[ConventionalPrefixConfig] = None,
+    ):
+        """Initialize the decorator with OpenAPI metadata parameters."""
+        self.summary = summary
+        self.description = description
+        self.tags = tags
+        self.operation_id = operation_id
+        self.request_body = request_body
+        self.responses = responses
+        self.parameters = parameters
+        self.deprecated = deprecated
+        self.security = security
+        self.external_docs = external_docs
+        self.query_model = query_model
+        self.path_params = path_params
+        self.auto_detect_params = auto_detect_params
+        self.language = language
+        self.prefix_config = prefix_config
 
-    Special parameter prefixes (automatically detected if auto_detect_params=True):
-    - x_request_body: Binds the entire request body object (auto-detected from type annotation)
-    - x_request_query: Binds the entire query parameters object (auto-detected from type annotation)
-    - x_request_path_<param_name>: Binds a path parameter (auto-detected from parameter name)
-    - x_request_file: Binds a file object (auto-detected from parameter name)
-
-    These prefixes can be configured using OpenAPIConfig.configure() method or the config parameter.
-
-    Args:
-        summary: A short summary of what the operation does
-        description: A verbose explanation of the operation behavior
-        tags: A list of tags for API documentation control
-        operation_id: Unique string used to identify the operation
-        request_body: The request body schema (Pydantic model or dict)
-        responses: The responses the API can return
-        parameters: Parameters that are sent with the request
-        deprecated: Declares this operation to be deprecated
-        security: A declaration of which security mechanisms can be used for this operation
-        external_docs: Additional external documentation
-        query_model: Pydantic model for query parameters (optional if auto-detected)
-        path_params: List of path parameter names (optional if auto-detected)
-        auto_detect_params: Whether to automatically detect parameters from function signature
-        language: Language code to use for I18nString values (default: current language)
-        prefix_config: Configuration object for parameter prefixes with attributes:
-            - request_body_prefix: Prefix for request body parameters
-            - request_query_prefix: Prefix for query parameters
-            - request_path_prefix: Prefix for path parameters
-            - request_file_prefix: Prefix for file parameters
-
-    Returns:
-        The decorated function with OpenAPI metadata attached and type annotations preserved
-    """
-
-    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+    def __call__(self, func: Callable[P, R]) -> Callable[P, R]:
+        """Apply the decorator to the function."""
         # Get the function signature to find parameters with special prefixes
         signature = inspect.signature(func)
         param_names = list(signature.parameters.keys())
@@ -611,59 +555,59 @@ def openapi_metadata(
         detected_query_model = None
         detected_path_params = []
 
-        if auto_detect_params:
+        if self.auto_detect_params:
             # Use helper function to detect parameters
             detected_request_body, detected_query_model, detected_path_params = (
-                _detect_parameters(signature, type_hints, prefix_config)
+                _detect_parameters(signature, type_hints, self.prefix_config)
             )
 
         # Use detected parameters if not explicitly provided
-        actual_request_body = request_body
+        actual_request_body = self.request_body
         if actual_request_body is None and detected_request_body is not None:
             actual_request_body = detected_request_body
 
-        actual_query_model = query_model
+        actual_query_model = self.query_model
         if actual_query_model is None and detected_query_model is not None:
             actual_query_model = detected_query_model
 
-        actual_path_params = path_params
+        actual_path_params = self.path_params
         if actual_path_params is None and detected_path_params:
             actual_path_params = detected_path_params
 
         # Generate OpenAPI metadata using helper function
         metadata = _generate_openapi_metadata(
-            summary=summary,
-            description=description,
-            tags=tags,
-            operation_id=operation_id,
-            deprecated=deprecated,
-            security=security,
-            external_docs=external_docs,
+            summary=self.summary,
+            description=self.description,
+            tags=self.tags,
+            operation_id=self.operation_id,
+            deprecated=self.deprecated,
+            security=self.security,
+            external_docs=self.external_docs,
             actual_request_body=actual_request_body,
-            responses=responses,
-            _parameters=parameters,
+            responses=self.responses,
+            _parameters=self.parameters,
             _actual_query_model=actual_query_model,
             _actual_path_params=actual_path_params,
-            language=language,
+            language=self.language,
         )
 
         # Handle parameters from the parameters argument
-        openapi_parameters = parameters or []
+        openapi_parameters = self.parameters or []
 
         # Add parameters from query_model and path_params
         if actual_query_model or actual_path_params:
-            model_parameters = extract_openapi_parameters_from_pydantic(
+            model_parameters = self.extract_parameters_from_models(
                 query_model=actual_query_model, path_params=actual_path_params
             )
             openapi_parameters.extend(model_parameters)
 
         # Add file parameters based on function signature
         file_params = []
-        if auto_detect_params:
+        if self.auto_detect_params:
             # Get function annotations
             func_annotations = get_type_hints(func)
             file_params = _detect_file_parameters(
-                param_names, func_annotations, prefix_config
+                param_names, func_annotations, self.prefix_config
             )
 
         # If we have file parameters, set the consumes property to multipart/form-data
@@ -689,9 +633,6 @@ def openapi_metadata(
         # Create a wrapper function that handles parameter binding
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # Process request parameters based on whether Flask-RESTful is available
-            parsed_args = None
-
             # Check if we're in a request context
             has_request_context = False
             try:
@@ -706,7 +647,7 @@ def openapi_metadata(
                 skip_params = {"self", "cls"}
 
                 # Get parameter prefixes (cached)
-                body_prefix, query_prefix, path_prefix, file_prefix = _get_parameter_prefixes(prefix_config)
+                body_prefix, query_prefix, path_prefix, file_prefix = _get_parameter_prefixes(self.prefix_config)
 
                 # Precompute prefix lengths for path and file parameters
                 path_prefix_len = len(path_prefix) + 1  # +1 for the underscore
@@ -723,54 +664,10 @@ def openapi_metadata(
                             continue
 
                         if param_name.startswith(body_prefix):
-                            if HAS_FLASK_RESTFUL:
-                                # Flask-RESTful approach using reqparse
-                                parser = create_reqparse_from_pydantic(
-                                    body_model=actual_request_body, query_model=None
-                                )
-                                parsed_args = parser.parse_args()
-
-                                # Create from parsed arguments
-                                body_data = {}
-                                model_fields = actual_request_body.model_fields
-                                for field_name in model_fields:
-                                    if field_name in parsed_args:
-                                        body_data[field_name] = parsed_args[field_name]
-
-                                model_instance = actual_request_body(**body_data)
-                                kwargs[param_name] = model_instance
-                            elif request.is_json:
-                                # Direct Flask approach without reqparse
-                                body_data = request.get_json(silent=True) or {}
-
-                                # Pre-process the body data to handle list fields correctly
-                                processed_body_data = _preprocess_request_data(body_data, actual_request_body)
-
-                                # Try to use model_validate first (better handling of complex types)
-                                try:
-                                    model_instance = actual_request_body.model_validate(
-                                        processed_body_data
-                                    )
-                                    kwargs[param_name] = model_instance
-                                except Exception as e:
-                                    # Log the validation error for debugging
-                                    import logging
-                                    logging.getLogger(__name__).debug(
-                                        f"Validation error: {e}. Falling back to manual construction."
-                                    )
-
-                                    # Fallback to the old approach if model_validate fails
-                                    # Filter body data to only include fields in the model
-                                    model_fields = actual_request_body.model_fields
-                                    filtered_body_data = {
-                                        k: v
-                                        for k, v in processed_body_data.items()
-                                        if k in model_fields
-                                    }
-                                    model_instance = actual_request_body(
-                                        **filtered_body_data
-                                    )
-                                    kwargs[param_name] = model_instance
+                            # Process request body
+                            kwargs = self.process_request_body(
+                                param_name, actual_request_body, kwargs
+                            )
                             break  # Only process the first request body parameter
 
                 # Process query parameters
@@ -780,34 +677,10 @@ def openapi_metadata(
                             continue
 
                         if param_name.startswith(query_prefix):
-                            if HAS_FLASK_RESTFUL and not parsed_args:
-                                # Flask-RESTful approach using reqparse
-                                parser = create_reqparse_from_pydantic(
-                                    query_model=actual_query_model, body_model=None
-                                )
-                                parsed_args = parser.parse_args()
-
-                                # Create from parsed arguments
-                                query_data = {}
-                                model_fields = actual_query_model.model_fields
-                                for field_name in model_fields:
-                                    if field_name in parsed_args:
-                                        query_data[field_name] = parsed_args[field_name]
-
-                                model_instance = actual_query_model(**query_data)
-                                kwargs[param_name] = model_instance
-                            else:
-                                # Direct Flask approach without reqparse
-                                query_data = {}
-                                model_fields = actual_query_model.model_fields
-                                for field_name in model_fields:
-                                    if field_name in request.args:
-                                        query_data[field_name] = request.args.get(
-                                            field_name
-                                        )
-
-                                model_instance = actual_query_model(**query_data)
-                                kwargs[param_name] = model_instance
+                            # Process query parameters
+                            kwargs = self.process_query_params(
+                                param_name, actual_query_model, kwargs
+                            )
                             break  # Only process the first query parameter
 
                 # Process path parameters
@@ -874,11 +747,8 @@ def openapi_metadata(
                                     # Just pass the file directly
                                     kwargs[param_name] = file_obj
 
-                # Add all parsed arguments to kwargs for regular parameters
-                if HAS_FLASK_RESTFUL and parsed_args:
-                    for arg_name, arg_value in parsed_args.items():
-                        if arg_name not in kwargs:
-                            kwargs[arg_name] = arg_value
+                # Process any additional framework-specific parameters
+                kwargs = self.process_additional_params(kwargs, param_names)
 
             # Filter out any kwargs that are not in the function signature
             # Get the function signature parameters once
@@ -905,4 +775,30 @@ def openapi_metadata(
 
         return cast(Callable[P, R], wrapper)
 
-    return decorator
+    @abstractmethod
+    def extract_parameters_from_models(
+        self, query_model: Optional[Type[BaseModel]], path_params: Optional[List[str]]
+    ) -> List[Dict[str, Any]]:
+        """Extract OpenAPI parameters from models."""
+        pass
+
+    @abstractmethod
+    def process_request_body(
+        self, param_name: str, model: Type[BaseModel], kwargs: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Process request body parameters."""
+        pass
+
+    @abstractmethod
+    def process_query_params(
+        self, param_name: str, model: Type[BaseModel], kwargs: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Process query parameters."""
+        pass
+
+    @abstractmethod
+    def process_additional_params(
+        self, kwargs: Dict[str, Any], param_names: List[str]
+    ) -> Dict[str, Any]:
+        """Process additional framework-specific parameters."""
+        pass
