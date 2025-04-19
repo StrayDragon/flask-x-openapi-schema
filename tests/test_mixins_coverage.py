@@ -9,7 +9,7 @@ from flask import Blueprint
 from flask.views import MethodView
 
 from flask_x_openapi_schema import OpenAPIIntegrationMixin, OpenAPIMethodViewMixin
-from flask_x_openapi_schema.extensions.flask_restful.resources import OpenAPIBlueprintMixin
+from flask_x_openapi_schema.x.flask_restful.resources import OpenAPIBlueprintMixin
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr, set_current_language
 
 

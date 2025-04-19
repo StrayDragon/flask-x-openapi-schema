@@ -9,7 +9,7 @@ from click.testing import CliRunner
 from flask import Flask
 
 from flask_x_openapi_schema.cli.commands import generate_openapi_command, register_commands
-from flask_x_openapi_schema.extensions.flask_restful.resources import OpenAPIIntegrationMixin
+from flask_x_openapi_schema.x.flask_restful.resources import OpenAPIIntegrationMixin
 
 
 class TestCommandsCoverage:

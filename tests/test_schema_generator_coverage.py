@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 from pydantic import BaseModel, Field
 from flask_restful import Resource  # type: ignore
 
-from flask_x_openapi_schema.extensions.flask_restful.resources import OpenAPISchemaGenerator
+from flask_x_openapi_schema.x.flask_restful.resources import OpenAPISchemaGenerator
 from flask_x_openapi_schema.i18n.i18n_model import I18nBaseModel
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr
 

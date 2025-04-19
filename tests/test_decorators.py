@@ -11,8 +11,8 @@ from flask_restful import Api, Resource
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from flask_x_openapi_schema.extensions.flask import openapi_metadata
-from flask_x_openapi_schema.extensions.flask_restful import (
+from flask_x_openapi_schema.x.flask import openapi_metadata
+from flask_x_openapi_schema.x.flask_restful import (
     openapi_metadata as openapi_metadata_resource,
 )
 from flask_x_openapi_schema.models.base import BaseRespModel

@@ -6,7 +6,6 @@ import pytest
 from flask import Flask
 from pydantic import BaseModel, Field
 
-from flask_x_openapi_schema import openapi_metadata
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr
 
 from tests.test_helpers import flask_request_context, create_mock_file
@@ -14,6 +13,7 @@ from tests.test_helpers import flask_request_context, create_mock_file
 from flask_x_openapi_schema.i18n.i18n_string import set_current_language
 from flask_x_openapi_schema.models.base import BaseRespModel
 from flask_x_openapi_schema.models.file_models import FileUploadModel
+from flask_x_openapi_schema.x.flask import openapi_metadata
 
 
 class TestDecoratorsCoverage:

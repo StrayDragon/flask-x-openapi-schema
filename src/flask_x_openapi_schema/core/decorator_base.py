@@ -452,7 +452,7 @@ class OpenAPIDecoratorBase:
         if self.framework_decorator is None:
             if self.framework == "flask":
                 # Import here to avoid circular imports
-                from ..extensions.flask.decorators import FlaskOpenAPIDecorator
+                from ..x.flask.decorators import FlaskOpenAPIDecorator
                 self.framework_decorator = FlaskOpenAPIDecorator(
                     summary=self.summary,
                     description=self.description,
@@ -472,7 +472,7 @@ class OpenAPIDecoratorBase:
                 )
             elif self.framework == "flask_restful":
                 # Import here to avoid circular imports
-                from ..extensions.flask_restful.decorators import FlaskRestfulOpenAPIDecorator
+                from ..x.flask_restful.decorators import FlaskRestfulOpenAPIDecorator
                 self.framework_decorator = FlaskRestfulOpenAPIDecorator(
                     summary=self.summary,
                     description=self.description,

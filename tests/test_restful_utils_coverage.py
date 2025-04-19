@@ -6,7 +6,7 @@ from enum import Enum
 
 import pytest
 
-from flask_x_openapi_schema.extensions.flask_restful.utils import _get_field_type
+from flask_x_openapi_schema.x.flask_restful.utils import _get_field_type
 
 
 class TestRestfulUtilsCoverage:

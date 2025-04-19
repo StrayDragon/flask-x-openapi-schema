@@ -10,9 +10,12 @@ import inspect
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
-from flask_x_openapi_schema import openapi_metadata
-from flask_x_openapi_schema.core.decorator_base import _detect_parameters, _generate_openapi_metadata
+from flask_x_openapi_schema.core.decorator_base import (
+    _detect_parameters,
+    _generate_openapi_metadata,
+)
 from flask_x_openapi_schema.models.base import BaseRespModel
+from flask_x_openapi_schema.x.flask import openapi_metadata
 
 
 class PerfTestRequestModel(BaseModel):
