@@ -11,11 +11,11 @@ graph TD
     A[File Upload Handling] --> B[Parameter Auto-Detection]
     A --> C[File Upload Models]
     A --> D[OpenAPI Documentation]
-    
+
     B --> E[x_request_file Parameters]
     C --> F[Validation]
     D --> G[Schema Generation]
-    
+
     E --> H[File Processing]
     F --> I[Type Safety]
     G --> J[API Documentation]
@@ -31,7 +31,7 @@ sequenceDiagram
     participant F as Flask
     participant D as Decorator
     participant R as Resource Method
-    
+
     C->>F: POST multipart/form-data
     F->>D: Process request
     D->>F: Extract file from request.files
@@ -44,7 +44,7 @@ sequenceDiagram
 ```python
 from flask_restful import Resource
 from werkzeug.datastructures import FileStorage
-from flask_x_openapi_schema import openapi_metadata
+from flask_x_openapi_schema.x.flask_restful import openapi_metadata
 
 class FileUploadResource(Resource):
     @openapi_metadata(
@@ -56,21 +56,21 @@ class FileUploadResource(Resource):
     def post(self, x_request_file: FileStorage):
         """
         Upload a file to the server.
-        
+
         This endpoint accepts a file upload and returns information about the uploaded file.
         The file is automatically injected into the method via the x_request_file parameter.
         """
         if not x_request_file:
             return {"error": "No file provided"}, 400
-            
+
         # Process the uploaded file
         filename = x_request_file.filename
         content_type = x_request_file.content_type
-        
+
         # Read the file content
         file_content = x_request_file.read()
         file_size = len(file_content)
-        
+
         # Return information about the uploaded file
         return {
             "filename": filename,
@@ -89,7 +89,7 @@ sequenceDiagram
     participant F as Flask
     participant D as Decorator
     participant R as Resource Method
-    
+
     C->>F: POST multipart/form-data with multiple files
     F->>D: Process request
     D->>F: Extract files from request.files
@@ -102,7 +102,7 @@ sequenceDiagram
 ```python
 from flask_restful import Resource
 from werkzeug.datastructures import FileStorage
-from flask_x_openapi_schema import openapi_metadata
+from flask_x_openapi_schema.x.flask_restful import openapi_metadata
 
 class MultipleFileUploadResource(Resource):
     @openapi_metadata(
@@ -114,43 +114,43 @@ class MultipleFileUploadResource(Resource):
     def post(self, x_request_file_document: FileStorage, x_request_file_image: FileStorage):
         """
         Upload multiple files to the server.
-        
+
         This endpoint accepts multiple file uploads and returns information about the uploaded files.
         The files are automatically injected into the method via the x_request_file_* parameters.
         """
         files_info = []
-        
+
         # Process the document file
         if x_request_file_document:
             filename = x_request_file_document.filename
             content_type = x_request_file_document.content_type
             file_content = x_request_file_document.read()
             file_size = len(file_content)
-            
+
             files_info.append({
                 "filename": filename,
                 "size": file_size,
                 "content_type": content_type,
                 "type": "document",
             })
-            
+
         # Process the image file
         if x_request_file_image:
             filename = x_request_file_image.filename
             content_type = x_request_file_image.content_type
             file_content = x_request_file_image.read()
             file_size = len(file_content)
-            
+
             files_info.append({
                 "filename": filename,
                 "size": file_size,
                 "content_type": content_type,
                 "type": "image",
             })
-            
+
         if not files_info:
             return {"error": "No files provided"}, 400
-            
+
         # Return information about the uploaded files
         return {"files": files_info}
 ```
@@ -165,24 +165,24 @@ classDiagram
         +file: FileStorage
         +validate_file()
     }
-    
+
     class ImageUploadModel {
         +allowed_extensions: list[str]
         +max_size: int
         +validate_file()
     }
-    
+
     class DocumentUploadModel {
         +allowed_extensions: list[str]
         +max_size: int
         +validate_file()
     }
-    
+
     class MultipleFileUploadModel {
         +files: list[FileStorage]
         +validate_files()
     }
-    
+
     FileUploadModel --|> BaseModel
     ImageUploadModel --|> FileUploadModel
     DocumentUploadModel --|> FileUploadModel
@@ -202,7 +202,8 @@ Flask-X-OpenAPI-Schema provides several built-in models for common file upload s
 
 ```python
 from flask_restful import Resource
-from flask_x_openapi_schema import openapi_metadata, ImageUploadModel
+from flask_x_openapi_schema.x.flask_restful import openapi_metadata
+from flask_x_openapi_schema import ImageUploadModel
 
 class ImageUploadResource(Resource):
     @openapi_metadata(
@@ -214,20 +215,20 @@ class ImageUploadResource(Resource):
     def post(self, x_request_file: ImageUploadModel):
         """
         Upload an image to the server.
-        
+
         This endpoint accepts an image upload and returns information about the uploaded image.
         The image is automatically injected into the method via the x_request_file parameter.
         The image is validated to ensure it's a valid image file.
         """
         # The file is automatically injected and validated
         file = x_request_file.file
-        
+
         # Process the file
         filename = file.filename
         content_type = file.content_type
         file_content = file.read()
         file_size = len(file_content)
-        
+
         # Return information about the uploaded file
         return {
             "filename": filename,
@@ -247,31 +248,31 @@ from werkzeug.datastructures import FileStorage
 
 class PDFUploadModel(FileUploadModel):
     """Model for PDF file uploads."""
-    
+
     file: FileStorage = Field(..., description="The PDF file to upload")
-    
+
     @validator("file")
     def validate_pdf(cls, file):
         """Validate that the file is a PDF."""
         if not file:
             raise ValueError("No file provided")
-            
+
         # Check file extension
         if not file.filename.lower().endswith(".pdf"):
             raise ValueError("File must be a PDF")
-            
+
         # Check content type
         if file.content_type != "application/pdf":
             raise ValueError("File must be a PDF")
-            
+
         # Check file size (max 10MB)
         file.seek(0, 2)  # Seek to the end of the file
         file_size = file.tell()  # Get the position (size)
         file.seek(0)  # Rewind to the beginning
-        
+
         if file_size > 10 * 1024 * 1024:  # 10MB
             raise ValueError("File size must be less than 10MB")
-            
+
         return file
 ```
 
@@ -333,12 +334,12 @@ Here's an example of how to upload files to your API from a client:
 async function uploadFile(file) {
   const formData = new FormData();
   formData.append('file', file);
-  
+
   const response = await fetch('/upload', {
     method: 'POST',
     body: formData,
   });
-  
+
   return response.json();
 }
 
@@ -359,7 +360,7 @@ def upload_file(file_path):
     with open(file_path, 'rb') as f:
         files = {'file': f}
         response = requests.post('http://localhost:5000/upload', files=files)
-    
+
     return response.json()
 
 # Usage
@@ -379,10 +380,10 @@ def process_file(file):
     with tempfile.NamedTemporaryFile(delete=False) as temp:
         # Save the file to a temporary location
         file.save(temp.name)
-        
+
         # Process the file
         # ...
-        
+
         # Return the result
         return {
             "filename": file.filename,
@@ -399,7 +400,7 @@ For large files, use streaming to avoid loading the entire file into memory:
 def stream_large_file(file):
     """Stream a large file to another location."""
     chunk_size = 4096  # 4KB chunks
-    
+
     with open('destination.file', 'wb') as f:
         # Read and write in chunks
         chunk = file.read(chunk_size)
@@ -430,10 +431,10 @@ def upload_and_process(file):
     # Save the file to a temporary location
     temp_path = f"/tmp/{secure_filename(file.filename)}"
     file.save(temp_path)
-    
+
     # Start background processing
     task = process_file_task.delay(temp_path)
-    
+
     # Return the task ID
     return {"task_id": task.id}
 ```
@@ -450,25 +451,25 @@ def validate_file(file):
     # Check if a file was provided
     if not file:
         return False, "No file provided"
-    
+
     # Check file extension
     allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif'}
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in allowed_extensions:
         return False, f"File extension {ext} not allowed"
-    
+
     # Check content type
     allowed_content_types = {'image/jpeg', 'image/png', 'image/gif'}
     if file.content_type not in allowed_content_types:
         return False, f"Content type {file.content_type} not allowed"
-    
+
     # Check file size
     file.seek(0, 2)
     size = file.tell()
     file.seek(0)
     if size > 5 * 1024 * 1024:  # 5MB
         return False, "File too large (max 5MB)"
-    
+
     return True, "File is valid"
 ```
 
@@ -512,15 +513,15 @@ def verify_content_type(file):
     # Read the first 2048 bytes
     header = file.read(2048)
     file.seek(0)
-    
+
     # Use python-magic to detect the content type
     mime = magic.Magic(mime=True)
     detected_type = mime.from_buffer(header)
-    
+
     # Compare with the declared content type
     if detected_type != file.content_type:
         return False, f"Content type mismatch: declared {file.content_type}, detected {detected_type}"
-    
+
     return True, "Content type verified"
 ```
 

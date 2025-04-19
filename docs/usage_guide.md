@@ -19,7 +19,8 @@ pip install git+https://github.com/langgenius/dify.git#subdirectory=api/core/ope
 ```python
 from flask import Flask
 from flask_restful import Api
-from flask_x_openapi_schema import OpenAPIIntegrationMixin
+# For Flask-RESTful
+from flask_x_openapi_schema.x.flask_restful import OpenAPIIntegrationMixin
 
 # Create a Flask app
 app = Flask(__name__)
@@ -30,6 +31,17 @@ class OpenAPIApi(OpenAPIIntegrationMixin, Api):
 
 # Initialize the API
 api = OpenAPIApi(app)
+
+# For Flask.MethodView
+from flask import Flask, Blueprint
+from flask.views import MethodView
+from flask_x_openapi_schema.x.flask import OpenAPIMethodViewMixin
+
+# Create a Flask app
+app = Flask(__name__)
+
+# Create a blueprint
+blueprint = Blueprint("api", __name__)
 ```
 
 ### 2. Define Pydantic Models
@@ -57,10 +69,52 @@ class ItemResponse(BaseRespModel):
 ### 3. Create API Resources
 
 ```python
+# Flask-RESTful example
 from flask_restful import Resource
-from flask_x_openapi_schema import openapi_metadata, responses_schema, success_response
+from flask_x_openapi_schema.x.flask_restful import openapi_metadata
+from flask_x_openapi_schema import responses_schema, success_response
 
 class ItemResource(Resource):
+    @openapi_metadata(
+        summary="Create a new item",
+        description="Create a new item with the given data",
+        tags=["Items"],
+        operation_id="createItem",
+        responses=responses_schema(
+            success_responses={
+                "201": success_response(
+                    model=ItemResponse,
+                    description="Item created successfully",
+                ),
+            },
+            errors={
+                "400": "Invalid request",
+            },
+        ),
+    )
+    def post(self, x_request_body: ItemRequest):
+        # Access the request body as a Pydantic model
+        name = x_request_body.name
+        price = x_request_body.price
+        description = x_request_body.description
+
+        # Create the item (in a real app, this would interact with a database)
+        item_id = "123"  # Example ID
+        created_at = "2023-01-01T12:00:00Z"  # Example timestamp
+
+        # Return the created item using the response model
+        return ItemResponse(
+            id=item_id,
+            name=name,
+            price=price,
+            created_at=created_at,
+        ), 201
+
+# Flask.MethodView example
+from flask.views import MethodView
+from flask_x_openapi_schema.x.flask import openapi_metadata, OpenAPIMethodViewMixin
+
+class ItemView(OpenAPIMethodViewMixin, MethodView):
     @openapi_metadata(
         summary="Create a new item",
         description="Create a new item with the given data",
@@ -100,14 +154,18 @@ class ItemResource(Resource):
 ### 4. Register Resources with the API
 
 ```python
-# Register the resource with the API
+# For Flask-RESTful
 api.add_resource(ItemResource, "/items")
+
+# For Flask.MethodView
+blueprint.add_url_rule("/items", view_func=ItemView.as_view("items"))
+app.register_blueprint(blueprint)
 ```
 
 ### 5. Generate OpenAPI Schema
 
 ```python
-# Generate OpenAPI schema
+# For Flask-RESTful
 schema = api.generate_openapi_schema(
     title="Items API",
     version="1.0.0",
@@ -118,6 +176,27 @@ schema = api.generate_openapi_schema(
 # Save the schema to a file
 with open("openapi.yaml", "w") as f:
     f.write(schema)
+
+# For Flask.MethodView with OpenAPISchemaGenerator
+from flask_x_openapi_schema import OpenAPISchemaGenerator
+
+# Create a schema generator
+generator = OpenAPISchemaGenerator(
+    title="Items API",
+    version="1.0.0",
+    description="API for managing items"
+)
+
+# Scan the blueprint
+generator.scan_blueprint(blueprint)
+
+# Generate the schema
+schema = generator.generate_schema()
+
+# Convert to YAML or JSON
+import yaml
+with open("openapi.yaml", "w") as f:
+    yaml.dump(schema, f)
 ```
 
 ## Advanced Usage
@@ -130,6 +209,8 @@ The `openapi_metadata` decorator automatically detects parameters with special p
 - `x_request_query`: Binds the entire query parameters object
 - `x_request_path_<param_name>`: Binds a path parameter
 - `x_request_file`: Binds a file object
+
+These prefixes can be customized using the `ConventionalPrefixConfig` class:
 
 ```python
 # Query parameters
@@ -176,23 +257,14 @@ def get(self, item_id: str, x_request_path_item_id: str):
 ### Internationalization Support
 
 ```python
-from flask_x_openapi_schema import I18nString, I18nBaseModel, set_current_language
+from flask_x_openapi_schema import I18nStr, set_current_language
 
 # Create internationalized strings
-summary = I18nString({
+summary = I18nStr({
     "en-US": "Get an item",
     "zh-Hans": "获取一个项目",
     "ja-JP": "アイテムを取得する",
 })
-
-# Create internationalized models
-class ItemI18nResponse(I18nBaseModel, BaseRespModel):
-    id: str = Field(..., description="The ID of the item")
-    name: str = Field(..., description="The name of the item")
-    description: I18nString = Field(
-        ...,
-        description="The description of the item (internationalized)"
-    )
 
 # Set the current language
 set_current_language("zh-Hans")
@@ -200,7 +272,7 @@ set_current_language("zh-Hans")
 # Use in decorator
 @openapi_metadata(
     summary=summary,
-    description=I18nString({
+    description=I18nStr({
         "en-US": "Get an item by ID from the database",
         "zh-Hans": "通过ID从数据库获取一个项目",
         "ja-JP": "IDからデータベースからアイテムを取得する",
@@ -392,7 +464,7 @@ def handle_error(error_code: int, message: str) -> tuple:
 You can customize the parameter prefixes used for auto-detection using the `ConventionalPrefixConfig` class:
 
 ```python
-from flask_x_openapi_schema import ConventionalPrefixConfig, configure_prefixes, reset_prefixes, GLOBAL_CONFIG
+from flask_x_openapi_schema import ConventionalPrefixConfig, configure_prefixes, reset_prefixes, GLOBAL_CONFIG_HOLDER
 
 # Create a custom configuration
 custom_config = ConventionalPrefixConfig(

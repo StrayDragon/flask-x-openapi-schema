@@ -8,28 +8,25 @@ Flask-X-OpenAPI-Schema provides robust support for internationalization in API d
 
 ```mermaid
 graph TD
-    A[I18n Support] --> B[I18nString]
-    A --> C[I18nBaseModel]
-    A --> D[Language Management]
-    
+    A[I18n Support] --> B[I18nStr]
+    A --> C[Language Management]
+
     B --> E[String Localization]
-    C --> F[Model Localization]
-    D --> G[Thread-Local Storage]
-    
+    C --> G[Thread-Local Storage]
+
     E --> H[OpenAPI Metadata]
-    F --> I[Schema Generation]
     G --> J[Current Language]
 ```
 
 ## Core Components
 
-### 1. I18nString
+### 1. I18nStr
 
-The `I18nString` class is the foundation of i18n support in Flask-X-OpenAPI-Schema. It allows you to define strings in multiple languages and automatically returns the appropriate string based on the current language setting.
+The `I18nStr` class is the foundation of i18n support in Flask-X-OpenAPI-Schema. It allows you to define strings in multiple languages and automatically returns the appropriate string based on the current language setting.
 
 ```mermaid
 classDiagram
-    class I18nString {
+    class I18nStr {
         +strings: dict
         +default_language: str
         +get(language)
@@ -41,10 +38,10 @@ classDiagram
 #### Usage
 
 ```python
-from flask_x_openapi_schema import I18nString
+from flask_x_openapi_schema import I18nStr
 
-# Create an I18nString with multiple language versions
-greeting = I18nString({
+# Create an I18nStr with multiple language versions
+greeting = I18nStr({
     "en-US": "Hello",
     "zh-Hans": "你好",
     "ja-JP": "こんにちは"
@@ -57,56 +54,14 @@ print(str(greeting))  # Outputs the greeting in the current language
 print(greeting.get("zh-Hans"))  # Outputs "你好"
 
 # Alternative creation method with keyword arguments
-greeting = I18nString.create(
+greeting = I18nStr.create(
     en_US="Hello",
     zh_Hans="你好",
     ja_JP="こんにちは"
 )
 ```
 
-### 2. I18nBaseModel
-
-The `I18nBaseModel` class extends Pydantic's `BaseModel` to provide internationalization support for models. It allows you to define models with internationalized fields and automatically generates language-specific schemas.
-
-```mermaid
-classDiagram
-    class I18nBaseModel {
-        +for_language(language)
-    }
-    I18nBaseModel --|> BaseModel
-```
-
-#### Usage
-
-```python
-from flask_x_openapi_schema import I18nBaseModel, I18nString
-from pydantic import Field
-
-class ItemI18n(I18nBaseModel):
-    id: str = Field(..., description="The ID of the item")
-    name: str = Field(..., description="The name of the item")
-    description: I18nString = Field(
-        ...,
-        description="The description of the item (internationalized)"
-    )
-
-# Create an instance with internationalized fields
-item = ItemI18n(
-    id="123",
-    name="Example Item",
-    description=I18nString({
-        "en-US": "This is an example item",
-        "zh-Hans": "这是一个示例项目",
-        "ja-JP": "これはサンプル項目です"
-    })
-)
-
-# Get a language-specific version of the model
-en_model = ItemI18n.for_language("en-US")
-zh_model = ItemI18n.for_language("zh-Hans")
-```
-
-### 3. Language Management
+### 2. Language Management
 
 Flask-X-OpenAPI-Schema provides functions for managing the current language setting. These functions use Python's `contextvars` module to store the current language in thread-local storage, allowing different threads to use different languages simultaneously.
 
@@ -116,7 +71,7 @@ sequenceDiagram
     participant L as Language Management
     participant T as Thread-Local Storage
     participant S as Schema Generator
-    
+
     A->>L: set_current_language("zh-Hans")
     L->>T: Store language
     A->>S: Generate schema
@@ -154,15 +109,19 @@ graph TD
 ### Usage
 
 ```python
-from flask_x_openapi_schema import I18nString, openapi_metadata
+from flask_x_openapi_schema.x.flask_restful import openapi_metadata
+from flask_x_openapi_schema import I18nStr, set_current_language
+
+# Set the current language for schema generation
+set_current_language("zh-Hans")
 
 @openapi_metadata(
-    summary=I18nString({
+    summary=I18nStr({
         "en-US": "Get an item",
         "zh-Hans": "获取一个项目",
         "ja-JP": "アイテムを取得する",
     }),
-    description=I18nString({
+    description=I18nStr({
         "en-US": "Get an item by ID from the database",
         "zh-Hans": "通过ID从数据库获取一个项目",
         "ja-JP": "IDからデータベースからアイテムを取得する",
@@ -184,7 +143,7 @@ sequenceDiagram
     participant L as Language Management
     participant G as Schema Generator
     participant S as Schema
-    
+
     A->>L: set_current_language("ja-JP")
     A->>G: generate_openapi_schema()
     G->>L: get_current_language()
@@ -196,7 +155,8 @@ sequenceDiagram
 ### Usage
 
 ```python
-from flask_x_openapi_schema import set_current_language, OpenAPIIntegrationMixin
+from flask_x_openapi_schema import set_current_language
+from flask_x_openapi_schema.x.flask_restful import OpenAPIIntegrationMixin
 from flask import Flask
 from flask_restful import Api
 
@@ -298,36 +258,16 @@ print(greeting.get("zh-Hans"))  # Returns "Hello"
 print(greeting.get("ja-JP"))    # Returns "Hello"
 ```
 
-### 4. Language-Specific Model Generation
+### 4. Single String for All Languages
 
-You can generate language-specific versions of `I18nBaseModel` instances:
+If you provide a single string instead of a dictionary, it will be used for all languages:
 
 ```python
-class ProductI18n(I18nBaseModel):
-    id: str
-    name: str
-    description: I18nString
+greeting = I18nStr("Hello")
 
-# Create a model instance
-product = ProductI18n(
-    id="123",
-    name="Example Product",
-    description=I18nString({
-        "en-US": "This is an example product",
-        "zh-Hans": "这是一个示例产品",
-        "ja-JP": "これはサンプル製品です"
-    })
-)
-
-# Generate language-specific models
-en_product = ProductI18n.for_language("en-US")
-zh_product = ProductI18n.for_language("zh-Hans")
-ja_product = ProductI18n.for_language("ja-JP")
-
-# The description field will be a string in the specified language
-print(en_product.model_dump())  # {"id": "123", "name": "Example Product", "description": "This is an example product"}
-print(zh_product.model_dump())  # {"id": "123", "name": "Example Product", "description": "这是一个示例产品"}
-print(ja_product.model_dump())  # {"id": "123", "name": "Example Product", "description": "これはサンプル製品です"}
+# Get the string in any language
+print(greeting.get("zh-Hans"))  # Returns "Hello"
+print(greeting.get("ja-JP"))    # Returns "Hello"
 ```
 
 ### 5. Context-Based Language Switching
