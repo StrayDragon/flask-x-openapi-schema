@@ -173,7 +173,11 @@ def create_openapi_flask_app():
         # Process the tags field to ensure it's a list
         if "tags" in data and not isinstance(data["tags"], list):
             try:
-                if isinstance(data["tags"], str) and data["tags"].startswith('[') and data["tags"].endswith(']'):
+                if (
+                    isinstance(data["tags"], str)
+                    and data["tags"].startswith("[")
+                    and data["tags"].endswith("]")
+                ):
                     data["tags"] = json.loads(data["tags"])
                 else:
                     data["tags"] = [data["tags"]]

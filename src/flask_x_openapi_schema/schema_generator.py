@@ -416,8 +416,6 @@ class OpenAPISchemaGenerator:
                 result[key] = value
         return result
 
-
-
     def _process_i18n_value(self, value: Any) -> Any:
         """
         Process a value that might be an I18nString or contain I18nString values.

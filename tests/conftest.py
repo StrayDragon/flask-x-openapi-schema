@@ -3,6 +3,7 @@ Pytest configuration file.
 """
 
 import pytest
+
 from flask_x_openapi_schema import reset_prefixes
 
 

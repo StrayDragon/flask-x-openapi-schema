@@ -2,33 +2,27 @@
 Decorators for adding OpenAPI metadata to Flask-RESTful Resource endpoints.
 """
 
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Type
 
 from pydantic import BaseModel
+import pytest
 
-from .base import OpenAPIDecoratorBase
-from ..i18n.i18n_string import I18nStr
+from .base import OpenAPIDecoratorBase, extract_openapi_parameters_from_pydantic
+
+# Cache for reqparse objects
+_REQPARSE_CACHE = {}
+
+# Cache for model instances
+_MODEL_INSTANCE_CACHE = {}
 
 # Check if Flask-RESTful is available
 try:
-    from ..restful_utils import (
-        create_reqparse_from_pydantic,
-        extract_openapi_parameters_from_pydantic,
-    )
-    HAS_FLASK_RESTFUL = True
+    import flask_restful  # type: ignore
 except ImportError:
-    # Define placeholder functions for when Flask-RESTful is not available
-    def create_reqparse_from_pydantic(*_args, **_kwargs):
-        raise ImportError(
-            "Flask-RESTful is not installed. Install with 'pip install flask-x-openapi-schema[restful]'"
-        )
+    pytest.skip("Flask-RESTful not installed")
 
-    def extract_openapi_parameters_from_pydantic(*_args, **_kwargs):
-        raise ImportError(
-            "Flask-RESTful is not installed. Install with 'pip install flask-x-openapi-schema[restful]'"
-        )
 
-    HAS_FLASK_RESTFUL = False
+from flask_x_openapi_schema.restful_utils import create_reqparse_from_pydantic
 
 
 class FlaskRestfulOpenAPIDecorator(OpenAPIDecoratorBase):
@@ -37,10 +31,6 @@ class FlaskRestfulOpenAPIDecorator(OpenAPIDecoratorBase):
     def __init__(self, *args, **kwargs):
         """Initialize the decorator and check if Flask-RESTful is available."""
         super().__init__(*args, **kwargs)
-        if not HAS_FLASK_RESTFUL:
-            raise ImportError(
-                "Flask-RESTful is not installed. Install with 'pip install flask-x-openapi-schema[restful]'"
-            )
         self.parsed_args = None
 
     def extract_parameters_from_models(
@@ -55,11 +45,27 @@ class FlaskRestfulOpenAPIDecorator(OpenAPIDecoratorBase):
         self, param_name: str, model: Type[BaseModel], kwargs: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Process request body parameters for Flask-RESTful."""
-        # Flask-RESTful approach using reqparse
-        parser = create_reqparse_from_pydantic(
-            body_model=model, query_model=None
-        )
+        # Check if we've already created a reqparse for this model
+        if id(model) in _REQPARSE_CACHE:
+            parser = _REQPARSE_CACHE[model]
+        else:
+            # Flask-RESTful approach using reqparse
+            parser = create_reqparse_from_pydantic(body_model=model, query_model=None)
+            # Cache the parser for future use (limit cache size to prevent memory issues)
+            if len(_REQPARSE_CACHE) > 100:
+                _REQPARSE_CACHE.clear()
+            _REQPARSE_CACHE[id(model)] = parser
+
         self.parsed_args = parser.parse_args()
+
+        # Create a cache key based on the parsed arguments
+        cache_key = (id(model), str(frozenset(self.parsed_args.items())))
+
+        # Check if we've already created a model instance for these arguments
+        if cache_key in _MODEL_INSTANCE_CACHE:
+            model_instance = _MODEL_INSTANCE_CACHE[cache_key]
+            kwargs[param_name] = model_instance
+            return kwargs
 
         # Create from parsed arguments
         body_data = {}
@@ -70,6 +76,12 @@ class FlaskRestfulOpenAPIDecorator(OpenAPIDecoratorBase):
 
         model_instance = model(**body_data)
         kwargs[param_name] = model_instance
+
+        # Cache the model instance for future use (limit cache size to prevent memory issues)
+        if len(_MODEL_INSTANCE_CACHE) > 1000:
+            _MODEL_INSTANCE_CACHE.clear()
+        _MODEL_INSTANCE_CACHE[cache_key] = model_instance
+
         return kwargs
 
     def process_query_params(
@@ -77,11 +89,29 @@ class FlaskRestfulOpenAPIDecorator(OpenAPIDecoratorBase):
     ) -> Dict[str, Any]:
         """Process query parameters for Flask-RESTful."""
         if not self.parsed_args:
-            # Flask-RESTful approach using reqparse
-            parser = create_reqparse_from_pydantic(
-                query_model=model, body_model=None
-            )
+            # Check if we've already created a reqparse for this model
+            if id(model) in _REQPARSE_CACHE:
+                parser = _REQPARSE_CACHE[model]
+            else:
+                # Flask-RESTful approach using reqparse
+                parser = create_reqparse_from_pydantic(
+                    query_model=model, body_model=None
+                )
+                # Cache the parser for future use (limit cache size to prevent memory issues)
+                if len(_REQPARSE_CACHE) > 100:
+                    _REQPARSE_CACHE.clear()
+                _REQPARSE_CACHE[id(model)] = parser
+
             self.parsed_args = parser.parse_args()
+
+            # Create a cache key based on the parsed arguments
+            cache_key = (id(model), str(frozenset(self.parsed_args.items())))
+
+            # Check if we've already created a model instance for these arguments
+            if cache_key in _MODEL_INSTANCE_CACHE:
+                model_instance = _MODEL_INSTANCE_CACHE[cache_key]
+                kwargs[param_name] = model_instance
+                return kwargs
 
             # Create from parsed arguments
             query_data = {}
@@ -92,6 +122,12 @@ class FlaskRestfulOpenAPIDecorator(OpenAPIDecoratorBase):
 
             model_instance = model(**query_data)
             kwargs[param_name] = model_instance
+
+            # Cache the model instance for future use (limit cache size to prevent memory issues)
+            if len(_MODEL_INSTANCE_CACHE) > 1000:
+                _MODEL_INSTANCE_CACHE.clear()
+            _MODEL_INSTANCE_CACHE[cache_key] = model_instance
+
         return kwargs
 
     def process_additional_params(

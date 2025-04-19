@@ -1,30 +1,24 @@
-from .decorators import (
+"""
+Flask-X-OpenAPI-Schema: A Flask extension for generating OpenAPI schemas from Pydantic models.
+"""
+
+from .decorators.base import (
     ConventionalPrefixConfig,
     configure_prefixes,
     reset_prefixes,
     GLOBAL_CONFIG_HOLDER,
-    openapi_metadata,
 )
-from .i18n import I18nStr, get_current_language, set_current_language
-from .i18n.i18n_model import I18nBaseModel
-from .mixins import OpenAPIIntegrationMixin, OpenAPIBlueprintMixin
-from .methodview_utils import OpenAPIMethodViewMixin
-from .models import (
-    BaseRespModel,
-    DocumentUploadModel,
+from .models.base import BaseRespModel
+from .models.file_models import (
     FileUploadModel,
     ImageUploadModel,
+    DocumentUploadModel,
     MultipleFileUploadModel,
 )
-from .restful_utils import create_reqparse_from_pydantic, pydantic_model_to_reqparse
+from .i18n.i18n_string import I18nStr, set_current_language, get_current_language
+from .methodview_utils import OpenAPIMethodViewMixin
+from .mixins import OpenAPIIntegrationMixin, OpenAPIBlueprintMixin
 from .schema_generator import OpenAPISchemaGenerator
-from .utils import (
-    error_response_schema,
-    pydantic_to_openapi_schema,
-    response_schema,
-    responses_schema,
-    success_response,
-)
 
 __all__ = [
     # Configuration
@@ -32,30 +26,21 @@ __all__ = [
     "configure_prefixes",
     "reset_prefixes",
     "GLOBAL_CONFIG_HOLDER",
-    # Base models
+    # Models
     "BaseRespModel",
-    "I18nBaseModel",
-    # File upload models
     "FileUploadModel",
     "ImageUploadModel",
     "DocumentUploadModel",
     "MultipleFileUploadModel",
-    # Internationalization support
+    # I18n
     "I18nStr",
-    # Core OpenAPI functionality
+    "set_current_language",
+    "get_current_language",
+    # MethodView
+    "OpenAPIMethodViewMixin",
+    # Mixins
     "OpenAPIIntegrationMixin",
     "OpenAPIBlueprintMixin",
-    "OpenAPIMethodViewMixin",
+    # Schema Generator
     "OpenAPISchemaGenerator",
-    # Utility functions
-    "create_reqparse_from_pydantic",
-    "error_response_schema",
-    "get_current_language",
-    "openapi_metadata",
-    "pydantic_model_to_reqparse",
-    "pydantic_to_openapi_schema",
-    "response_schema",
-    "responses_schema",
-    "set_current_language",
-    "success_response",
 ]

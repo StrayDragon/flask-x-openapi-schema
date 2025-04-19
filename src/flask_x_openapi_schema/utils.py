@@ -36,6 +36,7 @@ class ThreadSafeModelSchemaCache:
         with self._lock:
             return key in self._cache
 
+
 # Create a singleton instance
 _MODEL_SCHEMA_CACHE = ThreadSafeModelSchemaCache()
 

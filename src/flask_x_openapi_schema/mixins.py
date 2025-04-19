@@ -18,7 +18,11 @@ except ImportError:
         pass
 
 
-from .decorators import ConventionalPrefixConfig, configure_prefixes, GLOBAL_CONFIG_HOLDER
+from .decorators import (
+    ConventionalPrefixConfig,
+    configure_prefixes,
+    GLOBAL_CONFIG_HOLDER,
+)
 from .i18n.i18n_string import I18nStr, get_current_language
 from .methodview_utils import MethodViewOpenAPISchemaGenerator
 from .schema_generator import OpenAPISchemaGenerator
@@ -45,16 +49,20 @@ class OpenAPIIntegrationMixin(Api):
             # Create a new config with the provided values
             new_config = ConventionalPrefixConfig(
                 request_body_prefix=kwargs.get(
-                    "request_body_prefix", GLOBAL_CONFIG_HOLDER.get().request_body_prefix
+                    "request_body_prefix",
+                    GLOBAL_CONFIG_HOLDER.get().request_body_prefix,
                 ),
                 request_query_prefix=kwargs.get(
-                    "request_query_prefix", GLOBAL_CONFIG_HOLDER.get().request_query_prefix
+                    "request_query_prefix",
+                    GLOBAL_CONFIG_HOLDER.get().request_query_prefix,
                 ),
                 request_path_prefix=kwargs.get(
-                    "request_path_prefix", GLOBAL_CONFIG_HOLDER.get().request_path_prefix
+                    "request_path_prefix",
+                    GLOBAL_CONFIG_HOLDER.get().request_path_prefix,
                 ),
                 request_file_prefix=kwargs.get(
-                    "request_file_prefix", GLOBAL_CONFIG_HOLDER.get().request_file_prefix
+                    "request_file_prefix",
+                    GLOBAL_CONFIG_HOLDER.get().request_file_prefix,
                 ),
             )
             configure_prefixes(new_config)
@@ -119,16 +127,20 @@ class OpenAPIBlueprintMixin:
             # Create a new config with the provided values
             new_config = ConventionalPrefixConfig(
                 request_body_prefix=kwargs.get(
-                    "request_body_prefix", GLOBAL_CONFIG_HOLDER.get().request_body_prefix
+                    "request_body_prefix",
+                    GLOBAL_CONFIG_HOLDER.get().request_body_prefix,
                 ),
                 request_query_prefix=kwargs.get(
-                    "request_query_prefix", GLOBAL_CONFIG_HOLDER.get().request_query_prefix
+                    "request_query_prefix",
+                    GLOBAL_CONFIG_HOLDER.get().request_query_prefix,
                 ),
                 request_path_prefix=kwargs.get(
-                    "request_path_prefix", GLOBAL_CONFIG_HOLDER.get().request_path_prefix
+                    "request_path_prefix",
+                    GLOBAL_CONFIG_HOLDER.get().request_path_prefix,
                 ),
                 request_file_prefix=kwargs.get(
-                    "request_file_prefix", GLOBAL_CONFIG_HOLDER.get().request_file_prefix
+                    "request_file_prefix",
+                    GLOBAL_CONFIG_HOLDER.get().request_file_prefix,
                 ),
             )
             configure_prefixes(new_config)

@@ -8,10 +8,12 @@ from enum import Enum
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
+from flask_x_openapi_schema.decorators.base import (
+    extract_openapi_parameters_from_pydantic,
+)
 from flask_x_openapi_schema.restful_utils import (
     pydantic_model_to_reqparse,
     create_reqparse_from_pydantic,
-    extract_openapi_parameters_from_pydantic,
     _get_field_type,
 )
 

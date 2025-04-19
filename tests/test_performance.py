@@ -10,8 +10,8 @@ import inspect
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
-from flask_x_openapi_schema.decorators import (
-    openapi_metadata,
+from flask_x_openapi_schema.decorators.flask import openapi_metadata
+from flask_x_openapi_schema.decorators.base import (
     _detect_parameters,
     _generate_openapi_metadata,
     _extract_param_types,

@@ -11,7 +11,10 @@ from flask_restful import Api, Resource
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from flask_x_openapi_schema.decorators import openapi_metadata
+from flask_x_openapi_schema.decorators.flask import openapi_metadata
+from flask_x_openapi_schema.decorators.flask_restful import (
+    openapi_metadata as openapi_metadata_resource,
+)
 from flask_x_openapi_schema.models.base import BaseRespModel
 from flask_x_openapi_schema.i18n.i18n_string import set_current_language
 from flask_x_openapi_schema.models.file_models import FileUploadModel
@@ -402,7 +405,7 @@ def test_openapi_metadata_response_with_status_code():
 class SampleResource(Resource):
     """Test resource class for testing the decorator with Flask-RESTful."""
 
-    @openapi_metadata(
+    @openapi_metadata_resource(
         summary="Get test data",
         description="Get test data by ID",
         responses={
@@ -420,7 +423,7 @@ class SampleResource(Resource):
         """Get test data by ID."""
         return SampleResponseModel(id=test_id, name="Test", age=30)
 
-    @openapi_metadata(
+    @openapi_metadata_resource(
         summary="Create test data",
         description="Create new test data",
         request_body=SampleRequestModel,

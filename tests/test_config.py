@@ -11,8 +11,8 @@ from flask_x_openapi_schema.decorators import (
     ConventionalPrefixConfig,
     GLOBAL_CONFIG_HOLDER,
     configure_prefixes,
-    openapi_metadata,
 )
+from flask_x_openapi_schema.decorators.flask import openapi_metadata
 from flask_x_openapi_schema.mixins import OpenAPIIntegrationMixin, OpenAPIBlueprintMixin
 
 
@@ -78,7 +78,9 @@ def test_openapi_metadata_with_custom_prefixes():
 
         # Apply the decorator with custom config
         @openapi_metadata(summary="Test endpoint", prefix_config=custom_config)
-        def test_function(req_body: ConfigTestRequestModel, req_query: ConfigTestQueryModel):
+        def test_function(
+            req_body: ConfigTestRequestModel, req_query: ConfigTestQueryModel
+        ):
             return {"message": "Success"}
 
         # Check metadata
@@ -124,7 +126,9 @@ def test_openapi_metadata_with_per_function_config():
     )
 
     @openapi_metadata(summary="Test endpoint", prefix_config=custom_config)
-    def test_function(custom_body: ConfigTestRequestModel, custom_query: ConfigTestQueryModel):
+    def test_function(
+        custom_body: ConfigTestRequestModel, custom_query: ConfigTestQueryModel
+    ):
         return {"message": "Success"}
 
     # Check metadata
@@ -215,6 +219,3 @@ def test_openapi_blueprint_mixin_configure():
     blueprint.configure_openapi(
         request_body_prefix="bp_body2", request_query_prefix="bp_query2"
     )
-
-    # Since we can't easily test the global state in a reliable way,
-    # we'll just verify that the method doesn't raise exceptions

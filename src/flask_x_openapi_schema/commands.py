@@ -125,8 +125,6 @@ def generate_openapi_command(
         click.echo(f"Generated OpenAPI schema for {name} blueprint: {blueprint_output}")
 
 
-
-
 def register_commands(app: Flask) -> None:
     """
     Register OpenAPI commands with the Flask application.
