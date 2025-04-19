@@ -62,3 +62,37 @@ benchmark:
 	# Show the report location
 	echo "\nBenchmark report generated at: benchmarks/results/report.txt"
 	echo "Performance charts (if available) at: benchmarks/results/performance_charts.png"
+
+# 示例运行命令
+run-example-flask-simple:
+	uv run python -m examples.flask.simple_api
+
+run-example-flask-file:
+	uv run python -m examples.flask.file_upload
+
+run-example-flask-i18n:
+	uv run python -m examples.flask.i18n_demo
+
+run-example-restful-simple:
+	uv run python -m examples.flask_restful.simple_api
+
+run-example-restful-file:
+	uv run python -m examples.flask_restful.file_upload
+
+run-example-restful-i18n:
+	uv run python -m examples.flask_restful.i18n_demo
+
+# 运行所有示例
+run-all-examples:
+	@echo "运行 Flask 基本示例..."
+	just run-example-flask-simple
+	@echo "\n运行 Flask 文件上传示例..."
+	just run-example-flask-file
+	@echo "\n运行 Flask 国际化示例..."
+	just run-example-flask-i18n
+	@echo "\n运行 Flask-RESTful 基本示例..."
+	just run-example-restful-simple
+	@echo "\n运行 Flask-RESTful 文件上传示例..."
+	just run-example-restful-file
+	@echo "\n运行 Flask-RESTful 国际化示例..."
+	just run-example-restful-i18n
