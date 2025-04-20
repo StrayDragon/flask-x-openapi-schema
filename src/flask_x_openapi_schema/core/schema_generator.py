@@ -163,8 +163,24 @@ class OpenAPISchemaGenerator:
         Returns:
             The OpenAPI path
         """
+        from .cache import get_parameter_prefixes
+
+        # Get parameter prefixes from current configuration
+        _, _, path_prefix, _ = get_parameter_prefixes()
+        path_prefix_len = len(path_prefix) + 1  # +1 for the underscore
+
         # Replace Flask's <converter:param> with OpenAPI's {param}
-        return re.sub(r"<(?:[^:>]+:)?([^>]+)>", r"{\1}", flask_path)
+        # and remove any prefix from the parameter name
+        def replace_param(match):
+            param_name = match.group(1)
+
+            # Remove prefix if present (e.g., x_request_path_)
+            if param_name.startswith(f"{path_prefix}_"):
+                param_name = param_name[path_prefix_len:]
+
+            return f"{{{param_name}}}"
+
+        return re.sub(r"<(?:[^:>]+:)?([^>]+)>", replace_param, flask_path)
 
     def _extract_path_parameters(self, flask_path: str) -> list[dict[str, Any]]:
         """
@@ -176,12 +192,24 @@ class OpenAPISchemaGenerator:
         Returns:
             A list of OpenAPI parameter objects
         """
+        from .cache import get_parameter_prefixes
+
+        # Get parameter prefixes from current configuration
+        _, _, path_prefix, _ = get_parameter_prefixes()
+        path_prefix_len = len(path_prefix) + 1  # +1 for the underscore
+
         parameters = []
         # Match Flask's <converter:param> or <param>
         for match in re.finditer(r"<(?:([^:>]+):)?([^>]+)>", flask_path):
             converter, param_name = match.groups()
+
+            # Remove prefix if present (e.g., x_request_path_)
+            actual_param_name = param_name
+            if param_name.startswith(f"{path_prefix}_"):
+                actual_param_name = param_name[path_prefix_len:]
+
             param = {
-                "name": param_name,
+                "name": actual_param_name,
                 "in": "path",
                 "required": True,
                 "schema": self._get_schema_for_converter(converter or "string"),

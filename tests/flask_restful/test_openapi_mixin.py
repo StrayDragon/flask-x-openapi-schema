@@ -60,20 +60,14 @@ def app_with_api():
     # Create a Flask app
     flask_app = Flask(__name__)
 
-    # Create a blueprint
-    blueprint = Blueprint("api", __name__)
-
     # Create an OpenAPI-enabled API
     class OpenAPIApi(OpenAPIIntegrationMixin, Api):
         pass
 
-    api = OpenAPIApi(blueprint)
+    api = OpenAPIApi(flask_app)
 
     # Register the resources
-    api.add_resource(ItemResource, "/items/<string:item_id>")
-
-    # Register the blueprint with the app
-    flask_app.register_blueprint(blueprint, url_prefix="/api")
+    api.add_resource(ItemResource, "/api/items/<string:item_id>", endpoint="item_resource")
 
     return flask_app, api
 

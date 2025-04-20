@@ -83,6 +83,8 @@ def extract_openapi_parameters_from_methodview(
     Returns:
         List of OpenAPI parameter objects
     """
+    from ...core.cache import get_parameter_prefixes
+
     parameters = []
 
     # Get the method function
@@ -92,6 +94,10 @@ def extract_openapi_parameters_from_methodview(
 
     # Get type hints for the method
     type_hints = get_type_hints(method_func)
+
+    # Get parameter prefixes from current configuration
+    _, _, path_prefix, _ = get_parameter_prefixes()
+    path_prefix_len = len(path_prefix) + 1  # +1 for the underscore
 
     # Extract path parameters from URL
     path_params = []
@@ -106,6 +112,12 @@ def extract_openapi_parameters_from_methodview(
 
     # Add path parameters
     for param_name in path_params:
+        # Check if this is a prefixed parameter (e.g., x_request_path_*)
+        # If so, extract the actual parameter name
+        actual_param_name = param_name
+        if param_name.startswith(f"{path_prefix}_"):
+            actual_param_name = param_name[path_prefix_len:]
+
         param_type = type_hints.get(param_name, str)
         param_schema = {"type": "string"}
 
@@ -118,7 +130,7 @@ def extract_openapi_parameters_from_methodview(
             param_schema = {"type": "boolean"}
 
         parameters.append(
-            {"name": param_name, "in": "path", "required": True, "schema": param_schema}
+            {"name": actual_param_name, "in": "path", "required": True, "schema": param_schema}
         )
 
     # Check for request body in type hints
@@ -154,6 +166,26 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
         for view_class, url in blueprint._methodview_openapi_resources:
             self._process_methodview(view_class, url, blueprint.url_prefix or "")
 
+    def _register_models_from_method(self, method):
+        """
+        Register Pydantic models from method type hints.
+
+        Args:
+            method: The method to extract models from
+        """
+        # Get type hints for the method
+        type_hints = get_type_hints(method)
+
+        # Check each parameter for Pydantic models
+        for param_name, param_type in type_hints.items():
+            if param_name == "return":
+                continue
+
+            # Check if the parameter is a Pydantic model
+            if isinstance(param_type, type) and issubclass(param_type, BaseModel):
+                # Register the model
+                self._register_model(param_type)
+
     def _process_methodview(self, view_class, url, url_prefix):
         """
         Process a MethodView class for OpenAPI schema generation.
@@ -175,6 +207,11 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
         # Full URL path
         full_url = (url_prefix + url).replace("//", "/")
 
+        # Get parameter prefixes from current configuration
+        from ...core.cache import get_parameter_prefixes
+        _, _, path_prefix, _ = get_parameter_prefixes()
+        path_prefix_len = len(path_prefix) + 1  # +1 for the underscore
+
         # Convert Flask URL variables to OpenAPI path parameters
         path = full_url
         for segment in full_url.split("/"):
@@ -185,8 +222,13 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
                 else:
                     name = segment[1:-1]
 
+                # Remove prefix if present (e.g., x_request_path_)
+                actual_name = name
+                if name.startswith(f"{path_prefix}_"):
+                    actual_name = name[path_prefix_len:]
+
                 # Replace with OpenAPI path parameter syntax
-                path = path.replace(segment, "{" + name + "}")
+                path = path.replace(segment, "{" + actual_name + "}")
 
         # Process each method
         for method in methods:
@@ -210,6 +252,9 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
                 )
                 if parameters:
                     metadata["parameters"] = parameters
+
+            # Register Pydantic models from type hints
+            self._register_models_from_method(method_func)
 
             # Add the path and method to the schema
             if path not in self.paths:

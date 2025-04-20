@@ -29,6 +29,57 @@ class OpenAPIIntegrationMixin(Api):
     A mixin class for the flask-restful Api to collect OpenAPI metadata.
     """
 
+    def __init__(self, *args, **kwargs):
+        """
+        Initialize the mixin.
+
+        Args:
+            *args: Arguments to pass to the parent class
+            **kwargs: Keyword arguments to pass to the parent class
+        """
+        # 确保调用父类的 __init__ 方法
+        super().__init__(*args, **kwargs)
+
+        # 确保 resources 属性已初始化
+        if not hasattr(self, 'resources'):
+            self.resources = []
+
+    def add_resource(self, resource, *urls, **kwargs):
+        """
+        Add a resource to the API and register it for OpenAPI schema generation.
+
+        Args:
+            resource: The resource class
+            *urls: The URLs to register the resource with
+            **kwargs: Additional arguments to pass to the parent method
+
+        Returns:
+            The result of the parent method
+        """
+        # 调用父类的 add_resource 方法
+        result = super().add_resource(resource, *urls, **kwargs)
+
+        # 手动添加资源到 resources 属性
+        # 这是为了确保在测试中也能正确工作
+        if not hasattr(self, 'resources'):
+            self.resources = []
+
+        # 检查资源是否已经存在
+        for existing_resource, existing_urls, _ in self.resources:
+            if existing_resource == resource and set(existing_urls) == set(urls):
+                return result
+
+        # 添加资源
+        # 确保将 endpoint 作为字典中的一个键值对存储
+        if 'endpoint' not in kwargs and kwargs is not None:
+            kwargs['endpoint'] = resource.__name__.lower()
+        elif kwargs is None:
+            kwargs = {'endpoint': resource.__name__.lower()}
+
+        self.resources.append((resource, urls, kwargs))
+
+        return result
+
     def configure_openapi(
         self, *, prefix_config: ConventionalPrefixConfig = None, **kwargs
     ):
@@ -91,13 +142,18 @@ class OpenAPIIntegrationMixin(Api):
             title, version, description, language=current_lang
         )
 
+        # Get URL prefix from blueprint if available
+        url_prefix = None
+        if hasattr(self, 'blueprint') and hasattr(self.blueprint, 'url_prefix'):
+            url_prefix = self.blueprint.url_prefix
+
         for resource, urls, _ in self.resources:
-            generator._process_resource(resource, urls, self.blueprint.url_prefix)
+            generator._process_resource(resource, urls, url_prefix)
 
         schema = generator.generate_schema()
 
         if output_format == "yaml":
-            return yaml.dump(schema, sort_keys=False, default_flow_style=False)
+            return yaml.dump(schema, sort_keys=False, default_flow_style=False, allow_unicode=True)
         else:
             return schema
 
@@ -180,6 +236,6 @@ class OpenAPIBlueprintMixin:
         schema = generator.generate_schema()
 
         if output_format == "yaml":
-            return yaml.dump(schema, sort_keys=False, default_flow_style=False)
+            return yaml.dump(schema, sort_keys=False, default_flow_style=False, allow_unicode=True)
         else:
             return schema
