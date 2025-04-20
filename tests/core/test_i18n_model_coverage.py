@@ -2,9 +2,8 @@
 Tests for the i18n_model module to improve coverage.
 """
 
-import pytest
 import json
-from pydantic import BaseModel, Field
+from pydantic import Field
 from typing import Optional, List, Dict, Any
 
 from flask_x_openapi_schema.i18n.i18n_model import I18nBaseModel
@@ -16,12 +15,15 @@ class TestI18nModelCoverage:
 
     def test_i18n_base_model_basic(self):
         """Test basic functionality of I18nBaseModel."""
+
         # Create a model class that inherits from I18nBaseModel
         class TestModel(I18nBaseModel):
             name: I18nStr = Field(..., description="The name")
             description: Optional[I18nStr] = Field(None, description="The description")
             tags: List[str] = Field(default_factory=list, description="Tags")
-            metadata: Dict[str, Any] = Field(default_factory=dict, description="Metadata")
+            metadata: Dict[str, Any] = Field(
+                default_factory=dict, description="Metadata"
+            )
 
         # Create a model instance with I18nStr objects
         model = TestModel(
@@ -40,9 +42,7 @@ class TestI18nModelCoverage:
         # Create a model instance with I18nStr objects
         model = TestModel(
             name=I18nStr({"en-US": "Test", "zh-Hans": "测试"}),
-            description=I18nStr(
-                {"en-US": "This is a test", "zh-Hans": "这是一个测试"}
-            ),
+            description=I18nStr({"en-US": "This is a test", "zh-Hans": "这是一个测试"}),
             tags=["test", "example"],
             metadata={"key": "value"},
         )
@@ -61,6 +61,7 @@ class TestI18nModelCoverage:
 
     def test_i18n_base_model_serialization(self):
         """Test serialization of I18nBaseModel."""
+
         # Create a model class that inherits from I18nBaseModel
         class TestModel(I18nBaseModel):
             name: I18nStr = Field(..., description="The name")
@@ -69,9 +70,7 @@ class TestI18nModelCoverage:
         # Create a model instance with I18nStr objects
         model = TestModel(
             name=I18nStr({"en-US": "Test", "zh-Hans": "测试"}),
-            description=I18nStr(
-                {"en-US": "This is a test", "zh-Hans": "这是一个测试"}
-            ),
+            description=I18nStr({"en-US": "This is a test", "zh-Hans": "这是一个测试"}),
         )
 
         # Serialize the model to a dictionary
@@ -94,6 +93,7 @@ class TestI18nModelCoverage:
 
     def test_i18n_base_model_json(self):
         """Test JSON serialization of I18nBaseModel."""
+
         # Create a model class that inherits from I18nBaseModel
         class TestModel(I18nBaseModel):
             name: I18nStr = Field(..., description="The name")
@@ -102,9 +102,7 @@ class TestI18nModelCoverage:
         # Create a model instance with I18nStr objects
         model = TestModel(
             name=I18nStr({"en-US": "Test", "zh-Hans": "测试"}),
-            description=I18nStr(
-                {"en-US": "This is a test", "zh-Hans": "这是一个测试"}
-            ),
+            description=I18nStr({"en-US": "This is a test", "zh-Hans": "这是一个测试"}),
         )
 
         # Serialize the model to JSON

@@ -5,7 +5,6 @@ This module tests the performance of the library.
 """
 
 import time
-import pytest
 from typing import List, Optional
 
 from pydantic import BaseModel, Field

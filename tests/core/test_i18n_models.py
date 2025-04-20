@@ -5,7 +5,6 @@ This module tests the I18nBaseModel class for internationalization support.
 """
 
 import json
-import pytest
 from pydantic import Field, ConfigDict
 from typing import Optional, List
 

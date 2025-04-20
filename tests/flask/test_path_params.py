@@ -13,6 +13,7 @@ from flask_x_openapi_schema.x.flask.utils import generate_openapi_schema
 
 class ItemResponse(BaseModel):
     """Item response model."""
+
     id: str = Field(..., description="Item ID")
     name: str = Field(..., description="Item name")
     description: str = Field(None, description="Item description")
@@ -26,7 +27,7 @@ class ItemView(OpenAPIMethodViewMixin, MethodView):
         summary="获取单个项目",
         description="通过ID获取项目",
         tags=["项目"],
-        operation_id="getItem"
+        operation_id="getItem",
     )
     def get(self, _x_path_item_id: str):
         """Get a single item."""
@@ -34,7 +35,7 @@ class ItemView(OpenAPIMethodViewMixin, MethodView):
             id=_x_path_item_id,
             name="测试项目",
             description="这是一个测试项目",
-            price=10.99
+            price=10.99,
         )
         return response
 
@@ -66,7 +67,7 @@ def test_path_parameter_prefix_removal(app_with_blueprint):
         title="Test API",
         version="1.0.0",
         description="Test API Description",
-        output_format="json"
+        output_format="json",
     )
 
     # Check that the path is correct
@@ -93,7 +94,7 @@ def test_non_ascii_characters(app_with_blueprint):
         title="测试 API",
         version="1.0.0",
         description="测试 API 描述",
-        output_format="json"
+        output_format="json",
     )
 
     # Check that non-ASCII characters are preserved in the info section
@@ -111,7 +112,7 @@ def test_non_ascii_characters(app_with_blueprint):
         title="测试 API",
         version="1.0.0",
         description="测试 API 描述",
-        output_format="yaml"
+        output_format="yaml",
     )
 
     # Check that the YAML schema contains non-ASCII characters

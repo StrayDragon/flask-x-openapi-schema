@@ -130,7 +130,12 @@ def extract_openapi_parameters_from_methodview(
             param_schema = {"type": "boolean"}
 
         parameters.append(
-            {"name": actual_param_name, "in": "path", "required": True, "schema": param_schema}
+            {
+                "name": actual_param_name,
+                "in": "path",
+                "required": True,
+                "schema": param_schema,
+            }
         )
 
     # Check for request body in type hints
@@ -209,6 +214,7 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
 
         # Get parameter prefixes from current configuration
         from ...core.cache import get_parameter_prefixes
+
         _, _, path_prefix, _ = get_parameter_prefixes()
         path_prefix_len = len(path_prefix) + 1  # +1 for the underscore
 

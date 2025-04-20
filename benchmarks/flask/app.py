@@ -12,8 +12,11 @@ from flask import Flask, request, jsonify, Response
 
 from flask_x_openapi_schema.x.flask import openapi_metadata
 from benchmarks.common.models import (
-    UserRequest, UserQueryParams, UserResponse, UserRole,
-    AddressModel, ContactInfo, Preferences, UserStats
+    UserRequest,
+    UserQueryParams,
+    UserResponse,
+    UserRole,
+    UserStats,
 )
 from benchmarks.common.utils import get_performance_metrics
 
@@ -53,7 +56,9 @@ def create_standard_flask_app():
         # Validate username length
         username = data.get("username")
         if len(username) < 3 or len(username) > 50:
-            return jsonify({"error": "username must be between 3 and 50 characters"}), 400
+            return jsonify(
+                {"error": "username must be between 3 and 50 characters"}
+            ), 400
 
         # Validate email format
         email = data.get("email")
@@ -76,7 +81,9 @@ def create_standard_flask_app():
             return jsonify({"error": "role must be a string"}), 400
         valid_roles = [r.value for r in UserRole]
         if role not in valid_roles:
-            return jsonify({"error": f"role must be one of: {', '.join(valid_roles)}"}), 400
+            return jsonify(
+                {"error": f"role must be one of: {', '.join(valid_roles)}"}
+            ), 400
 
         # Tags validation
         tags = data.get("tags", [])
@@ -95,9 +102,13 @@ def create_standard_flask_app():
                 return jsonify({"error": "each address must be an object"}), 400
             for field in ["street", "city", "state", "postal_code", "country"]:
                 if field not in addr:
-                    return jsonify({"error": f"address missing required field: {field}"}), 400
+                    return jsonify(
+                        {"error": f"address missing required field: {field}"}
+                    ), 400
                 if not isinstance(addr[field], str):
-                    return jsonify({"error": f"address field {field} must be a string"}), 400
+                    return jsonify(
+                        {"error": f"address field {field} must be a string"}
+                    ), 400
             if "is_primary" in addr and not isinstance(addr["is_primary"], bool):
                 return jsonify({"error": "address is_primary must be a boolean"}), 400
 
@@ -108,7 +119,9 @@ def create_standard_flask_app():
                 return jsonify({"error": "contact_info must be an object"}), 400
             for field in ["phone", "alternative_email", "emergency_contact"]:
                 if field in contact_info and not isinstance(contact_info[field], str):
-                    return jsonify({"error": f"contact_info field {field} must be a string"}), 400
+                    return jsonify(
+                        {"error": f"contact_info field {field} must be a string"}
+                    ), 400
 
         # Preferences validation
         preferences = data.get("preferences")
@@ -117,9 +130,15 @@ def create_standard_flask_app():
                 return jsonify({"error": "preferences must be an object"}), 400
             for field in ["theme", "language", "timezone", "email_frequency"]:
                 if field in preferences and not isinstance(preferences[field], str):
-                    return jsonify({"error": f"preferences field {field} must be a string"}), 400
-            if "notifications_enabled" in preferences and not isinstance(preferences["notifications_enabled"], bool):
-                return jsonify({"error": "preferences notifications_enabled must be a boolean"}), 400
+                    return jsonify(
+                        {"error": f"preferences field {field} must be a string"}
+                    ), 400
+            if "notifications_enabled" in preferences and not isinstance(
+                preferences["notifications_enabled"], bool
+            ):
+                return jsonify(
+                    {"error": "preferences notifications_enabled must be a boolean"}
+                ), 400
 
         # Metadata validation
         metadata = data.get("metadata", {})
@@ -127,8 +146,8 @@ def create_standard_flask_app():
             return jsonify({"error": "metadata must be an object"}), 400
 
         # Query parameters validation
-        include_inactive = request.args.get("include_inactive", "false").lower() == "true"
-        sort_by = request.args.get("sort_by", "username")
+        _ = request.args.get("include_inactive", "false").lower() == "true"
+        _ = request.args.get("sort_by", "username")
         sort_order = request.args.get("sort_order", "asc")
         if sort_order not in ["asc", "desc"]:
             return jsonify({"error": "sort_order must be 'asc' or 'desc'"}), 400
@@ -150,9 +169,13 @@ def create_standard_flask_app():
         # Additional query parameters
         filter_role = request.args.get("filter_role")
         if filter_role and filter_role not in [r.value for r in UserRole]:
-            return jsonify({"error": f"filter_role must be one of: {', '.join([r.value for r in UserRole])}"}), 400
+            return jsonify(
+                {
+                    "error": f"filter_role must be one of: {', '.join([r.value for r in UserRole])}"
+                }
+            ), 400
 
-        search = request.args.get("search")
+        _ = request.args.get("search")
 
         try:
             min_age = request.args.get("min_age")
@@ -176,8 +199,8 @@ def create_standard_flask_app():
         if tags_filter:
             tags_filter = tags_filter.split(",")
 
-        created_after = request.args.get("created_after")
-        created_before = request.args.get("created_before")
+        _ = request.args.get("created_after")
+        _ = request.args.get("created_before")
 
         # Create response with all fields
         created_at = datetime.now().isoformat()
@@ -188,7 +211,7 @@ def create_standard_flask_app():
             "last_login": None,
             "post_count": 0,
             "comment_count": 0,
-            "reputation": 0
+            "reputation": 0,
         }
 
         # Create response
@@ -219,10 +242,12 @@ def create_standard_flask_app():
         metrics["request_duration_ms"] = processing_time
 
         # Create response with metrics in headers
-        resp = Response(json.dumps(response), status=201, mimetype='application/json')
-        resp.headers['X-Processing-Time'] = f"{processing_time:.2f}ms"
-        resp.headers['X-DB-Queries'] = str(metrics["db_query_count"])
-        resp.headers['X-Cache-Status'] = f"hits={metrics['cache_hits']},misses={metrics['cache_misses']}"
+        resp = Response(json.dumps(response), status=201, mimetype="application/json")
+        resp.headers["X-Processing-Time"] = f"{processing_time:.2f}ms"
+        resp.headers["X-DB-Queries"] = str(metrics["db_query_count"])
+        resp.headers["X-Cache-Status"] = (
+            f"hits={metrics['cache_hits']},misses={metrics['cache_misses']}"
+        )
 
         return resp
 
@@ -248,9 +273,11 @@ def create_openapi_flask_app():
                 },
             },
             "400": {"description": "Bad request"},
-        }
+        },
     )
-    def openapi_create_user(user_id: str, _x_body: UserRequest = None, _x_query: UserQueryParams = None):
+    def openapi_create_user(
+        user_id: str, _x_body: UserRequest = None, _x_query: UserQueryParams = None
+    ):
         """Create a user using flask-x-openapi-schema."""
         try:
             # Start timing for performance metrics
@@ -262,7 +289,7 @@ def create_openapi_flask_app():
                 last_login=None,
                 post_count=0,
                 comment_count=0,
-                reputation=0
+                reputation=0,
             )
 
             # Create response with current timestamp
@@ -297,9 +324,11 @@ def create_openapi_flask_app():
 
             # Create response with metrics in headers
             resp = response.to_response(201)
-            resp.headers['X-Processing-Time'] = f"{processing_time:.2f}ms"
-            resp.headers['X-DB-Queries'] = str(metrics["db_query_count"])
-            resp.headers['X-Cache-Status'] = f"hits={metrics['cache_hits']},misses={metrics['cache_misses']}"
+            resp.headers["X-Processing-Time"] = f"{processing_time:.2f}ms"
+            resp.headers["X-DB-Queries"] = str(metrics["db_query_count"])
+            resp.headers["X-Cache-Status"] = (
+                f"hits={metrics['cache_hits']},misses={metrics['cache_misses']}"
+            )
 
             return resp
         except Exception as e:

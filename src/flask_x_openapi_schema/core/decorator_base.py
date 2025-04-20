@@ -3,11 +3,8 @@ Base classes and utilities for OpenAPI metadata decorators.
 """
 
 import inspect
-import threading
-import weakref
-from abc import ABC, abstractmethod
 from collections.abc import Callable
-from functools import lru_cache, wraps
+from functools import wraps
 from typing import (
     Any,
     Dict,
@@ -439,6 +436,7 @@ class OpenAPIDecoratorBase:
             if self.framework == "flask":
                 # Import here to avoid circular imports
                 from ..x.flask.decorators import FlaskOpenAPIDecorator
+
                 self.framework_decorator = FlaskOpenAPIDecorator(
                     summary=self.summary,
                     description=self.description,
@@ -454,6 +452,7 @@ class OpenAPIDecoratorBase:
             elif self.framework == "flask_restful":
                 # Import here to avoid circular imports
                 from ..x.flask_restful.decorators import FlaskRestfulOpenAPIDecorator
+
                 self.framework_decorator = FlaskRestfulOpenAPIDecorator(
                     summary=self.summary,
                     description=self.description,
@@ -791,7 +790,9 @@ class OpenAPIDecoratorBase:
                                 kwargs[param_name] = file_obj
 
             # Process any additional framework-specific parameters
-            kwargs = self.framework_decorator.process_additional_params(kwargs, param_names)
+            kwargs = self.framework_decorator.process_additional_params(
+                kwargs, param_names
+            )
 
         # Filter out any kwargs that are not in the function signature
         # Get the function signature parameters once

@@ -4,7 +4,6 @@ Tests for the utils module.
 This module tests the utility functions for converting Pydantic models to OpenAPI schemas.
 """
 
-import pytest
 from typing import List, Optional, Dict, Any
 from enum import Enum
 
@@ -117,6 +116,7 @@ def test_pydantic_to_openapi_schema_complex():
 
 def test_pydantic_to_openapi_schema_nested():
     """Test pydantic_to_openapi_schema with nested models."""
+
     # Define a nested model
     class Address(BaseModel):
         """Address model for testing."""

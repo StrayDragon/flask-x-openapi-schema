@@ -10,7 +10,11 @@ To run:
 
 from locust import HttpUser, task, between
 
-from benchmarks.common.utils import get_random_user_data, get_random_user_id, get_query_params
+from benchmarks.common.utils import (
+    get_random_user_data,
+    get_random_user_id,
+    get_query_params,
+)
 
 
 class StandardFlaskUser(HttpUser):

@@ -3,10 +3,12 @@ Tests for the mixins module to improve coverage.
 """
 
 from unittest.mock import MagicMock
-import pytest
 import yaml
 
-from flask_x_openapi_schema.x.flask_restful.resources import OpenAPIIntegrationMixin, OpenAPIBlueprintMixin
+from flask_x_openapi_schema.x.flask_restful.resources import (
+    OpenAPIIntegrationMixin,
+    OpenAPIBlueprintMixin,
+)
 
 
 class TestMixinsCoverage:

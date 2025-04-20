@@ -4,7 +4,7 @@ Flask-RESTful benchmark applications.
 This module contains Flask-RESTful applications for benchmarking with and without flask-x-openapi-schema.
 """
 
-from flask import Flask, request
+from flask import Flask
 from flask_restful import Api, Resource, reqparse
 
 from flask_x_openapi_schema.x.flask_restful import openapi_metadata
@@ -23,23 +23,33 @@ def create_standard_flask_restful_app():
             """Create a user using standard Flask-RESTful."""
             # Create a request parser
             parser = reqparse.RequestParser()
-            parser.add_argument("username", type=str, required=True, help="Username is required")
-            parser.add_argument("email", type=str, required=True, help="Email is required")
-            parser.add_argument("full_name", type=str, required=True, help="Full name is required")
+            parser.add_argument(
+                "username", type=str, required=True, help="Username is required"
+            )
+            parser.add_argument(
+                "email", type=str, required=True, help="Email is required"
+            )
+            parser.add_argument(
+                "full_name", type=str, required=True, help="Full name is required"
+            )
             parser.add_argument("age", type=int, required=True, help="Age is required")
             parser.add_argument("is_active", type=bool, default=True)
             parser.add_argument("tags", type=list, default=[])
 
             # Parse query parameters
             query_parser = reqparse.RequestParser()
-            query_parser.add_argument("include_inactive", type=bool, default=False, location="args")
-            query_parser.add_argument("sort_by", type=str, default="username", location="args")
+            query_parser.add_argument(
+                "include_inactive", type=bool, default=False, location="args"
+            )
+            query_parser.add_argument(
+                "sort_by", type=str, default="username", location="args"
+            )
             query_parser.add_argument("limit", type=int, default=10, location="args")
             query_parser.add_argument("offset", type=int, default=0, location="args")
 
             # Parse arguments
             args = parser.parse_args(strict=True)
-            query_args = query_parser.parse_args()
+            _ = query_parser.parse_args()
 
             # Create response
             response = {
@@ -84,9 +94,11 @@ def create_openapi_flask_restful_app():
                     },
                 },
                 "400": {"description": "Bad request"},
-            }
+            },
         )
-        def post(self, user_id, _x_body: UserRequest = None, _x_query: UserQueryParams = None):
+        def post(
+            self, user_id, _x_body: UserRequest = None, _x_query: UserQueryParams = None
+        ):
             """Create a user using flask-x-openapi-schema."""
             try:
                 # Create response
@@ -127,23 +139,33 @@ def create_combined_app():
             """Create a user using standard Flask-RESTful."""
             # Create a request parser
             parser = reqparse.RequestParser()
-            parser.add_argument("username", type=str, required=True, help="Username is required")
-            parser.add_argument("email", type=str, required=True, help="Email is required")
-            parser.add_argument("full_name", type=str, required=True, help="Full name is required")
+            parser.add_argument(
+                "username", type=str, required=True, help="Username is required"
+            )
+            parser.add_argument(
+                "email", type=str, required=True, help="Email is required"
+            )
+            parser.add_argument(
+                "full_name", type=str, required=True, help="Full name is required"
+            )
             parser.add_argument("age", type=int, required=True, help="Age is required")
             parser.add_argument("is_active", type=bool, default=True)
             parser.add_argument("tags", type=list, default=[])
 
             # Parse query parameters
             query_parser = reqparse.RequestParser()
-            query_parser.add_argument("include_inactive", type=bool, default=False, location="args")
-            query_parser.add_argument("sort_by", type=str, default="username", location="args")
+            query_parser.add_argument(
+                "include_inactive", type=bool, default=False, location="args"
+            )
+            query_parser.add_argument(
+                "sort_by", type=str, default="username", location="args"
+            )
             query_parser.add_argument("limit", type=int, default=10, location="args")
             query_parser.add_argument("offset", type=int, default=0, location="args")
 
             # Parse arguments
             args = parser.parse_args(strict=True)
-            query_args = query_parser.parse_args()
+            _ = query_parser.parse_args()
 
             # Create response
             response = {
@@ -178,9 +200,11 @@ def create_combined_app():
                     },
                 },
                 "400": {"description": "Bad request"},
-            }
+            },
         )
-        def post(self, user_id, _x_body: UserRequest = None, _x_query: UserQueryParams = None):
+        def post(
+            self, user_id, _x_body: UserRequest = None, _x_query: UserQueryParams = None
+        ):
             """Create a user using flask-x-openapi-schema."""
             try:
                 # Create response

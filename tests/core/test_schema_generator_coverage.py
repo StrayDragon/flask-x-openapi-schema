@@ -2,8 +2,7 @@
 Tests for the schema_generator module to improve coverage.
 """
 
-import pytest
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -51,6 +50,7 @@ class TestSchemaGeneratorCoverage:
 
     def test_schema_generator_with_enum(self):
         """Test OpenAPISchemaGenerator with Enum."""
+
         # Define an Enum
         class Color(str, Enum):
             RED = "red"
@@ -84,6 +84,7 @@ class TestSchemaGeneratorCoverage:
 
     def test_schema_generator_with_nested_models(self):
         """Test OpenAPISchemaGenerator with nested models."""
+
         # Define nested models
         class Address(BaseModel):
             street: str = Field(..., description="The street")
@@ -117,10 +118,13 @@ class TestSchemaGeneratorCoverage:
 
     def test_schema_generator_with_complex_types(self):
         """Test OpenAPISchemaGenerator with complex types."""
+
         # Define a model with complex types
         class ComplexModel(BaseModel):
             tags: List[str] = Field(default_factory=list, description="Tags")
-            metadata: Dict[str, Any] = Field(default_factory=dict, description="Metadata")
+            metadata: Dict[str, Any] = Field(
+                default_factory=dict, description="Metadata"
+            )
             nested_list: List[List[int]] = Field(
                 default_factory=list, description="Nested list"
             )

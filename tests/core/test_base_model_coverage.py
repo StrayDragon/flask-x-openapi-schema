@@ -2,8 +2,7 @@
 Tests for the base model to improve coverage.
 """
 
-import pytest
-from pydantic import BaseModel, Field
+from pydantic import Field
 from typing import Optional
 
 from flask_x_openapi_schema.models.base import BaseRespModel

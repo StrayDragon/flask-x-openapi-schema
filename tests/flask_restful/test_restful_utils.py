@@ -8,7 +8,11 @@ from enum import Enum
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
-from flask_x_openapi_schema.x.flask_restful.utils import _get_field_type, create_reqparse_from_pydantic, pydantic_model_to_reqparse
+from flask_x_openapi_schema.x.flask_restful.utils import (
+    _get_field_type,
+    create_reqparse_from_pydantic,
+    pydantic_model_to_reqparse,
+)
 
 
 class SampleEnum(Enum):

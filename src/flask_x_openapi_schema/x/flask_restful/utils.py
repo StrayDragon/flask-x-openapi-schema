@@ -9,20 +9,23 @@ from typing import Any, Optional, Union
 
 try:
     from flask_restful import reqparse  # type: ignore
+
     HAS_FLASK_RESTFUL = True
 except ImportError:
     HAS_FLASK_RESTFUL = False
+
     # Create a placeholder class for when Flask-RESTful is not available
     class reqparse:
         class RequestParser:
             def __init__(self):
                 self.args = []
-            
+
             def add_argument(self, *args, **kwargs):
                 pass
-            
+
             def parse_args(self):
                 return {}
+
 
 from pydantic import BaseModel
 
@@ -43,7 +46,7 @@ def pydantic_model_to_reqparse(
     """
     if not HAS_FLASK_RESTFUL:
         raise ImportError("Flask-RESTful is not installed")
-        
+
     parser = reqparse.RequestParser()
     exclude = exclude or []
 
@@ -141,7 +144,7 @@ def create_reqparse_from_pydantic(
     """
     if not HAS_FLASK_RESTFUL:
         raise ImportError("Flask-RESTful is not installed")
-        
+
     parser = reqparse.RequestParser()
 
     if query_model:

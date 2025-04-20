@@ -6,12 +6,16 @@ import pytest
 from flask import Flask
 from flask_restful import Resource
 
-from flask_x_openapi_schema.x.flask_restful import openapi_metadata, OpenAPIIntegrationMixin
+from flask_x_openapi_schema.x.flask_restful import (
+    openapi_metadata,
+    OpenAPIIntegrationMixin,
+)
 from pydantic import BaseModel, Field
 
 
 class ItemResponse(BaseModel):
     """Item response model."""
+
     id: str = Field(..., description="Item ID")
     name: str = Field(..., description="Item name")
     description: str = Field(None, description="Item description")
@@ -25,15 +29,12 @@ class ItemResource(Resource):
         summary="获取单个项目",
         description="通过ID获取项目",
         tags=["项目"],
-        operation_id="getItem"
+        operation_id="getItem",
     )
     def get(self, item_id: str):
         """Get a single item."""
         response = ItemResponse(
-            id=item_id,
-            name="测试项目",
-            description="这是一个测试项目",
-            price=10.99
+            id=item_id, name="测试项目", description="这是一个测试项目", price=10.99
         )
         return response
 
@@ -66,11 +67,12 @@ def test_path_parameter_handling(app_with_api):
         title="Test API",
         version="1.0.0",
         description="Test API Description",
-        output_format="json"
+        output_format="json",
     )
 
     # Print schema for debugging
     import json
+
     print(f"Schema paths: {json.dumps(schema.get('paths', {}), indent=2)}")
 
     # Check that paths exist
@@ -106,7 +108,7 @@ def test_non_ascii_characters(app_with_api):
         title="测试 API",
         version="1.0.0",
         description="测试 API 描述",
-        output_format="json"
+        output_format="json",
     )
 
     # Check that non-ASCII characters are preserved in the info section
@@ -133,7 +135,7 @@ def test_non_ascii_characters(app_with_api):
         title="测试 API",
         version="1.0.0",
         description="测试 API 描述",
-        output_format="yaml"
+        output_format="yaml",
     )
 
     # Check that the YAML schema contains non-ASCII characters

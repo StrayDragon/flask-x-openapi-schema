@@ -4,7 +4,6 @@ Tests for the schema_generator module.
 This module tests the OpenAPISchemaGenerator class.
 """
 
-import pytest
 from typing import List, Optional
 
 from pydantic import BaseModel, Field

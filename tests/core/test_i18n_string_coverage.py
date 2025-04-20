@@ -2,10 +2,11 @@
 Tests for the i18n_string module to improve coverage.
 """
 
-import pytest
-import json
-
-from flask_x_openapi_schema.i18n.i18n_string import I18nStr, set_current_language, get_current_language
+from flask_x_openapi_schema.i18n.i18n_string import (
+    I18nStr,
+    set_current_language,
+    get_current_language,
+)
 
 
 class TestI18nStringCoverage:

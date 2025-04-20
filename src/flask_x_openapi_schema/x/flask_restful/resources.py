@@ -18,7 +18,11 @@ except ImportError:
         pass
 
 
-from ...core.config import ConventionalPrefixConfig, configure_prefixes, GLOBAL_CONFIG_HOLDER
+from ...core.config import (
+    ConventionalPrefixConfig,
+    configure_prefixes,
+    GLOBAL_CONFIG_HOLDER,
+)
 from ...core.schema_generator import OpenAPISchemaGenerator
 from ...i18n.i18n_string import I18nStr, get_current_language
 from ..flask.views import MethodViewOpenAPISchemaGenerator
@@ -41,7 +45,7 @@ class OpenAPIIntegrationMixin(Api):
         super().__init__(*args, **kwargs)
 
         # 确保 resources 属性已初始化
-        if not hasattr(self, 'resources'):
+        if not hasattr(self, "resources"):
             self.resources = []
 
     def add_resource(self, resource, *urls, **kwargs):
@@ -61,7 +65,7 @@ class OpenAPIIntegrationMixin(Api):
 
         # 手动添加资源到 resources 属性
         # 这是为了确保在测试中也能正确工作
-        if not hasattr(self, 'resources'):
+        if not hasattr(self, "resources"):
             self.resources = []
 
         # 检查资源是否已经存在
@@ -71,10 +75,10 @@ class OpenAPIIntegrationMixin(Api):
 
         # 添加资源
         # 确保将 endpoint 作为字典中的一个键值对存储
-        if 'endpoint' not in kwargs and kwargs is not None:
-            kwargs['endpoint'] = resource.__name__.lower()
+        if "endpoint" not in kwargs and kwargs is not None:
+            kwargs["endpoint"] = resource.__name__.lower()
         elif kwargs is None:
-            kwargs = {'endpoint': resource.__name__.lower()}
+            kwargs = {"endpoint": resource.__name__.lower()}
 
         self.resources.append((resource, urls, kwargs))
 
@@ -144,7 +148,7 @@ class OpenAPIIntegrationMixin(Api):
 
         # Get URL prefix from blueprint if available
         url_prefix = None
-        if hasattr(self, 'blueprint') and hasattr(self.blueprint, 'url_prefix'):
+        if hasattr(self, "blueprint") and hasattr(self.blueprint, "url_prefix"):
             url_prefix = self.blueprint.url_prefix
 
         for resource, urls, _ in self.resources:
@@ -153,7 +157,9 @@ class OpenAPIIntegrationMixin(Api):
         schema = generator.generate_schema()
 
         if output_format == "yaml":
-            return yaml.dump(schema, sort_keys=False, default_flow_style=False, allow_unicode=True)
+            return yaml.dump(
+                schema, sort_keys=False, default_flow_style=False, allow_unicode=True
+            )
         else:
             return schema
 
@@ -236,6 +242,8 @@ class OpenAPIBlueprintMixin:
         schema = generator.generate_schema()
 
         if output_format == "yaml":
-            return yaml.dump(schema, sort_keys=False, default_flow_style=False, allow_unicode=True)
+            return yaml.dump(
+                schema, sort_keys=False, default_flow_style=False, allow_unicode=True
+            )
         else:
             return schema

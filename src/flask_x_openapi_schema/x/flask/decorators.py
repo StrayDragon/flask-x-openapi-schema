@@ -50,6 +50,7 @@ class FlaskOpenAPIDecorator:
         if self.base_decorator is None:
             # Import here to avoid circular imports
             from ...core.decorator_base import OpenAPIDecoratorBase
+
             self.base_decorator = OpenAPIDecoratorBase(
                 summary=self.summary,
                 description=self.description,
@@ -166,7 +167,8 @@ class FlaskOpenAPIDecorator:
 
 
 # Define a type variable for the function
-F = TypeVar('F', bound=Callable[..., Any])
+F = TypeVar("F", bound=Callable[..., Any])
+
 
 def openapi_metadata(
     *,

@@ -52,7 +52,9 @@ def generate_openapi_schema(
     if output_format == "yaml":
         import yaml
 
-        return yaml.dump(schema, sort_keys=False, default_flow_style=False, allow_unicode=True)
+        return yaml.dump(
+            schema, sort_keys=False, default_flow_style=False, allow_unicode=True
+        )
     else:
         return schema
 

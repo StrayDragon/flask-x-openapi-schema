@@ -310,9 +310,7 @@ def test_openapi_metadata_wrapper_preserves_signature():
     """Test that the wrapper function preserves the original function's signature."""
 
     @openapi_metadata(summary="Test endpoint")
-    def test_function(
-        _x_body: SampleRequestModel, _x_query: SampleQueryModel
-    ):
+    def test_function(_x_body: SampleRequestModel, _x_query: SampleQueryModel):
         return {"message": "Success"}
 
     # Check that the wrapper has the same signature as the original function

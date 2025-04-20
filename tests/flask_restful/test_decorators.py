@@ -73,9 +73,7 @@ class SampleResource(Resource):
     )
     def post(self, _x_body: SampleRequestModel):
         """Create new test data."""
-        return SampleResponseModel(
-            id="new-id", name=_x_body.name, age=_x_body.age
-        ), 201
+        return SampleResponseModel(id="new-id", name=_x_body.name, age=_x_body.age), 201
 
 
 @pytest.fixture

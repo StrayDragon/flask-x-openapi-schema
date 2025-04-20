@@ -38,10 +38,18 @@ def calculate_percentiles(data):
         # Fallback if percentile columns are not found
         return {
             "p50": data["Median Response Time"].median(),
-            "p75": data["75%"].median() if "75%" in data.columns else data["Median Response Time"].median() * 1.2,
-            "p90": data["90%"].median() if "90%" in data.columns else data["Median Response Time"].median() * 1.5,
-            "p95": data["95%"].median() if "95%" in data.columns else data["Median Response Time"].median() * 1.8,
-            "p99": data["99%"].median() if "99%" in data.columns else data["Median Response Time"].median() * 2.0,
+            "p75": data["75%"].median()
+            if "75%" in data.columns
+            else data["Median Response Time"].median() * 1.2,
+            "p90": data["90%"].median()
+            if "90%" in data.columns
+            else data["Median Response Time"].median() * 1.5,
+            "p95": data["95%"].median()
+            if "95%" in data.columns
+            else data["Median Response Time"].median() * 1.8,
+            "p99": data["99%"].median()
+            if "99%" in data.columns
+            else data["Median Response Time"].median() * 2.0,
         }
 
 
@@ -52,7 +60,7 @@ def generate_performance_charts(flask_results, flask_restful_results):
 
     # Create a figure with multiple subplots
     fig, axs = plt.subplots(2, 2, figsize=(15, 10))
-    fig.suptitle('Performance Comparison: Standard vs OpenAPI', fontsize=16)
+    fig.suptitle("Performance Comparison: Standard vs OpenAPI", fontsize=16)
 
     # Response Time Comparison
     if flask_results is not None:
@@ -61,43 +69,71 @@ def generate_performance_charts(flask_results, flask_restful_results):
 
         if not standard_rows.empty and not openapi_rows.empty:
             # Response Time Distribution
-            axs[0, 0].hist(standard_rows["Average Response Time"], alpha=0.5, bins=20, label="Flask Standard")
-            axs[0, 0].hist(openapi_rows["Average Response Time"], alpha=0.5, bins=20, label="Flask OpenAPI")
-            axs[0, 0].set_title('Response Time Distribution (Flask)')
-            axs[0, 0].set_xlabel('Response Time (ms)')
-            axs[0, 0].set_ylabel('Frequency')
+            axs[0, 0].hist(
+                standard_rows["Average Response Time"],
+                alpha=0.5,
+                bins=20,
+                label="Flask Standard",
+            )
+            axs[0, 0].hist(
+                openapi_rows["Average Response Time"],
+                alpha=0.5,
+                bins=20,
+                label="Flask OpenAPI",
+            )
+            axs[0, 0].set_title("Response Time Distribution (Flask)")
+            axs[0, 0].set_xlabel("Response Time (ms)")
+            axs[0, 0].set_ylabel("Frequency")
             axs[0, 0].legend()
 
             # Requests per Second
-            axs[0, 1].bar(["Standard", "OpenAPI"],
-                         [standard_rows["Requests/s"].sum(), openapi_rows["Requests/s"].sum()],
-                         color=["blue", "orange"])
-            axs[0, 1].set_title('Requests per Second (Flask)')
-            axs[0, 1].set_ylabel('Requests/s')
+            axs[0, 1].bar(
+                ["Standard", "OpenAPI"],
+                [standard_rows["Requests/s"].sum(), openapi_rows["Requests/s"].sum()],
+                color=["blue", "orange"],
+            )
+            axs[0, 1].set_title("Requests per Second (Flask)")
+            axs[0, 1].set_ylabel("Requests/s")
 
     # Response Time Comparison for Flask-RESTful
     if flask_restful_results is not None:
-        standard_rows = flask_restful_results[flask_restful_results["Name"].str.contains("/standard/")]
-        openapi_rows = flask_restful_results[flask_restful_results["Name"].str.contains("/openapi/")]
+        standard_rows = flask_restful_results[
+            flask_restful_results["Name"].str.contains("/standard/")
+        ]
+        openapi_rows = flask_restful_results[
+            flask_restful_results["Name"].str.contains("/openapi/")
+        ]
 
         if not standard_rows.empty and not openapi_rows.empty:
             # Response Time Distribution
-            axs[1, 0].hist(standard_rows["Average Response Time"], alpha=0.5, bins=20, label="Flask-RESTful Standard")
-            axs[1, 0].hist(openapi_rows["Average Response Time"], alpha=0.5, bins=20, label="Flask-RESTful OpenAPI")
-            axs[1, 0].set_title('Response Time Distribution (Flask-RESTful)')
-            axs[1, 0].set_xlabel('Response Time (ms)')
-            axs[1, 0].set_ylabel('Frequency')
+            axs[1, 0].hist(
+                standard_rows["Average Response Time"],
+                alpha=0.5,
+                bins=20,
+                label="Flask-RESTful Standard",
+            )
+            axs[1, 0].hist(
+                openapi_rows["Average Response Time"],
+                alpha=0.5,
+                bins=20,
+                label="Flask-RESTful OpenAPI",
+            )
+            axs[1, 0].set_title("Response Time Distribution (Flask-RESTful)")
+            axs[1, 0].set_xlabel("Response Time (ms)")
+            axs[1, 0].set_ylabel("Frequency")
             axs[1, 0].legend()
 
             # Requests per Second
-            axs[1, 1].bar(["Standard", "OpenAPI"],
-                         [standard_rows["Requests/s"].sum(), openapi_rows["Requests/s"].sum()],
-                         color=["blue", "orange"])
-            axs[1, 1].set_title('Requests per Second (Flask-RESTful)')
-            axs[1, 1].set_ylabel('Requests/s')
+            axs[1, 1].bar(
+                ["Standard", "OpenAPI"],
+                [standard_rows["Requests/s"].sum(), openapi_rows["Requests/s"].sum()],
+                color=["blue", "orange"],
+            )
+            axs[1, 1].set_title("Requests per Second (Flask-RESTful)")
+            axs[1, 1].set_ylabel("Requests/s")
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-    plt.savefig('benchmarks/results/performance_charts.png')
+    plt.savefig("benchmarks/results/performance_charts.png")
 
 
 def generate_report():
@@ -150,8 +186,13 @@ def generate_report():
 
             # Calculate percentiles
             percentiles = calculate_percentiles(standard_rows)
-            median = percentiles.get("p50", standard_rows["Median Response Time"].median())
-            percentile_90 = percentiles.get("p90", standard_rows["90%"].median() if "90%" in standard_rows.columns else 0)
+            median = percentiles.get(
+                "p50", standard_rows["Median Response Time"].median()
+            )
+            percentile_90 = percentiles.get(
+                "p90",
+                standard_rows["90%"].median() if "90%" in standard_rows.columns else 0,
+            )
             percentile_95 = percentiles.get("p95", 0)
             percentile_99 = percentiles.get("p99", 0)
 
@@ -184,8 +225,13 @@ def generate_report():
 
             # Calculate percentiles
             percentiles = calculate_percentiles(openapi_rows)
-            median = percentiles.get("p50", openapi_rows["Median Response Time"].median())
-            percentile_90 = percentiles.get("p90", openapi_rows["90%"].median() if "90%" in openapi_rows.columns else 0)
+            median = percentiles.get(
+                "p50", openapi_rows["Median Response Time"].median()
+            )
+            percentile_90 = percentiles.get(
+                "p90",
+                openapi_rows["90%"].median() if "90%" in openapi_rows.columns else 0,
+            )
             percentile_95 = percentiles.get("p95", 0)
             percentile_99 = percentiles.get("p99", 0)
 
@@ -211,10 +257,16 @@ def generate_report():
 
             # Calculate performance difference
             if not standard_rows.empty:
-                perf_diff = ((avg - standard_rows["Average Response Time"].mean()) /
-                            standard_rows["Average Response Time"].mean() * 100)
-                rps_diff = ((rps - standard_rows["Requests/s"].sum()) /
-                           standard_rows["Requests/s"].sum() * 100)
+                perf_diff = (
+                    (avg - standard_rows["Average Response Time"].mean())
+                    / standard_rows["Average Response Time"].mean()
+                    * 100
+                )
+                rps_diff = (
+                    (rps - standard_rows["Requests/s"].sum())
+                    / standard_rows["Requests/s"].sum()
+                    * 100
+                )
 
                 diff_text = f"[{'green' if perf_diff <= 0 else 'red'}]Response time: {perf_diff:.2f}% | "
                 diff_text += f"[{'green' if rps_diff >= 0 else 'red'}]RPS: {'+' if rps_diff > 0 else ''}{rps_diff:.2f}%"
@@ -237,8 +289,12 @@ def generate_report():
     # Add Flask-RESTful results
     if flask_restful_results is not None:
         # Calculate metrics for standard and OpenAPI endpoints
-        standard_rows = flask_restful_results[flask_restful_results["Name"].str.contains("/standard/")]
-        openapi_rows = flask_restful_results[flask_restful_results["Name"].str.contains("/openapi/")]
+        standard_rows = flask_restful_results[
+            flask_restful_results["Name"].str.contains("/standard/")
+        ]
+        openapi_rows = flask_restful_results[
+            flask_restful_results["Name"].str.contains("/openapi/")
+        ]
 
         if not standard_rows.empty:
             # Calculate metrics for standard endpoint
@@ -249,8 +305,13 @@ def generate_report():
 
             # Calculate percentiles
             percentiles = calculate_percentiles(standard_rows)
-            median = percentiles.get("p50", standard_rows["Median Response Time"].median())
-            percentile_90 = percentiles.get("p90", standard_rows["90%"].median() if "90%" in standard_rows.columns else 0)
+            median = percentiles.get(
+                "p50", standard_rows["Median Response Time"].median()
+            )
+            percentile_90 = percentiles.get(
+                "p90",
+                standard_rows["90%"].median() if "90%" in standard_rows.columns else 0,
+            )
             percentile_95 = percentiles.get("p95", 0)
             percentile_99 = percentiles.get("p99", 0)
 
@@ -283,8 +344,13 @@ def generate_report():
 
             # Calculate percentiles
             percentiles = calculate_percentiles(openapi_rows)
-            median = percentiles.get("p50", openapi_rows["Median Response Time"].median())
-            percentile_90 = percentiles.get("p90", openapi_rows["90%"].median() if "90%" in openapi_rows.columns else 0)
+            median = percentiles.get(
+                "p50", openapi_rows["Median Response Time"].median()
+            )
+            percentile_90 = percentiles.get(
+                "p90",
+                openapi_rows["90%"].median() if "90%" in openapi_rows.columns else 0,
+            )
             percentile_95 = percentiles.get("p95", 0)
             percentile_99 = percentiles.get("p99", 0)
 
@@ -310,10 +376,16 @@ def generate_report():
 
             # Calculate performance difference
             if not standard_rows.empty:
-                perf_diff = ((avg - standard_rows["Average Response Time"].mean()) /
-                            standard_rows["Average Response Time"].mean() * 100)
-                rps_diff = ((rps - standard_rows["Requests/s"].sum()) /
-                           standard_rows["Requests/s"].sum() * 100)
+                perf_diff = (
+                    (avg - standard_rows["Average Response Time"].mean())
+                    / standard_rows["Average Response Time"].mean()
+                    * 100
+                )
+                rps_diff = (
+                    (rps - standard_rows["Requests/s"].sum())
+                    / standard_rows["Requests/s"].sum()
+                    * 100
+                )
 
                 diff_text = f"[{'green' if perf_diff <= 0 else 'red'}]Response time: {perf_diff:.2f}% | "
                 diff_text += f"[{'green' if rps_diff >= 0 else 'red'}]RPS: {'+' if rps_diff > 0 else ''}{rps_diff:.2f}%"
@@ -342,8 +414,10 @@ def generate_report():
         console.print(table)
 
     # Print chart info if available
-    if os.path.exists('benchmarks/results/performance_charts.png'):
-        print("\nPerformance charts generated: benchmarks/results/performance_charts.png")
+    if os.path.exists("benchmarks/results/performance_charts.png"):
+        print(
+            "\nPerformance charts generated: benchmarks/results/performance_charts.png"
+        )
 
 
 if __name__ == "__main__":

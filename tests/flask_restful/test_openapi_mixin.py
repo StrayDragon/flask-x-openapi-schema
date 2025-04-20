@@ -7,7 +7,7 @@ This module tests the OpenAPIIntegrationMixin class without using the openapi_me
 import pytest
 from typing import List, Optional
 
-from flask import Flask, Blueprint
+from flask import Flask
 from flask_restful import Api, Resource
 from pydantic import BaseModel, Field
 
@@ -67,7 +67,9 @@ def app_with_api():
     api = OpenAPIApi(flask_app)
 
     # Register the resources
-    api.add_resource(ItemResource, "/api/items/<string:item_id>", endpoint="item_resource")
+    api.add_resource(
+        ItemResource, "/api/items/<string:item_id>", endpoint="item_resource"
+    )
 
     return flask_app, api
 

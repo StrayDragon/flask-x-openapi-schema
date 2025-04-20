@@ -13,7 +13,10 @@ from flask_x_openapi_schema.core.config import (
     configure_prefixes,
 )
 from flask_x_openapi_schema.x.flask import openapi_metadata
-from flask_x_openapi_schema.x.flask_restful.resources import OpenAPIIntegrationMixin, OpenAPIBlueprintMixin
+from flask_x_openapi_schema.x.flask_restful.resources import (
+    OpenAPIIntegrationMixin,
+    OpenAPIBlueprintMixin,
+)
 
 
 # Define test models

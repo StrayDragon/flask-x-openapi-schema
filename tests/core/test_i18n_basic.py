@@ -4,9 +4,11 @@ Basic tests for the i18n features of flask-x-openapi-schema.
 This module tests the internationalization functionality of the library.
 """
 
-import pytest
-
-from flask_x_openapi_schema.i18n.i18n_string import I18nStr, set_current_language, get_current_language
+from flask_x_openapi_schema.i18n.i18n_string import (
+    I18nStr,
+    set_current_language,
+    get_current_language,
+)
 
 
 def test_i18n_string_basic():
@@ -57,7 +59,8 @@ def test_i18n_string_fallback():
 
     # Create an I18nStr with a different default language
     i18n_str = I18nStr(
-        {"en-US": "Hello, world!", "zh-Hans": "你好，世界！"}, default_language="zh-Hans"
+        {"en-US": "Hello, world!", "zh-Hans": "你好，世界！"},
+        default_language="zh-Hans",
     )
 
     # Check that the new default language is used when an unknown language is specified
