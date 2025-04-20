@@ -60,7 +60,6 @@ class SampleResource(Resource):
     @openapi_metadata(
         summary="Create test data",
         description="Create new test data",
-        request_body=SampleRequestModel,
         responses={
             "201": {
                 "description": "Created successfully",

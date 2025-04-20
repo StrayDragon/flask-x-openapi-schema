@@ -72,7 +72,6 @@ class ItemView(OpenAPIMethodViewMixin, MethodView):
         description="Create a new item",
         tags=["Items"],
         operation_id="createItem",
-        request_body=ItemRequest,
     )
     def post(self, item_id: str, x_request_body: ItemRequest = None):
         """Create a new item."""
@@ -131,7 +130,6 @@ def test_get_item(client):
     assert data["price"] == 10.99
 
 
-@pytest.mark.skip(reason="Known issue with list serialization in request body")
 def test_create_item(client):
     """Test creating a new item."""
     # Create a direct instance of ItemRequest to test the endpoint

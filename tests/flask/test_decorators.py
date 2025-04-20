@@ -156,7 +156,7 @@ def test_openapi_metadata_with_i18n():
 def test_openapi_metadata_with_request_body():
     """Test openapi_metadata decorator with request body."""
 
-    @openapi_metadata(summary="Test endpoint", request_body=SampleRequestModel)
+    @openapi_metadata(summary="Test endpoint")
     def test_function(x_request_body: SampleRequestModel):
         return {"name": x_request_body.name, "age": x_request_body.age}
 
@@ -173,7 +173,7 @@ def test_openapi_metadata_with_request_body():
 def test_openapi_metadata_with_query_model():
     """Test openapi_metadata decorator with query model."""
 
-    @openapi_metadata(summary="Test endpoint", query_model=SampleQueryModel)
+    @openapi_metadata(summary="Test endpoint")
     def test_function(x_request_query: SampleQueryModel):
         return {"sort": x_request_query.sort, "limit": x_request_query.limit}
 
@@ -200,7 +200,7 @@ def test_openapi_metadata_with_query_model():
 def test_openapi_metadata_with_path_params():
     """Test openapi_metadata decorator with path parameters."""
 
-    @openapi_metadata(summary="Test endpoint", path_params=["user_id"])
+    @openapi_metadata(summary="Test endpoint")
     def test_function(user_id: str, x_request_path_user_id: str):
         return {"user_id": user_id}
 
@@ -247,10 +247,10 @@ def test_openapi_metadata_with_responses():
     assert metadata["responses"]["404"]["description"] == "Not found"
 
 
-def test_openapi_metadata_auto_detect_params():
-    """Test auto-detection of parameters in openapi_metadata decorator."""
+def test_openapi_metadata_parameter_extraction():
+    """Test extraction of parameters based on prefixes in openapi_metadata decorator."""
 
-    @openapi_metadata(summary="Test endpoint", path_params=["user_id"])
+    @openapi_metadata(summary="Test endpoint")
     def test_function(
         x_request_body: SampleRequestModel,
         x_request_query: SampleQueryModel,

@@ -112,13 +112,14 @@ def preprocess_request_data(
     return result
 
 
-def _detect_parameters(
+def _extract_parameters_from_prefixes(
     signature: inspect.Signature,
     type_hints: Dict[str, Any],
     config: Optional[ConventionalPrefixConfig] = None,
 ) -> Tuple[Optional[Type[BaseModel]], Optional[Type[BaseModel]], List[str]]:
     """
-    Detect request parameters from function signature.
+    Extract parameters based on prefix types from function signature.
+    This function does not auto-detect parameters, but simply extracts them based on their prefixes.
     Results are cached based on the function signature and type hints.
 
     Args:
@@ -127,7 +128,7 @@ def _detect_parameters(
         config: Optional configuration object with custom prefixes
 
     Returns:
-        Tuple of (detected_request_body, detected_query_model, detected_path_params)
+        Tuple of (request_body, query_model, path_params)
     """
     # Create a cache key based on signature and type hints
     # We use the signature's string representation and a frozenset of type hints items
@@ -137,13 +138,13 @@ def _detect_parameters(
         id(config) if config else None,
     )
 
-    # Check if we've already cached this detection
+    # Check if we've already cached this extraction
     if cache_key in PARAM_DETECTION_CACHE:
         return PARAM_DETECTION_CACHE[cache_key]
 
-    detected_request_body = None
-    detected_query_model = None
-    detected_path_params = []
+    request_body = None
+    query_model = None
+    path_params = []
 
     # Get parameter prefixes (cached)
     body_prefix, query_prefix, path_prefix, _ = get_parameter_prefixes(config)
@@ -168,7 +169,7 @@ def _detect_parameters(
                 and isinstance(param_type, type)
                 and issubclass(param_type, BaseModel)
             ):
-                detected_request_body = param_type
+                request_body = param_type
                 continue
 
         # Check for request_query parameter
@@ -179,7 +180,7 @@ def _detect_parameters(
                 and isinstance(param_type, type)
                 and issubclass(param_type, BaseModel)
             ):
-                detected_query_model = param_type
+                query_model = param_type
                 continue
 
         # Check for request_path parameter
@@ -187,15 +188,14 @@ def _detect_parameters(
             # Extract the path parameter name from the parameter name
             # Format: x_request_path_<param_name>
             param_suffix = param_name[path_prefix_len:]
-            if "_" in param_suffix:
-                path_param_name = param_suffix.split("_", 1)[1]
-                detected_path_params.append(path_param_name)
+            # Use the full suffix as the parameter name
+            path_params.append(param_suffix)
 
     # Cache the result (limit cache size to prevent memory issues)
     if len(PARAM_DETECTION_CACHE) > 1000:  # Limit cache size
         PARAM_DETECTION_CACHE.clear()
 
-    result = (detected_request_body, detected_query_model, detected_path_params)
+    result = (request_body, query_model, path_params)
     PARAM_DETECTION_CACHE[cache_key] = result
 
     return result
@@ -234,9 +234,6 @@ def _generate_openapi_metadata(
     external_docs: Optional[Dict[str, str]],
     actual_request_body: Optional[Union[Type[BaseModel], Dict[str, Any]]],
     responses: Optional[Dict[str, Any]],
-    _parameters: Optional[List[Dict[str, Any]]],
-    _actual_query_model: Optional[Type[BaseModel]],
-    _actual_path_params: Optional[List[str]],
     language: Optional[str],
 ) -> Dict[str, Any]:
     """
@@ -408,15 +405,10 @@ class OpenAPIDecoratorBase:
         description: Optional[Union[str, I18nStr]] = None,
         tags: Optional[List[str]] = None,
         operation_id: Optional[str] = None,
-        request_body: Optional[Union[Type[BaseModel], Dict[str, Any]]] = None,
         responses: Optional[Dict[str, Any]] = None,
-        parameters: Optional[List[Dict[str, Any]]] = None,
         deprecated: bool = False,
         security: Optional[List[Dict[str, List[str]]]] = None,
         external_docs: Optional[Dict[str, str]] = None,
-        query_model: Optional[Type[BaseModel]] = None,
-        path_params: Optional[List[str]] = None,
-        auto_detect_params: bool = True,
         language: Optional[str] = None,
         prefix_config: Optional[ConventionalPrefixConfig] = None,
         framework: str = "flask",
@@ -426,21 +418,15 @@ class OpenAPIDecoratorBase:
         self.description = description
         self.tags = tags
         self.operation_id = operation_id
-        self.request_body = request_body
         self.responses = responses
-        self.parameters = parameters
         self.deprecated = deprecated
         self.security = security
         self.external_docs = external_docs
-        self.query_model = query_model
-        self.path_params = path_params
-        self.auto_detect_params = auto_detect_params
         self.language = language
         self.prefix_config = prefix_config
         self.framework = framework
 
-        # Store framework type for later use
-        self.framework = framework
+        # Framework-specific decorator
         self.framework_decorator = None
 
         # We'll initialize the framework-specific decorator when needed
@@ -458,15 +444,10 @@ class OpenAPIDecoratorBase:
                     description=self.description,
                     tags=self.tags,
                     operation_id=self.operation_id,
-                    request_body=self.request_body,
                     responses=self.responses,
-                    parameters=self.parameters,
                     deprecated=self.deprecated,
                     security=self.security,
                     external_docs=self.external_docs,
-                    query_model=self.query_model,
-                    path_params=self.path_params,
-                    auto_detect_params=self.auto_detect_params,
                     language=self.language,
                     prefix_config=self.prefix_config,
                 )
@@ -478,15 +459,10 @@ class OpenAPIDecoratorBase:
                     description=self.description,
                     tags=self.tags,
                     operation_id=self.operation_id,
-                    request_body=self.request_body,
                     responses=self.responses,
-                    parameters=self.parameters,
                     deprecated=self.deprecated,
                     security=self.security,
                     external_docs=self.external_docs,
-                    query_model=self.query_model,
-                    path_params=self.path_params,
-                    auto_detect_params=self.auto_detect_params,
                     language=self.language,
                     prefix_config=self.prefix_config,
                 )
@@ -515,29 +491,20 @@ class OpenAPIDecoratorBase:
         # Get type hints from the function
         type_hints = get_type_hints(func)
 
-        # Auto-detect parameters if enabled
-        detected_request_body = None
-        detected_query_model = None
-        detected_path_params = []
+        # Extract parameters based on prefixes
+        extracted_request_body = None
+        extracted_query_model = None
+        extracted_path_params = []
 
-        if self.auto_detect_params:
-            # Use helper function to detect parameters (cached)
-            detected_request_body, detected_query_model, detected_path_params = (
-                _detect_parameters(signature, type_hints, self.prefix_config)
-            )
+        # Use helper function to extract parameters based on prefixes (cached)
+        extracted_request_body, extracted_query_model, extracted_path_params = (
+            _extract_parameters_from_prefixes(signature, type_hints, self.prefix_config)
+        )
 
-        # Use detected parameters if not explicitly provided
-        actual_request_body = self.request_body
-        if actual_request_body is None and detected_request_body is not None:
-            actual_request_body = detected_request_body
-
-        actual_query_model = self.query_model
-        if actual_query_model is None and detected_query_model is not None:
-            actual_query_model = detected_query_model
-
-        actual_path_params = self.path_params
-        if actual_path_params is None and detected_path_params:
-            actual_path_params = detected_path_params
+        # Use extracted parameters
+        actual_request_body = extracted_request_body
+        actual_query_model = extracted_query_model
+        actual_path_params = extracted_path_params
 
         # Generate OpenAPI metadata using helper function
         # Create a cache key for metadata
@@ -553,7 +520,6 @@ class OpenAPIDecoratorBase:
             if isinstance(actual_request_body, type)
             else str(actual_request_body),
             str(self.responses) if self.responses else None,
-            str(self.parameters) if self.parameters else None,
             id(actual_query_model) if actual_query_model else None,
             str(actual_path_params) if actual_path_params else None,
             self.language,
@@ -574,9 +540,6 @@ class OpenAPIDecoratorBase:
                 external_docs=self.external_docs,
                 actual_request_body=actual_request_body,
                 responses=self.responses,
-                _parameters=self.parameters,
-                _actual_query_model=actual_query_model,
-                _actual_path_params=actual_path_params,
                 language=self.language,
             )
 
@@ -585,8 +548,8 @@ class OpenAPIDecoratorBase:
                 METADATA_CACHE.clear()
             METADATA_CACHE[cache_key] = metadata
 
-        # Handle parameters from the parameters argument
-        openapi_parameters = self.parameters or []
+        # Initialize parameters list
+        openapi_parameters = []
 
         # Add parameters from query_model and path_params
         if actual_query_model or actual_path_params:
@@ -642,12 +605,11 @@ class OpenAPIDecoratorBase:
 
         # Add file parameters based on function signature
         file_params = []
-        if self.auto_detect_params:
-            # Get function annotations
-            func_annotations = get_type_hints(func)
-            file_params = _detect_file_parameters(
-                param_names, func_annotations, self.prefix_config
-            )
+        # Get function annotations
+        func_annotations = get_type_hints(func)
+        file_params = _detect_file_parameters(
+            param_names, func_annotations, self.prefix_config
+        )
 
         # If we have file parameters, set the consumes property to multipart/form-data
         if file_params:
@@ -775,10 +737,8 @@ class OpenAPIDecoratorBase:
                     if param_name.startswith(path_prefix):
                         # Extract the path parameter name
                         param_suffix = param_name[path_prefix_len:]
-                        if "_" in param_suffix:
-                            path_param_name = param_suffix.split("_", 1)[1]
-                            if path_param_name in kwargs:
-                                kwargs[param_name] = kwargs[path_param_name]
+                        if param_suffix in kwargs:
+                            kwargs[param_name] = kwargs[param_suffix]
 
             # Process file parameters
             for param_name in param_names:
