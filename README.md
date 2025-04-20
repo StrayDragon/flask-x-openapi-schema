@@ -27,7 +27,7 @@ pip install flask-x-openapi-schema[flask-restful]
 - **Framework Support**: Works with both Flask and Flask-RESTful applications
 - **Auto-Generation**: Generate OpenAPI schemas from Flask-RESTful resources and Flask.MethodView classes
 - **Pydantic Integration**: Seamlessly convert Pydantic models to OpenAPI schemas
-- **Smart Parameter Handling**: Automatically inject request parameters from Pydantic models with configurable prefixes
+- **Smart Parameter Handling**: Inject request parameters from Pydantic models with configurable prefixes
 - **Type Safety**: Preserve type annotations for better IDE support and validation
 - **Multiple Formats**: Output schemas in YAML or JSON format
 - **Internationalization**: Built-in i18n support for API documentation with thread-safe language switching
@@ -196,9 +196,9 @@ from flask_x_openapi_schema.x.flask import openapi_metadata, OpenAPIMethodViewMi
 from flask_x_openapi_schema.x.flask_restful import openapi_metadata, OpenAPIIntegrationMixin
 ```
 
-### Auto-Detection of Parameters
+### Parameter Binding with Special Prefixes
 
-The library automatically detects parameters with special prefixes:
+The library binds parameters with special prefixes:
 
 - `x_request_body`: Request body from JSON
 - `x_request_query`: Query parameters
@@ -273,7 +273,7 @@ class ItemResponse(BaseRespModel):
     id: str = Field(..., description="Item ID")
     name: str = Field(..., description="Item name")
     price: float = Field(..., description="Item price")
-    
+
     # Will be automatically converted to a Flask response
     # return ItemResponse(id="123", name="Example", price=10.99), 200
 ```

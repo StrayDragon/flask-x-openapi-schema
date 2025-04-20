@@ -10,7 +10,7 @@ The library focuses on automating the process of generating OpenAPI documentatio
 
 - **Automatic OpenAPI Schema Generation**: Generate OpenAPI schemas from Flask-RESTful resources and Flask.MethodView classes
 - **Pydantic Integration**: Seamlessly convert Pydantic models to OpenAPI schemas
-- **Smart Parameter Handling**: Automatically inject request parameters from Pydantic models
+- **Smart Parameter Handling**: Inject request parameters from Pydantic models using special prefixes
 - **Type Safety**: Preserve type annotations for better IDE support and validation
 - **Multiple Formats**: Output schemas in YAML or JSON format
 - **Internationalization**: Built-in i18n support for API documentation
@@ -29,7 +29,7 @@ graph TD
     D --> E[OpenAPI Schema]
 
     F[Resource Methods] --> G[openapi_metadata Decorator]
-    G --> H[Parameter Auto-Detection]
+    G --> H[Parameter Binding]
     H --> I[Request Processing]
     I --> J[Response Generation]
 
@@ -49,9 +49,9 @@ graph TD
 
 The `openapi_metadata` decorator is the primary entry point for adding OpenAPI metadata to API endpoints. It handles parameter detection, binding, and response conversion.
 
-### 2. Parameter Auto-Detection
+### 2. Parameter Binding
 
-The library automatically detects parameters with special prefixes:
+The library binds parameters with special prefixes:
 
 - `x_request_body`: Request body from JSON
 - `x_request_query`: Query parameters

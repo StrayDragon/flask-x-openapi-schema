@@ -201,9 +201,9 @@ with open("openapi.yaml", "w") as f:
 
 ## Advanced Usage
 
-### Parameter Auto-Detection
+### Parameter Binding with Special Prefixes
 
-The `openapi_metadata` decorator automatically detects parameters with special prefixes:
+The `openapi_metadata` decorator binds parameters with special prefixes:
 
 - `x_request_body`: Binds the entire request body object
 - `x_request_query`: Binds the entire query parameters object
@@ -444,7 +444,7 @@ def handle_error(error_code: int, message: str) -> tuple:
 
 ### Common Issues and Solutions
 
-1. **Issue**: Parameters not being detected automatically.
+1. **Issue**: Parameters not being bound correctly.
    **Solution**: Ensure you're using the correct parameter prefixes (`x_request_body`, `x_request_query`, etc.) and that your parameters have type annotations.
 
 2. **Issue**: Pydantic models not showing up in the OpenAPI schema.
