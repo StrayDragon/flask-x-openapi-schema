@@ -12,7 +12,7 @@ graph TD
     A --> C[File Upload Models]
     A --> D[OpenAPI Documentation]
 
-    B --> E[x_request_file Parameters]
+    B --> E[_x_file Parameters]
     C --> F[Validation]
     D --> G[Schema Generation]
 
@@ -23,7 +23,7 @@ graph TD
 
 ## Basic File Upload
 
-The simplest way to handle file uploads is to use the `x_request_file` parameter prefix with the `openapi_metadata` decorator.
+The simplest way to handle file uploads is to use the `_x_file` parameter prefix with the `openapi_metadata` decorator.
 
 ```mermaid
 sequenceDiagram
@@ -35,7 +35,7 @@ sequenceDiagram
     C->>F: POST multipart/form-data
     F->>D: Process request
     D->>F: Extract file from request.files
-    D->>R: Inject file as x_request_file parameter
+    D->>R: Inject file as _x_file parameter
     R->>C: Return response
 ```
 
@@ -53,22 +53,22 @@ class FileUploadResource(Resource):
         tags=["Files"],
         operation_id="uploadFile",
     )
-    def post(self, x_request_file: FileStorage):
+    def post(self, _x_file: FileStorage):
         """
         Upload a file to the server.
 
         This endpoint accepts a file upload and returns information about the uploaded file.
-        The file is automatically injected into the method via the x_request_file parameter.
+        The file is automatically injected into the method via the _x_file parameter.
         """
-        if not x_request_file:
+        if not _x_file:
             return {"error": "No file provided"}, 400
 
         # Process the uploaded file
-        filename = x_request_file.filename
-        content_type = x_request_file.content_type
+        filename = _x_file.filename
+        content_type = _x_file.content_type
 
         # Read the file content
-        file_content = x_request_file.read()
+        file_content = _x_file.read()
         file_size = len(file_content)
 
         # Return information about the uploaded file
@@ -81,7 +81,7 @@ class FileUploadResource(Resource):
 
 ## Multiple File Uploads
 
-You can handle multiple file uploads by using multiple parameters with the `x_request_file` prefix followed by the file name.
+You can handle multiple file uploads by using multiple parameters with the `_x_file` prefix followed by the file name.
 
 ```mermaid
 sequenceDiagram
@@ -212,16 +212,16 @@ class ImageUploadResource(Resource):
         tags=["Images"],
         operation_id="uploadImage",
     )
-    def post(self, x_request_file: ImageUploadModel):
+    def post(self, _x_file: ImageUploadModel):
         """
         Upload an image to the server.
 
         This endpoint accepts an image upload and returns information about the uploaded image.
-        The image is automatically injected into the method via the x_request_file parameter.
+        The image is automatically injected into the method via the _x_file parameter.
         The image is validated to ensure it's a valid image file.
         """
         # The file is automatically injected and validated
-        file = x_request_file.file
+        file = _x_file.file
 
         # Process the file
         filename = file.filename
@@ -548,4 +548,4 @@ def upload_file():
 
 ## Conclusion
 
-Flask-X-OpenAPI-Schema provides comprehensive support for handling file uploads in Flask-RESTful APIs. By using the `x_request_file` parameter prefix and the built-in file upload models, you can easily implement file upload functionality with proper validation and documentation. The automatic OpenAPI schema generation ensures that your API documentation is always up-to-date with your implementation.
+Flask-X-OpenAPI-Schema provides comprehensive support for handling file uploads in Flask-RESTful APIs. By using the `_x_file` parameter prefix and the built-in file upload models, you can easily implement file upload functionality with proper validation and documentation. The automatic OpenAPI schema generation ensures that your API documentation is always up-to-date with your implementation.

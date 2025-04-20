@@ -427,10 +427,10 @@ class ConventionalPrefixConfig:
 
     def __init__(
         self,
-        request_body_prefix: str = "x_request_body",
-        request_query_prefix: str = "x_request_query",
-        request_path_prefix: str = "x_request_path",
-        request_file_prefix: str = "x_request_file",
+        request_body_prefix: str = "_x_body",
+        request_query_prefix: str = "_x_query",
+        request_path_prefix: str = "_x_path",
+        request_file_prefix: str = "_x_file",
     ):
         self.request_body_prefix = request_body_prefix
         self.request_query_prefix = request_query_prefix

@@ -6,10 +6,10 @@ import threading
 from dataclasses import dataclass
 
 # Default parameter prefixes
-DEFAULT_BODY_PREFIX = "x_request_body"
-DEFAULT_QUERY_PREFIX = "x_request_query"
-DEFAULT_PATH_PREFIX = "x_request_path"
-DEFAULT_FILE_PREFIX = "x_request_file"
+DEFAULT_BODY_PREFIX = "_x_body"
+DEFAULT_QUERY_PREFIX = "_x_query"
+DEFAULT_PATH_PREFIX = "_x_path"
+DEFAULT_FILE_PREFIX = "_x_file"
 
 
 @dataclass(frozen=True)
@@ -26,10 +26,10 @@ class ConventionalPrefixConfig:
         request_file_prefix: Prefix for file parameters
     """
 
-    request_body_prefix: str = "x_request_body"
-    request_query_prefix: str = "x_request_query"
-    request_path_prefix: str = "x_request_path"
-    request_file_prefix: str = "x_request_file"
+    request_body_prefix: str = DEFAULT_BODY_PREFIX
+    request_query_prefix: str = DEFAULT_QUERY_PREFIX
+    request_path_prefix: str = DEFAULT_PATH_PREFIX
+    request_file_prefix: str = DEFAULT_FILE_PREFIX
 
 
 # Global configuration instance with thread safety
@@ -37,12 +37,7 @@ class ThreadSafeConfig:
     """Thread-safe configuration holder."""
 
     def __init__(self):
-        self._config = ConventionalPrefixConfig(
-            request_body_prefix=DEFAULT_BODY_PREFIX,
-            request_query_prefix=DEFAULT_QUERY_PREFIX,
-            request_path_prefix=DEFAULT_PATH_PREFIX,
-            request_file_prefix=DEFAULT_FILE_PREFIX,
-        )
+        self._config = ConventionalPrefixConfig()
         self._lock = threading.RLock()
 
     def get(self) -> ConventionalPrefixConfig:

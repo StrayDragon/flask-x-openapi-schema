@@ -71,10 +71,10 @@ class SampleResource(Resource):
             }
         },
     )
-    def post(self, x_request_body: SampleRequestModel):
+    def post(self, _x_body: SampleRequestModel):
         """Create new test data."""
         return SampleResponseModel(
-            id="new-id", name=x_request_body.name, age=x_request_body.age
+            id="new-id", name=_x_body.name, age=_x_body.age
         ), 201
 
 

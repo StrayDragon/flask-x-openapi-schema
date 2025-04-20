@@ -92,11 +92,11 @@ class ItemResource(Resource):
             },
         ),
     )
-    def post(self, x_request_body: ItemRequest):
+    def post(self, _x_body: ItemRequest):
         # Access the request body as a Pydantic model
-        name = x_request_body.name
-        price = x_request_body.price
-        description = x_request_body.description
+        name = _x_body.name
+        price = _x_body.price
+        description = _x_body.description
 
         # Create the item (in a real app, this would interact with a database)
         item_id = "123"  # Example ID
@@ -132,11 +132,11 @@ class ItemView(OpenAPIMethodViewMixin, MethodView):
             },
         ),
     )
-    def post(self, x_request_body: ItemRequest):
+    def post(self, _x_body: ItemRequest):
         # Access the request body as a Pydantic model
-        name = x_request_body.name
-        price = x_request_body.price
-        description = x_request_body.description
+        name = _x_body.name
+        price = _x_body.price
+        description = _x_body.description
 
         # Create the item (in a real app, this would interact with a database)
         item_id = "123"  # Example ID
@@ -205,10 +205,10 @@ with open("openapi.yaml", "w") as f:
 
 The `openapi_metadata` decorator binds parameters with special prefixes:
 
-- `x_request_body`: Binds the entire request body object
-- `x_request_query`: Binds the entire query parameters object
-- `x_request_path_<param_name>`: Binds a path parameter
-- `x_request_file`: Binds a file object
+- `_x_body`: Binds the entire request body object
+- `_x_query`: Binds the entire query parameters object
+- `_x_path_<param_name>`: Binds a path parameter
+- `_x_file`: Binds a file object
 
 These prefixes can be customized using the `ConventionalPrefixConfig` class:
 
@@ -225,10 +225,10 @@ class ItemQueryParams(BaseModel):
     tags=["Items"],
     operation_id="getItems",
 )
-def get(self, x_request_query: ItemQueryParams):
+def get(self, _x_query: ItemQueryParams):
     # Access the query parameters as a Pydantic model
-    skip = x_request_query.skip
-    limit = x_request_query.limit
+    skip = _x_query.skip
+    limit = _x_query.limit
 
     # Return a list of items
     return {
@@ -246,9 +246,9 @@ def get(self, x_request_query: ItemQueryParams):
     tags=["Items"],
     operation_id="getItem",
 )
-def get(self, item_id: str, x_request_path_item_id: str):
+def get(self, item_id: str, _x_path_item_id: str):
     # Access the path parameter
-    item_id_from_path = x_request_path_item_id
+    item_id_from_path = _x_path_item_id
 
     # Return the item
     return {"id": item_id_from_path, "name": "Example Item"}, 200
@@ -297,9 +297,9 @@ from flask_x_openapi_schema import openapi_metadata, FileUploadModel
     tags=["Files"],
     operation_id="uploadFile",
 )
-def post(self, x_request_file: FileStorage):
+def post(self, _x_file: FileStorage):
     # The file is automatically injected from request.files
-    filename = x_request_file.filename
+    filename = _x_file.filename
     # Process the file...
     return {"filename": filename}
 
@@ -321,9 +321,9 @@ def post(self, x_request_file_document: FileStorage, x_request_file_image: FileS
     tags=["Images"],
     operation_id="uploadImage",
 )
-def post(self, x_request_file: FileUploadModel):
+def post(self, _x_file: FileUploadModel):
     # The file is automatically injected and validated
-    file = x_request_file.file
+    file = _x_file.file
     # Process the file...
     return {"filename": file.filename}
 ```
@@ -445,13 +445,13 @@ def handle_error(error_code: int, message: str) -> tuple:
 ### Common Issues and Solutions
 
 1. **Issue**: Parameters not being bound correctly.
-   **Solution**: Ensure you're using the correct parameter prefixes (`x_request_body`, `x_request_query`, etc.) and that your parameters have type annotations.
+   **Solution**: Ensure you're using the correct parameter prefixes (`_x_body`, `_x_query`, etc.) and that your parameters have type annotations.
 
 2. **Issue**: Pydantic models not showing up in the OpenAPI schema.
    **Solution**: Make sure your models are properly registered with the schema generator by using them in the `openapi_metadata` decorator.
 
 3. **Issue**: File uploads not working.
-   **Solution**: Ensure your form is using `enctype="multipart/form-data"` and that you're using the correct parameter prefix (`x_request_file`).
+   **Solution**: Ensure your form is using `enctype="multipart/form-data"` and that you're using the correct parameter prefix (`_x_file`).
 
 4. **Issue**: Internationalized strings not showing up in the correct language.
    **Solution**: Check that you've set the current language using `set_current_language()` before generating the schema.

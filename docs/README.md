@@ -53,10 +53,10 @@ The `openapi_metadata` decorator is the primary entry point for adding OpenAPI m
 
 The library binds parameters with special prefixes:
 
-- `x_request_body`: Request body from JSON
-- `x_request_query`: Query parameters
-- `x_request_path_<name>`: Path parameters
-- `x_request_file`: File uploads
+- `_x_body`: Request body from JSON
+- `_x_query`: Query parameters
+- `_x_path_<name>`: Path parameters
+- `_x_file`: File uploads
 
 ### 3. Schema Generation
 

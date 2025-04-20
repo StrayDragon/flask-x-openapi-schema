@@ -250,7 +250,7 @@ def create_openapi_flask_app():
             "400": {"description": "Bad request"},
         }
     )
-    def openapi_create_user(user_id: str, x_request_body: UserRequest = None, x_request_query: UserQueryParams = None):
+    def openapi_create_user(user_id: str, _x_body: UserRequest = None, _x_query: UserQueryParams = None):
         """Create a user using flask-x-openapi-schema."""
         try:
             # Start timing for performance metrics
@@ -271,17 +271,17 @@ def create_openapi_flask_app():
             # Create response
             response = UserResponse(
                 id=user_id,
-                username=x_request_body.username,
-                email=x_request_body.email,
-                full_name=x_request_body.full_name,
-                age=x_request_body.age,
-                is_active=x_request_body.is_active,
-                role=x_request_body.role,
-                tags=x_request_body.tags,
-                addresses=x_request_body.addresses,
-                contact_info=x_request_body.contact_info,
-                preferences=x_request_body.preferences,
-                metadata=x_request_body.metadata,
+                username=_x_body.username,
+                email=_x_body.email,
+                full_name=_x_body.full_name,
+                age=_x_body.age,
+                is_active=_x_body.is_active,
+                role=_x_body.role,
+                tags=_x_body.tags,
+                addresses=_x_body.addresses,
+                contact_info=_x_body.contact_info,
+                preferences=_x_body.preferences,
+                metadata=_x_body.metadata,
                 stats=stats,
                 created_at=created_at,
                 updated_at=None,

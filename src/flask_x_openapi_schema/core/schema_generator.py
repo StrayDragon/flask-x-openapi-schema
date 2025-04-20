@@ -174,7 +174,7 @@ class OpenAPISchemaGenerator:
         def replace_param(match):
             param_name = match.group(1)
 
-            # Remove prefix if present (e.g., x_request_path_)
+            # Remove prefix if present (e.g., _x_path_)
             if param_name.startswith(f"{path_prefix}_"):
                 param_name = param_name[path_prefix_len:]
 
@@ -203,7 +203,7 @@ class OpenAPISchemaGenerator:
         for match in re.finditer(r"<(?:([^:>]+):)?([^>]+)>", flask_path):
             converter, param_name = match.groups()
 
-            # Remove prefix if present (e.g., x_request_path_)
+            # Remove prefix if present (e.g., _x_path_)
             actual_param_name = param_name
             if param_name.startswith(f"{path_prefix}_"):
                 actual_param_name = param_name[path_prefix_len:]

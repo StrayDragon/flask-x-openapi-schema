@@ -117,12 +117,12 @@ class ItemResource(Resource):
         tags=["Items"],
         operation_id="createItem"
     )
-    def post(self, x_request_body: ItemRequest):
+    def post(self, _x_body: ItemRequest):
         # The request body is automatically parsed and validated
         return ItemResponse(
             id="123",
-            name=x_request_body.name,
-            price=x_request_body.price
+            name=_x_body.name,
+            price=_x_body.price
         ), 201
 
 # Register the resource
@@ -166,12 +166,12 @@ class ItemView(OpenAPIMethodViewMixin, MethodView):
         tags=["Items"],
         operation_id="createItem"
     )
-    def post(self, x_request_body: ItemRequest):
+    def post(self, _x_body: ItemRequest):
         # The request body is automatically parsed and validated
         return ItemResponse(
             id="123",
-            name=x_request_body.name,
-            price=x_request_body.price
+            name=_x_body.name,
+            price=_x_body.price
         ), 201
 
 # Register the view
@@ -200,10 +200,10 @@ from flask_x_openapi_schema.x.flask_restful import openapi_metadata, OpenAPIInte
 
 The library binds parameters with special prefixes:
 
-- `x_request_body`: Request body from JSON
-- `x_request_query`: Query parameters
-- `x_request_path_<param_name>`: Path parameters
-- `x_request_file`: File uploads
+- `_x_body`: Request body from JSON
+- `_x_query`: Query parameters
+- `_x_path_<param_name>`: Path parameters
+- `_x_file`: File uploads
 
 ### Configurable Parameter Prefixes
 
@@ -258,9 +258,9 @@ from flask_x_openapi_schema import ImageUploadModel
 @openapi_metadata(
     summary="Upload an image"
 )
-def post(self, x_request_file: ImageUploadModel):
+def post(self, _x_file: ImageUploadModel):
     # File is automatically injected and validated
-    return {"filename": x_request_file.file.filename}
+    return {"filename": _x_file.file.filename}
 ```
 
 ### Response Models

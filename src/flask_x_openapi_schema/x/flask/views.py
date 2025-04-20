@@ -112,7 +112,7 @@ def extract_openapi_parameters_from_methodview(
 
     # Add path parameters
     for param_name in path_params:
-        # Check if this is a prefixed parameter (e.g., x_request_path_*)
+        # Check if this is a prefixed parameter (e.g., _x_path_*)
         # If so, extract the actual parameter name
         actual_param_name = param_name
         if param_name.startswith(f"{path_prefix}_"):
@@ -222,7 +222,7 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
                 else:
                     name = segment[1:-1]
 
-                # Remove prefix if present (e.g., x_request_path_)
+                # Remove prefix if present (e.g., _x_path_)
                 actual_name = name
                 if name.startswith(f"{path_prefix}_"):
                     actual_name = name[path_prefix_len:]

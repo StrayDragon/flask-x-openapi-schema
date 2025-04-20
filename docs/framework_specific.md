@@ -8,18 +8,18 @@ Flask-X-OpenAPI-Schema provides separate implementations for different Flask-bas
 graph TD
     A[Flask-X-OpenAPI-Schema] --> B[Core]
     A --> C[Framework-Specific]
-    
+
     B --> D[Schema Generation]
     B --> E[Parameter Handling]
     B --> F[Internationalization]
     B --> G[File Uploads]
-    
+
     C --> H[Flask]
     C --> I[Flask-RESTful]
-    
+
     H --> J[OpenAPIMethodViewMixin]
     H --> K[Flask Decorator]
-    
+
     I --> L[OpenAPIIntegrationMixin]
     I --> M[Flask-RESTful Decorator]
 ```
@@ -59,15 +59,15 @@ class ItemView(OpenAPIMethodViewMixin, MethodView):
     def get(self, item_id: str):
         # ...
         return {"id": item_id, "name": "Example", "price": 10.99}
-    
+
     @openapi_metadata(
         summary="Create an item",
         tags=["Items"],
         operation_id="createItem"
     )
-    def post(self, x_request_body: ItemModel):
+    def post(self, _x_body: ItemModel):
         # ...
-        return {"id": "123", "name": x_request_body.name, "price": x_request_body.price}, 201
+        return {"id": "123", "name": _x_body.name, "price": _x_body.price}, 201
 
 # Register the view
 blueprint = Blueprint("api", __name__)
@@ -146,15 +146,15 @@ class ItemResource(Resource):
     def get(self, item_id: str):
         # ...
         return {"id": item_id, "name": "Example", "price": 10.99}
-    
+
     @openapi_metadata(
         summary="Create an item",
         tags=["Items"],
         operation_id="createItem"
     )
-    def post(self, x_request_body: ItemModel):
+    def post(self, _x_body: ItemModel):
         # ...
-        return {"id": "123", "name": x_request_body.name, "price": x_request_body.price}, 201
+        return {"id": "123", "name": _x_body.name, "price": _x_body.price}, 201
 
 # Register the resource
 api.add_resource(ItemResource, "/items", "/items/<item_id>")
@@ -240,9 +240,9 @@ class ItemResource(Resource):
         tags=["Items"],
         operation_id="createItem"
     )
-    def post(self, x_request_body: ItemModel):
+    def post(self, _x_body: ItemModel):
         # ...
-        return {"id": "123", "name": x_request_body.name, "price": x_request_body.price}, 201
+        return {"id": "123", "name": _x_body.name, "price": _x_body.price}, 201
 
 # Register the resource
 api.add_resource(ItemResource, "/items")
@@ -254,7 +254,7 @@ api.add_resource(ItemResource, "/items")
    ```python
    # Good
    from flask_x_openapi_schema.x.flask import openapi_metadata
-   
+
    # Avoid
    from flask_x_openapi_schema import openapi_metadata
    ```

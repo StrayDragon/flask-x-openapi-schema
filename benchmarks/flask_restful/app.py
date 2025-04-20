@@ -86,18 +86,18 @@ def create_openapi_flask_restful_app():
                 "400": {"description": "Bad request"},
             }
         )
-        def post(self, user_id, x_request_body: UserRequest = None, x_request_query: UserQueryParams = None):
+        def post(self, user_id, _x_body: UserRequest = None, _x_query: UserQueryParams = None):
             """Create a user using flask-x-openapi-schema."""
             try:
                 # Create response
                 response = UserResponse(
                     id=user_id,
-                    username=x_request_body.username,
-                    email=x_request_body.email,
-                    full_name=x_request_body.full_name,
-                    age=x_request_body.age,
-                    is_active=x_request_body.is_active,
-                    tags=x_request_body.tags,
+                    username=_x_body.username,
+                    email=_x_body.email,
+                    full_name=_x_body.full_name,
+                    age=_x_body.age,
+                    is_active=_x_body.is_active,
+                    tags=_x_body.tags,
                     created_at="2023-01-01T00:00:00Z",
                     updated_at=None,
                 )
@@ -180,18 +180,18 @@ def create_combined_app():
                 "400": {"description": "Bad request"},
             }
         )
-        def post(self, user_id, x_request_body: UserRequest = None, x_request_query: UserQueryParams = None):
+        def post(self, user_id, _x_body: UserRequest = None, _x_query: UserQueryParams = None):
             """Create a user using flask-x-openapi-schema."""
             try:
                 # Create response
                 response = UserResponse(
                     id=user_id,
-                    username=x_request_body.username,
-                    email=x_request_body.email,
-                    full_name=x_request_body.full_name,
-                    age=x_request_body.age,
-                    is_active=x_request_body.is_active,
-                    tags=x_request_body.tags,
+                    username=_x_body.username,
+                    email=_x_body.email,
+                    full_name=_x_body.full_name,
+                    age=_x_body.age,
+                    is_active=_x_body.is_active,
+                    tags=_x_body.tags,
                     created_at="2023-01-01T00:00:00Z",
                     updated_at=None,
                 )

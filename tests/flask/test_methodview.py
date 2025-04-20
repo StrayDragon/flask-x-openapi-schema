@@ -73,15 +73,15 @@ class ItemView(OpenAPIMethodViewMixin, MethodView):
         tags=["Items"],
         operation_id="createItem",
     )
-    def post(self, item_id: str, x_request_body: ItemRequest = None):
+    def post(self, item_id: str, _x_body: ItemRequest = None):
         """Create a new item."""
         # In a real app, this would save to a database
         response = ItemResponse(
             id=item_id,
-            name=x_request_body.name,
-            description=x_request_body.description,
-            price=x_request_body.price,
-            tags=x_request_body.tags,
+            name=_x_body.name,
+            description=_x_body.description,
+            price=_x_body.price,
+            tags=_x_body.tags,
         )
         return response, 201
 

@@ -186,7 +186,7 @@ def _extract_parameters_from_prefixes(
         # Check for request_path parameter
         if param_name.startswith(path_prefix):
             # Extract the path parameter name from the parameter name
-            # Format: x_request_path_<param_name>
+            # Format: _x_path_<param_name>
             param_suffix = param_name[path_prefix_len:]
             # Use the full suffix as the parameter name
             path_params.append(param_suffix)

@@ -28,10 +28,10 @@ class ItemView(OpenAPIMethodViewMixin, MethodView):
         tags=["项目"],
         operation_id="getItem"
     )
-    def get(self, x_request_path_item_id: str):
+    def get(self, _x_path_item_id: str):
         """Get a single item."""
         response = ItemResponse(
-            id=x_request_path_item_id,
+            id=_x_path_item_id,
             name="测试项目",
             description="这是一个测试项目",
             price=10.99
@@ -47,7 +47,7 @@ def app_with_blueprint():
 
     # Register the view
     ItemView.register_to_blueprint(
-        blueprint, "/items/<string:x_request_path_item_id>", endpoint="item"
+        blueprint, "/items/<string:_x_path_item_id>", endpoint="item"
     )
 
     # Register the blueprint

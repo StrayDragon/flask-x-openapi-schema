@@ -72,12 +72,12 @@ class ItemResource(Resource):
         tags=["Items"],
         operation_id="createItem"
     )
-    def post(self, x_request_body: ItemRequest):
+    def post(self, _x_body: ItemRequest):
         # The request body is automatically parsed and validated
         return ItemResponse(
             id="123",
-            name=x_request_body.name,
-            price=x_request_body.price
+            name=_x_body.name,
+            price=_x_body.price
         ), 201
 
 # Register the resource
@@ -121,12 +121,12 @@ class ItemView(OpenAPIMethodViewMixin, MethodView):
         tags=["Items"],
         operation_id="createItem"
     )
-    def post(self, x_request_body: ItemRequest):
+    def post(self, _x_body: ItemRequest):
         # The request body is automatically parsed and validated
         return ItemResponse(
             id="123",
-            name=x_request_body.name,
-            price=x_request_body.price
+            name=_x_body.name,
+            price=_x_body.price
         ), 201
 
 # Register the view

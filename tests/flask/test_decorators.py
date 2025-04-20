@@ -157,8 +157,8 @@ def test_openapi_metadata_with_request_body():
     """Test openapi_metadata decorator with request body."""
 
     @openapi_metadata(summary="Test endpoint")
-    def test_function(x_request_body: SampleRequestModel):
-        return {"name": x_request_body.name, "age": x_request_body.age}
+    def test_function(_x_body: SampleRequestModel):
+        return {"name": _x_body.name, "age": _x_body.age}
 
     # Check metadata
     metadata = test_function._openapi_metadata
@@ -174,8 +174,8 @@ def test_openapi_metadata_with_query_model():
     """Test openapi_metadata decorator with query model."""
 
     @openapi_metadata(summary="Test endpoint")
-    def test_function(x_request_query: SampleQueryModel):
-        return {"sort": x_request_query.sort, "limit": x_request_query.limit}
+    def test_function(_x_query: SampleQueryModel):
+        return {"sort": _x_query.sort, "limit": _x_query.limit}
 
     # Check metadata
     metadata = test_function._openapi_metadata
@@ -201,7 +201,7 @@ def test_openapi_metadata_with_path_params():
     """Test openapi_metadata decorator with path parameters."""
 
     @openapi_metadata(summary="Test endpoint")
-    def test_function(user_id: str, x_request_path_user_id: str):
+    def test_function(user_id: str, _x_path_user_id: str):
         return {"user_id": user_id}
 
     # Check metadata
@@ -252,9 +252,9 @@ def test_openapi_metadata_parameter_extraction():
 
     @openapi_metadata(summary="Test endpoint")
     def test_function(
-        x_request_body: SampleRequestModel,
-        x_request_query: SampleQueryModel,
-        x_request_path_user_id: str,
+        _x_body: SampleRequestModel,
+        _x_query: SampleQueryModel,
+        _x_path_user_id: str,
     ):
         return {"message": "Success"}
 
@@ -285,8 +285,8 @@ def test_openapi_metadata_with_file_upload():
     """Test openapi_metadata decorator with file upload."""
 
     @openapi_metadata(summary="Test file upload")
-    def test_function(x_request_file: FileUploadModel):
-        return {"filename": x_request_file.file.filename}
+    def test_function(_x_file: FileUploadModel):
+        return {"filename": _x_file.file.filename}
 
     # Check metadata
     metadata = test_function._openapi_metadata
@@ -311,21 +311,21 @@ def test_openapi_metadata_wrapper_preserves_signature():
 
     @openapi_metadata(summary="Test endpoint")
     def test_function(
-        x_request_body: SampleRequestModel, x_request_query: SampleQueryModel
+        _x_body: SampleRequestModel, _x_query: SampleQueryModel
     ):
         return {"message": "Success"}
 
     # Check that the wrapper has the same signature as the original function
     signature = inspect.signature(test_function)
-    assert "x_request_body" in signature.parameters
-    assert "x_request_query" in signature.parameters
+    assert "_x_body" in signature.parameters
+    assert "_x_query" in signature.parameters
 
     # Check that type annotations are preserved
     annotations = test_function.__annotations__
-    assert "x_request_body" in annotations
-    assert annotations["x_request_body"] == SampleRequestModel
-    assert "x_request_query" in annotations
-    assert annotations["x_request_query"] == SampleQueryModel
+    assert "_x_body" in annotations
+    assert annotations["_x_body"] == SampleRequestModel
+    assert "_x_query" in annotations
+    assert annotations["_x_query"] == SampleQueryModel
 
 
 def test_openapi_metadata_response_conversion():

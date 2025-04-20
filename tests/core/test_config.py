@@ -35,17 +35,17 @@ def test_openapi_config_defaults():
     """Test the default values of ConventionalPrefixConfig."""
     # Test the default global config
     global_config = GLOBAL_CONFIG_HOLDER.get()
-    assert global_config.request_body_prefix == "x_request_body"
-    assert global_config.request_query_prefix == "x_request_query"
-    assert global_config.request_path_prefix == "x_request_path"
-    assert global_config.request_file_prefix == "x_request_file"
+    assert global_config.request_body_prefix == "_x_body"
+    assert global_config.request_query_prefix == "_x_query"
+    assert global_config.request_path_prefix == "_x_path"
+    assert global_config.request_file_prefix == "_x_file"
 
     # Test creating a new config with defaults
     config = ConventionalPrefixConfig()
-    assert config.request_body_prefix == "x_request_body"
-    assert config.request_query_prefix == "x_request_query"
-    assert config.request_path_prefix == "x_request_path"
-    assert config.request_file_prefix == "x_request_file"
+    assert config.request_body_prefix == "_x_body"
+    assert config.request_query_prefix == "_x_query"
+    assert config.request_path_prefix == "_x_path"
+    assert config.request_file_prefix == "_x_file"
 
 
 def test_openapi_config_configure():
@@ -149,7 +149,7 @@ def test_openapi_metadata_with_per_function_config():
     # Define another function with default prefixes
     @openapi_metadata(summary="Test endpoint")
     def test_function_default(
-        x_request_body: ConfigTestRequestModel, x_request_query: ConfigTestQueryModel
+        _x_body: ConfigTestRequestModel, _x_query: ConfigTestQueryModel
     ):
         return {"message": "Success"}
 
