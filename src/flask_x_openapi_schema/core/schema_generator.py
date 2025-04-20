@@ -362,33 +362,59 @@ class OpenAPISchemaGenerator:
             # Default response if no return type is specified
             operation["responses"] = {"200": {"description": "Successful response"}}
 
-    def _register_model(self, model: type[BaseModel]) -> None:
+    def _register_model(self, model: type) -> None:
         """
-        Register a Pydantic model in the components schemas.
+        Register a Pydantic model or enum in the components schemas.
 
         Args:
-            model: The Pydantic model to register
+            model: The model to register (Pydantic model or enum)
         """
+        print(f"Attempting to register model: {model.__name__}")
+
         with self._models_lock:
             # Skip if already registered
             if model in self._registered_models:
+                print(f"Model {model.__name__} already registered, skipping")
                 return
 
             # Add to registered models set
             self._registered_models.add(model)
+            print(f"Added {model.__name__} to registered models set")
+
+        # Handle enum types
+        if hasattr(model, "__members__"):
+            # This is an enum type
+            with self._components_lock:
+                enum_schema = {
+                    "type": "string",
+                    "enum": [e.value for e in model]
+                }
+
+                if model.__name__ not in self.components["schemas"]:
+                    self.components["schemas"][model.__name__] = enum_schema
+                    print(f"Added enum {model.__name__} to components/schemas")
+            return
+
+        # Handle Pydantic models
+        if not issubclass(model, BaseModel):
+            print(f"Warning: {model.__name__} is not a BaseModel or enum, skipping")
+            return
 
         # Generate schema (thread-safe via utils.py caching)
         if issubclass(model, I18nBaseModel):
             # Create a language-specific version of the model
             language_model = model.for_language(self.language)
             schema = pydantic_to_openapi_schema(language_model)
+            print(f"Generated schema for I18nBaseModel {model.__name__}")
         else:
             # Use the cached version from utils.py
             schema = pydantic_to_openapi_schema(model)
+            print(f"Generated schema for BaseModel {model.__name__}")
 
         # Update components in a thread-safe manner
         with self._components_lock:
             self.components["schemas"][model.__name__] = schema
+            print(f"Added {model.__name__} to components/schemas")
 
         # Register nested models
         self._register_nested_models(model)
@@ -405,11 +431,13 @@ class OpenAPISchemaGenerator:
             return
 
         # Check each field for nested models
-        for _, field_info in model.model_fields.items():
+        for field_name, field_info in model.model_fields.items():
             field_type = field_info.annotation
+            print(f"Checking field {field_name} with type {field_type}")
 
             # Handle direct BaseModel references
             if isinstance(field_type, type) and issubclass(field_type, BaseModel):
+                print(f"Found nested model {field_type.__name__} in field {field_name}")
                 self._register_model(field_type)
                 continue
 
@@ -420,7 +448,33 @@ class OpenAPISchemaGenerator:
             if origin and args:
                 for arg in args:
                     if isinstance(arg, type) and issubclass(arg, BaseModel):
+                        print(f"Found nested model {arg.__name__} in container field {field_name}")
                         self._register_model(arg)
+                    elif hasattr(arg, "__members__"):
+                        # Handle enum types
+                        print(f"Found enum type {arg.__name__} in container field {field_name}")
+                        # Register enum in components/schemas
+                        with self._components_lock:
+                            enum_schema = {
+                                "type": "string",
+                                "enum": [e.value for e in arg]
+                            }
+
+                            if arg.__name__ not in self.components["schemas"]:
+                                self.components["schemas"][arg.__name__] = enum_schema
+
+            # Handle enum types directly
+            elif hasattr(field_type, "__members__"):
+                print(f"Found enum type {field_type.__name__} in field {field_name}")
+                # Register enum in components/schemas
+                with self._components_lock:
+                    enum_schema = {
+                        "type": "string",
+                        "enum": [e.value for e in field_type]
+                    }
+
+                    if field_type.__name__ not in self.components["schemas"]:
+                        self.components["schemas"][field_type.__name__] = enum_schema
 
     def _process_i18n_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """

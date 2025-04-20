@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from ...core.config import ConventionalPrefixConfig
 from ...i18n.i18n_string import I18nStr
+from ...models.responses import OpenAPIMetaResponse
 
 
 class FlaskOpenAPIDecorator:
@@ -20,7 +21,7 @@ class FlaskOpenAPIDecorator:
         description: Optional[Union[str, I18nStr]] = None,
         tags: Optional[List[str]] = None,
         operation_id: Optional[str] = None,
-        responses: Optional[Dict[str, Any]] = None,
+        responses: Optional[OpenAPIMetaResponse] = None,
         deprecated: bool = False,
         security: Optional[List[Dict[str, List[str]]]] = None,
         external_docs: Optional[Dict[str, str]] = None,
@@ -176,7 +177,7 @@ def openapi_metadata(
     description: Optional[Union[str, I18nStr]] = None,
     tags: Optional[List[str]] = None,
     operation_id: Optional[str] = None,
-    responses: Optional[Dict[str, Any]] = None,
+    responses: Optional[OpenAPIMetaResponse] = None,
     deprecated: bool = False,
     security: Optional[List[Dict[str, List[str]]]] = None,
     external_docs: Optional[Dict[str, str]] = None,

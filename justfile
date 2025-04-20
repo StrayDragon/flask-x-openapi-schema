@@ -62,3 +62,11 @@ benchmark:
 	# Show the report location
 	echo "\nBenchmark report generated at: benchmarks/results/report.txt"
 	echo "Performance charts (if available) at: benchmarks/results/performance_charts.png"
+
+
+run-example-flask:
+	uv run python -m examples.flask.app
+
+run-example-flask-restful:
+	uv run python -m examples.flask_restful.app
+

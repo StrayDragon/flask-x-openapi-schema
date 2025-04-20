@@ -58,7 +58,8 @@ class BaseRespModel(BaseModel):
         Returns:
             A dictionary representation of the model
         """
-        return self.model_dump(exclude_none=True)
+        # Use model_dump with custom encoder for datetime objects
+        return self.model_dump(exclude_none=True, mode='json')
 
     def to_response(
         self, status_code: Optional[int] = None

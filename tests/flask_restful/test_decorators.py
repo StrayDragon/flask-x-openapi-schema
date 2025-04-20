@@ -12,6 +12,10 @@ from typing import Optional
 
 from flask_x_openapi_schema.x.flask_restful import openapi_metadata
 from flask_x_openapi_schema.models.base import BaseRespModel
+from flask_x_openapi_schema.models.responses import (
+    OpenAPIMetaResponse,
+    OpenAPIMetaResponseItem,
+)
 
 
 # Define test models
@@ -42,16 +46,14 @@ class SampleResource(Resource):
     @openapi_metadata(
         summary="Get test data",
         description="Get test data by ID",
-        responses={
-            "200": {
-                "description": "Successful response",
-                "content": {
-                    "application/json": {
-                        "schema": {"$ref": "#/components/schemas/TestResponseModel"}
-                    }
-                },
+        responses=OpenAPIMetaResponse(
+            responses={
+                "200": OpenAPIMetaResponseItem(
+                    model=SampleResponseModel,
+                    description="Successful response",
+                )
             }
-        },
+        ),
     )
     def get(self, test_id):
         """Get test data by ID."""
@@ -60,16 +62,14 @@ class SampleResource(Resource):
     @openapi_metadata(
         summary="Create test data",
         description="Create new test data",
-        responses={
-            "201": {
-                "description": "Created successfully",
-                "content": {
-                    "application/json": {
-                        "schema": {"$ref": "#/components/schemas/TestResponseModel"}
-                    }
-                },
+        responses=OpenAPIMetaResponse(
+            responses={
+                "201": OpenAPIMetaResponseItem(
+                    model=SampleResponseModel,
+                    description="Created successfully",
+                )
             }
-        },
+        ),
     )
     def post(self, _x_body: SampleRequestModel):
         """Create new test data."""

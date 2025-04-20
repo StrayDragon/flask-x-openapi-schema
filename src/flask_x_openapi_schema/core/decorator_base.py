@@ -29,6 +29,7 @@ except ImportError:
 
 from ..i18n.i18n_string import I18nStr, get_current_language
 from ..models.base import BaseRespModel
+from ..models.responses import OpenAPIMetaResponse
 from .cache import (
     FUNCTION_METADATA_CACHE,
     METADATA_CACHE,
@@ -37,6 +38,7 @@ from .cache import (
     extract_param_types,
     get_parameter_prefixes,
 )
+from .utils import _fix_references
 from .config import ConventionalPrefixConfig, GLOBAL_CONFIG_HOLDER
 
 # Type variables for function parameters and return type
@@ -230,7 +232,7 @@ def _generate_openapi_metadata(
     security: Optional[List[Dict[str, List[str]]]],
     external_docs: Optional[Dict[str, str]],
     actual_request_body: Optional[Union[Type[BaseModel], Dict[str, Any]]],
-    responses: Optional[Dict[str, Any]],
+    responses: Optional[OpenAPIMetaResponse],
     language: Optional[str],
 ) -> Dict[str, Any]:
     """
@@ -287,7 +289,7 @@ def _generate_openapi_metadata(
 
     # Handle responses
     if responses:
-        metadata["responses"] = responses
+        metadata["responses"] = responses.to_openapi_dict()
 
     return metadata
 
@@ -402,7 +404,7 @@ class OpenAPIDecoratorBase:
         description: Optional[Union[str, I18nStr]] = None,
         tags: Optional[List[str]] = None,
         operation_id: Optional[str] = None,
-        responses: Optional[Dict[str, Any]] = None,
+        responses: Optional[OpenAPIMetaResponse] = None,
         deprecated: bool = False,
         security: Optional[List[Dict[str, List[str]]]] = None,
         external_docs: Optional[Dict[str, str]] = None,
@@ -582,11 +584,13 @@ class OpenAPIDecoratorBase:
                     required = schema.get("required", [])
 
                     for field_name, field_schema in properties.items():
+                        # Fix references in field_schema
+                        fixed_schema = _fix_references(field_schema)
                         param = {
                             "name": field_name,
                             "in": "query",
                             "required": field_name in required,
-                            "schema": field_schema,
+                            "schema": fixed_schema,
                         }
 
                         # Add description if available

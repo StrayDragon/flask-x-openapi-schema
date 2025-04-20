@@ -37,7 +37,19 @@ def pydantic_to_openapi_schema(model: type[BaseModel]) -> dict[str, Any]:
 
     # Extract properties and required fields
     if "properties" in model_schema:
-        schema["properties"] = model_schema["properties"]
+        # Process properties to fix references
+        properties = {}
+        for prop_name, prop_schema in model_schema["properties"].items():
+            properties[prop_name] = _fix_references(prop_schema)
+        schema["properties"] = properties
+    else:
+        schema["properties"] = {}
+
+    # Handle $defs in Pydantic v2
+    if "$defs" in model_schema:
+        # We don't need to include $defs in our schema, as we'll register these models separately
+        # But we do need to fix references to them
+        pass
 
     if "required" in model_schema:
         schema["required"] = model_schema["required"]
@@ -50,6 +62,35 @@ def pydantic_to_openapi_schema(model: type[BaseModel]) -> dict[str, Any]:
     MODEL_SCHEMA_CACHE.set(model_key, schema)
 
     return schema
+
+
+def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
+    """
+    Fix references in a schema to use components/schemas instead of $defs.
+
+    Args:
+        schema: The schema to fix
+
+    Returns:
+        The fixed schema
+    """
+    if not isinstance(schema, dict):
+        return schema
+
+    result = {}
+    for key, value in schema.items():
+        if key == "$ref" and isinstance(value, str) and "#/$defs/" in value:
+            # Replace $defs with components/schemas
+            model_name = value.split("/")[-1]
+            result[key] = f"#/components/schemas/{model_name}"
+        elif isinstance(value, dict):
+            result[key] = _fix_references(value)
+        elif isinstance(value, list):
+            result[key] = [_fix_references(item) if isinstance(item, dict) else item for item in value]
+        else:
+            result[key] = value
+
+    return result
 
 
 @lru_cache(maxsize=128)

@@ -142,4 +142,4 @@ def test_pydantic_to_openapi_schema_nested():
 
     # Check that the nested model is referenced correctly
     assert "$ref" in schema["properties"]["address"]
-    assert schema["properties"]["address"]["$ref"] == "#/$defs/Address"
+    assert schema["properties"]["address"]["$ref"] == "#/components/schemas/Address"

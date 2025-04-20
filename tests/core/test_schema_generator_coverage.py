@@ -114,7 +114,7 @@ class TestSchemaGeneratorCoverage:
         user_schema = schema["components"]["schemas"]["User"]
         address_schema = user_schema["properties"]["address"]
         assert "$ref" in address_schema
-        assert address_schema["$ref"] == "#/$defs/Address"
+        assert address_schema["$ref"] == "#/components/schemas/Address"
 
     def test_schema_generator_with_complex_types(self):
         """Test OpenAPISchemaGenerator with complex types."""

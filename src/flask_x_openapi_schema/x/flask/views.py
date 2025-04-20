@@ -191,6 +191,16 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
                 # Register the model
                 self._register_model(param_type)
 
+        # Check for OpenAPIMetaResponse in metadata
+        metadata = getattr(method, "_openapi_metadata", {})
+        if "responses" in metadata and hasattr(metadata["responses"], "responses"):
+            # This is an OpenAPIMetaResponse object
+            for status_code, response_item in metadata["responses"].responses.items():
+                if response_item.model:
+                    print(f"Registering response model from _register_models_from_method: {response_item.model.__name__} for status code {status_code}")
+                    # Register the response model
+                    self._register_model(response_item.model)
+
     def _process_methodview(self, view_class, url, url_prefix):
         """
         Process a MethodView class for OpenAPI schema generation.
@@ -243,6 +253,11 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
             # Get OpenAPI metadata from the method
             metadata = getattr(method_func, "_openapi_metadata", {})
 
+            # Extract path parameters regardless of whether metadata exists
+            path_parameters = extract_openapi_parameters_from_methodview(
+                view_class, method.lower(), url
+            )
+
             # If no metadata, try to generate some basic info
             if not metadata:
                 metadata = {
@@ -252,15 +267,60 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
                     "description": method_func.__doc__ if method_func.__doc__ else "",
                 }
 
-                # Extract parameters
-                parameters = extract_openapi_parameters_from_methodview(
-                    view_class, method.lower(), url
-                )
-                if parameters:
-                    metadata["parameters"] = parameters
+                # Add parameters to metadata
+                if path_parameters:
+                    metadata["parameters"] = path_parameters
+            else:
+                # If metadata exists, merge path parameters with existing parameters
+                if path_parameters:
+                    if "parameters" in metadata:
+                        # Filter out any existing path parameters with the same name
+                        existing_path_param_names = [
+                            p["name"] for p in metadata["parameters"]
+                            if p.get("in") == "path"
+                        ]
+                        new_path_params = [
+                            p for p in path_parameters
+                            if p["name"] not in existing_path_param_names
+                        ]
+                        metadata["parameters"].extend(new_path_params)
+                    else:
+                        metadata["parameters"] = path_parameters
 
             # Register Pydantic models from type hints
             self._register_models_from_method(method_func)
+
+            # Process responses in metadata
+            if "responses" in metadata and hasattr(metadata["responses"], "to_openapi_dict"):
+                # Register response models
+                if hasattr(metadata["responses"], "responses"):
+                    print(f"Found OpenAPIMetaResponse with {len(metadata['responses'].responses)} responses")
+                    for status_code, response_item in metadata["responses"].responses.items():
+                        print(f"Processing response for status code {status_code}")
+                        if response_item.model:
+                            print(f"Registering model from _process_methodview: {response_item.model.__name__}")
+                            # Force register the model and its nested models
+                            self._register_model(response_item.model)
+
+                            # Also register any enum types used in the model
+                            if hasattr(response_item.model, "model_fields"):
+                                for field_name, field_info in response_item.model.model_fields.items():
+                                    field_type = field_info.annotation
+                                    # Check if field is an enum
+                                    if hasattr(field_type, "__origin__") and field_type.__origin__ is not None:
+                                        # Handle container types like List[Enum]
+                                        args = getattr(field_type, "__args__", [])
+                                        for arg in args:
+                                            if hasattr(arg, "__members__"):
+                                                print(f"Registering enum type: {arg.__name__}")
+                                                self._register_model(arg)
+                                    elif hasattr(field_type, "__members__"):
+                                        # Direct enum type
+                                        print(f"Registering enum type: {field_type.__name__}")
+                                        self._register_model(field_type)
+
+                # Convert OpenAPIMetaResponse to dict
+                metadata["responses"] = metadata["responses"].to_openapi_dict()
 
             # Add the path and method to the schema
             if path not in self.paths:

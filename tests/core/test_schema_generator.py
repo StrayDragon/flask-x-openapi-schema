@@ -138,4 +138,4 @@ def test_schema_generator_register_model_with_reference():
     assert items_schema["type"] == "array"
     assert "items" in items_schema
     assert "$ref" in items_schema["items"]
-    assert items_schema["items"]["$ref"] == "#/$defs/SimpleModel"
+    assert items_schema["items"]["$ref"] == "#/components/schemas/SimpleModel"

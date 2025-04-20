@@ -14,6 +14,10 @@ from flask_x_openapi_schema.x.flask import openapi_metadata
 from flask_x_openapi_schema.models.base import BaseRespModel
 from flask_x_openapi_schema.i18n.i18n_string import set_current_language
 from flask_x_openapi_schema.models.file_models import FileUploadModel
+from flask_x_openapi_schema.models.responses import (
+    OpenAPIMetaResponse,
+    OpenAPIMetaResponseItem,
+)
 
 
 # Create a mock I18nString class that works with Pydantic v2
@@ -223,17 +227,17 @@ def test_openapi_metadata_with_responses():
 
     @openapi_metadata(
         summary="Test endpoint",
-        responses={
-            "200": {
-                "description": "Successful response",
-                "content": {
-                    "application/json": {
-                        "schema": {"$ref": "#/components/schemas/TestResponseModel"}
-                    }
-                },
-            },
-            "404": {"description": "Not found"},
-        },
+        responses=OpenAPIMetaResponse(
+            responses={
+                "200": OpenAPIMetaResponseItem(
+                    model=SampleResponseModel,
+                    description="Successful response",
+                ),
+                "404": OpenAPIMetaResponseItem(
+                    description="Not found",
+                ),
+            }
+        ),
     )
     def test_function():
         return SampleResponseModel(id="123", name="Test", age=30)
