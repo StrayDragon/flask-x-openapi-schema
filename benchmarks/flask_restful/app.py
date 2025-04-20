@@ -74,8 +74,6 @@ def create_openapi_flask_restful_app():
             summary="Create a new user",
             description="Create a new user with the given ID",
             tags=["users"],
-            request_body=UserRequest,
-            query_model=UserQueryParams,
             responses={
                 "201": {
                     "description": "User created successfully",
@@ -86,7 +84,7 @@ def create_openapi_flask_restful_app():
                     },
                 },
                 "400": {"description": "Bad request"},
-            },
+            }
         )
         def post(self, user_id, x_request_body: UserRequest = None, x_request_query: UserQueryParams = None):
             """Create a user using flask-x-openapi-schema."""
@@ -170,8 +168,6 @@ def create_combined_app():
             summary="Create a new user",
             description="Create a new user with the given ID",
             tags=["users"],
-            request_body=UserRequest,
-            query_model=UserQueryParams,
             responses={
                 "201": {
                     "description": "User created successfully",
@@ -182,7 +178,7 @@ def create_combined_app():
                     },
                 },
                 "400": {"description": "Bad request"},
-            },
+            }
         )
         def post(self, user_id, x_request_body: UserRequest = None, x_request_query: UserQueryParams = None):
             """Create a user using flask-x-openapi-schema."""

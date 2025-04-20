@@ -238,8 +238,6 @@ def create_openapi_flask_app():
         summary="Create a new user",
         description="Create a new user with the given ID",
         tags=["users"],
-        request_body=UserRequest,
-        query_model=UserQueryParams,
         responses={
             "201": {
                 "description": "User created successfully",
@@ -250,7 +248,7 @@ def create_openapi_flask_app():
                 },
             },
             "400": {"description": "Bad request"},
-        },
+        }
     )
     def openapi_create_user(user_id: str, x_request_body: UserRequest = None, x_request_query: UserQueryParams = None):
         """Create a user using flask-x-openapi-schema."""
