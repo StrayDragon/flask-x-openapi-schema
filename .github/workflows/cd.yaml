@@ -20,6 +20,10 @@ jobs:
           python-version: '3.12'
           enable-cache: true
 
+      - name: Install just
+        run: |
+          uv tool install rust-just
+
       - name: Install build dependencies
         run: just sync-all-deps
 
