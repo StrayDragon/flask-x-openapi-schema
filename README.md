@@ -16,10 +16,10 @@ Full documentation is available in the [docs](./docs) directory.
 
 ```bash
 # Install the package
-pip install flask-x-openapi-schema
+uv pip install flask-x-openapi-schema
 
 # With Flask-RESTful support
-pip install flask-x-openapi-schema[flask-restful]
+uv pip install flask-x-openapi-schema[flask-restful]
 ```
 
 ## ✨ Features
@@ -37,47 +37,13 @@ pip install flask-x-openapi-schema[flask-restful]
 
 ## 📦 Installation
 
-### Basic Installation
-
-```bash
-# Install from PyPI
-pip install flask-x-openapi-schema
-
-# From the repository root using uv (recommended)
-uv pip install -e .
-
-# Or using pip
-pip install -e .
-```
-
-### Optional Dependencies
-
-By default, only Flask, Pydantic, and PyYAML are installed. For Flask-RESTful integration:
-
-```bash
-# Using uv (recommended)
-uv pip install flask-x-openapi-schema[flask-restful]
-# or for development
-uv pip install -e .[flask-restful]
-
-# Using pip
-pip install flask-x-openapi-schema[flask-restful]
-# or
-pip install -e .[flask-restful]
-```
-
 ### Development Setup
 
-This project uses `uv` for package management and `ruff` for linting and formatting:
+This project uses `uv` for package management and `ruff` for linting and formatting and need `just` for project management:
 
 ```bash
-# Install uv if you don't have it
-pip install uv
-
 # Install all dependencies including development ones
-uv pip install -e .[dev,flask-restful]
-# or using dependency groups
-uv sync --all-extras
+just sync-all-deps
 
 # Format and lint code
 just format-and-lintfix
@@ -85,102 +51,15 @@ just format-and-lintfix
 
 ## 🛠️ Basic Usage
 
-### Flask-RESTful Example
-
-```python
-from flask import Flask
-from flask_restful import Resource, Api
-from pydantic import BaseModel, Field
-from flask_x_openapi_schema.x.flask_restful import openapi_metadata, OpenAPIIntegrationMixin
-from flask_x_openapi_schema import BaseRespModel
-
-# Create a Flask app with OpenAPI support
-app = Flask(__name__)
-class OpenAPIApi(OpenAPIIntegrationMixin, Api):
-    pass
-api = OpenAPIApi(app)
-
-# Define request and response models
-class ItemRequest(BaseModel):
-    name: str = Field(..., description="Item name")
-    price: float = Field(..., description="Item price")
-
-class ItemResponse(BaseRespModel):
-    id: str = Field(..., description="Item ID")
-    name: str = Field(..., description="Item name")
-    price: float = Field(..., description="Item price")
-
-# Create a resource with OpenAPI metadata
-class ItemResource(Resource):
-    @openapi_metadata(
-        summary="Create a new item",
-        tags=["Items"],
-        operation_id="createItem"
-    )
-    def post(self, _x_body: ItemRequest):
-        # The request body is automatically parsed and validated
-        return ItemResponse(
-            id="123",
-            name=_x_body.name,
-            price=_x_body.price
-        ), 201
-
-# Register the resource
-api.add_resource(ItemResource, "/items")
-
-# Generate OpenAPI schema
-with open("openapi.yaml", "w") as f:
-    f.write(api.generate_openapi_schema(
-        title="Items API",
-        version="1.0.0",
-        description="API for managing items"
-    ))
-```
+See the [Usage Guide](./docs/usage_guide.md) for more detailed examples.
 
 ### Flask.MethodView Example
 
-```python
-from flask import Flask, Blueprint
-from flask.views import MethodView
-from pydantic import BaseModel, Field
-from flask_x_openapi_schema.x.flask import openapi_metadata, OpenAPIMethodViewMixin
-from flask_x_openapi_schema import BaseRespModel
+(diy) see and run [example](./examples/flask/app.py)
 
-# Create a Flask app
-app = Flask(__name__)
+### Flask-RESTful Example
 
-# Define request and response models
-class ItemRequest(BaseModel):
-    name: str = Field(..., description="Item name")
-    price: float = Field(..., description="Item price")
-
-class ItemResponse(BaseRespModel):
-    id: str = Field(..., description="Item ID")
-    name: str = Field(..., description="Item name")
-    price: float = Field(..., description="Item price")
-
-# Create a MethodView with OpenAPI metadata
-class ItemView(OpenAPIMethodViewMixin, MethodView):
-    @openapi_metadata(
-        summary="Create a new item",
-        tags=["Items"],
-        operation_id="createItem"
-    )
-    def post(self, _x_body: ItemRequest):
-        # The request body is automatically parsed and validated
-        return ItemResponse(
-            id="123",
-            name=_x_body.name,
-            price=_x_body.price
-        ), 201
-
-# Register the view
-blueprint = Blueprint("api", __name__)
-blueprint.add_url_rule("/items", view_func=ItemView.as_view("items"))
-app.register_blueprint(blueprint)
-```
-
-See the [Usage Guide](./docs/usage_guide.md) for more detailed examples.
+(diy) see and run [example](./examples/flask_restful/app.py)
 
 ## 📋 Key Features
 
@@ -190,22 +69,22 @@ The library provides separate implementations for Flask and Flask-RESTful:
 
 ```python
 # For Flask.MethodView
-from flask_x_openapi_schema.x.flask import openapi_metadata, OpenAPIMethodViewMixin
+from flask_x_openapi_schema.x.flask import openapi_metadata
 
 # For Flask-RESTful
-from flask_x_openapi_schema.x.flask_restful import openapi_metadata, OpenAPIIntegrationMixin
+from flask_x_openapi_schema.x.flask_restful import openapi_metadata
 ```
 
 ### Parameter Binding with Special Prefixes
 
-The library binds parameters with special prefixes:
+The library binds parameters with special prefixes default, and can custom by yourself:
 
 - `_x_body`: Request body from JSON
 - `_x_query`: Query parameters
 - `_x_path_<param_name>`: Path parameters
 - `_x_file`: File uploads
 
-### Configurable Parameter Prefixes
+#### Custom Parameter Prefixes
 
 ```python
 from flask_x_openapi_schema import ConventionalPrefixConfig, configure_prefixes
@@ -231,7 +110,7 @@ def my_function(req_body: MyModel, req_query: QueryModel):
     return {"message": "Success"}
 ```
 
-### Internationalization Support
+### I18n Support
 
 ```python
 from flask_x_openapi_schema import I18nStr, set_current_language
@@ -244,7 +123,8 @@ set_current_language("zh-Hans")
         "en-US": "Get an item",
         "zh-Hans": "获取一个项目",
         "ja-JP": "アイテムを取得する"
-    })
+    }),
+    ...
 )
 def get(self, item_id):
     # ...
@@ -286,12 +166,6 @@ This project uses `pytest` for testing and `pytest-cov` for coverage reporting:
 # Run tests with coverage report
 just test
 
-# Or manually
-uv run pytest
-
-# Run specific tests
-uv run pytest tests/flask/
-
 # View HTML coverage report
 # Open htmlcov/index.html in your browser
 ```
@@ -303,22 +177,14 @@ The project includes benchmarking tools to measure performance:
 ```bash
 # Run benchmarks and generate report
 just benchmark
-
-# View benchmark results
-cat results/report.txt
-
-# View performance charts
-open results/performance_charts.png
 ```
 
-## 📖 Documentation
+## 📖 More Docs
 
-- [Installation Guide](./docs/index.md#installation)
-- [Usage Guide](./docs/usage_guide.md)
 - [Core Components](./docs/core_components.md)
 - [Internationalization](./docs/internationalization.md)
 - [File Uploads](./docs/file_uploads.md)
-- [Examples](./examples/)
+- [...](./docs/)
 
 ## 🧩 Components
 

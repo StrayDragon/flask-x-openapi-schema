@@ -3,7 +3,7 @@ format-and-lintfix:
 	ruff check --fix
 
 sync-all-deps:
-	uv sync --all-extras
+	uv sync --all-extras --dev
 
 test:
 	uv run pytest

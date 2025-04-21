@@ -1,551 +1,395 @@
-# File Upload Handling in Flask-X-OpenAPI-Schema
+# File Upload Support in Flask-X-OpenAPI-Schema
 
-This document provides a detailed explanation of the file upload handling capabilities in Flask-X-OpenAPI-Schema and how to use them effectively.
+This document explains how to use the file upload functionality in Flask-X-OpenAPI-Schema with both Flask and Flask-RESTful applications.
 
 ## Overview
 
-Flask-X-OpenAPI-Schema provides robust support for handling file uploads in Flask-RESTful APIs. It simplifies the process of receiving and processing uploaded files, while also providing validation and documentation through OpenAPI schemas.
+Flask-X-OpenAPI-Schema provides built-in support for file uploads, making it easy to handle file uploads in your API endpoints. The library includes:
 
-```mermaid
-graph TD
-    A[File Upload Handling] --> B[Parameter Auto-Detection]
-    A --> C[File Upload Models]
-    A --> D[OpenAPI Documentation]
-
-    B --> E[_x_file Parameters]
-    C --> F[Validation]
-    D --> G[Schema Generation]
-
-    E --> H[File Processing]
-    F --> I[Type Safety]
-    G --> J[API Documentation]
-```
-
-## Basic File Upload
-
-The simplest way to handle file uploads is to use the `_x_file` parameter prefix with the `openapi_metadata` decorator.
-
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant F as Flask
-    participant D as Decorator
-    participant R as Resource Method
-
-    C->>F: POST multipart/form-data
-    F->>D: Process request
-    D->>F: Extract file from request.files
-    D->>R: Inject file as _x_file parameter
-    R->>C: Return response
-```
-
-### Example
-
-```python
-from flask_restful import Resource
-from werkzeug.datastructures import FileStorage
-from flask_x_openapi_schema.x.flask_restful import openapi_metadata
-
-class FileUploadResource(Resource):
-    @openapi_metadata(
-        summary="Upload a file",
-        description="Upload a file to the server",
-        tags=["Files"],
-        operation_id="uploadFile",
-    )
-    def post(self, _x_file: FileStorage):
-        """
-        Upload a file to the server.
-
-        This endpoint accepts a file upload and returns information about the uploaded file.
-        The file is automatically injected into the method via the _x_file parameter.
-        """
-        if not _x_file:
-            return {"error": "No file provided"}, 400
-
-        # Process the uploaded file
-        filename = _x_file.filename
-        content_type = _x_file.content_type
-
-        # Read the file content
-        file_content = _x_file.read()
-        file_size = len(file_content)
-
-        # Return information about the uploaded file
-        return {
-            "filename": filename,
-            "size": file_size,
-            "content_type": content_type,
-        }
-```
-
-## Multiple File Uploads
-
-You can handle multiple file uploads by using multiple parameters with the `_x_file` prefix followed by the file name.
-
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant F as Flask
-    participant D as Decorator
-    participant R as Resource Method
-
-    C->>F: POST multipart/form-data with multiple files
-    F->>D: Process request
-    D->>F: Extract files from request.files
-    D->>R: Inject files as x_request_file_* parameters
-    R->>C: Return response
-```
-
-### Example
-
-```python
-from flask_restful import Resource
-from werkzeug.datastructures import FileStorage
-from flask_x_openapi_schema.x.flask_restful import openapi_metadata
-
-class MultipleFileUploadResource(Resource):
-    @openapi_metadata(
-        summary="Upload multiple files",
-        description="Upload multiple files to the server",
-        tags=["Files"],
-        operation_id="uploadMultipleFiles",
-    )
-    def post(self, x_request_file_document: FileStorage, x_request_file_image: FileStorage):
-        """
-        Upload multiple files to the server.
-
-        This endpoint accepts multiple file uploads and returns information about the uploaded files.
-        The files are automatically injected into the method via the x_request_file_* parameters.
-        """
-        files_info = []
-
-        # Process the document file
-        if x_request_file_document:
-            filename = x_request_file_document.filename
-            content_type = x_request_file_document.content_type
-            file_content = x_request_file_document.read()
-            file_size = len(file_content)
-
-            files_info.append({
-                "filename": filename,
-                "size": file_size,
-                "content_type": content_type,
-                "type": "document",
-            })
-
-        # Process the image file
-        if x_request_file_image:
-            filename = x_request_file_image.filename
-            content_type = x_request_file_image.content_type
-            file_content = x_request_file_image.read()
-            file_size = len(file_content)
-
-            files_info.append({
-                "filename": filename,
-                "size": file_size,
-                "content_type": content_type,
-                "type": "image",
-            })
-
-        if not files_info:
-            return {"error": "No files provided"}, 400
-
-        # Return information about the uploaded files
-        return {"files": files_info}
-```
+1. **File Upload Models**: Pre-defined Pydantic models for common file types
+2. **Automatic File Injection**: Files are automatically injected into your handler functions
+3. **OpenAPI Schema Generation**: File upload fields are properly documented in the OpenAPI schema
+4. **Validation**: File uploads can be validated based on content type, size, etc.
 
 ## File Upload Models
 
-For better type checking, validation, and IDE support, Flask-X-OpenAPI-Schema provides Pydantic models for file uploads.
+Flask-X-OpenAPI-Schema provides several pre-defined file upload models:
 
-```mermaid
-classDiagram
-    class FileUploadModel {
-        +file: FileStorage
-        +validate_file()
-    }
-
-    class ImageUploadModel {
-        +allowed_extensions: list[str]
-        +max_size: int
-        +validate_file()
-    }
-
-    class DocumentUploadModel {
-        +allowed_extensions: list[str]
-        +max_size: int
-        +validate_file()
-    }
-
-    class MultipleFileUploadModel {
-        +files: list[FileStorage]
-        +validate_files()
-    }
-
-    FileUploadModel --|> BaseModel
-    ImageUploadModel --|> FileUploadModel
-    DocumentUploadModel --|> FileUploadModel
-    MultipleFileUploadModel --|> BaseModel
+```python
+from flask_x_openapi_schema import (
+    FileUploadModel,          # Generic file upload
+    ImageUploadModel,         # Image files (png, jpg, etc.)
+    DocumentUploadModel,      # Document files (pdf, docx, etc.)
+    AudioUploadModel,         # Audio files (mp3, wav, etc.)
+    VideoUploadModel,         # Video files (mp4, avi, etc.)
+)
 ```
 
-### Built-in Models
+You can also create custom file upload models by extending the base `FileUploadModel` class:
 
-Flask-X-OpenAPI-Schema provides several built-in models for common file upload scenarios:
+```python
+from flask_x_openapi_schema import FileUploadModel
+from pydantic import Field
 
-1. **FileUploadModel**: Base model for file uploads
-2. **ImageUploadModel**: Model for image file uploads with validation
-3. **DocumentUploadModel**: Model for document file uploads with validation
-4. **MultipleFileUploadModel**: Model for multiple file uploads
+class CustomFileUpload(FileUploadModel):
+    description: str = Field(..., description="File description")
+    category: str = Field(..., description="File category")
+    
+    # Customize allowed content types
+    allowed_content_types = ["application/pdf", "application/msword"]
+    
+    # Customize maximum file size (in bytes)
+    max_size = 10 * 1024 * 1024  # 10 MB
+```
 
-### Example
+## Basic Usage
+
+### With Flask.MethodView
+
+```python
+from flask.views import MethodView
+from flask_x_openapi_schema.x.flask import openapi_metadata, OpenAPIMethodViewMixin
+from flask_x_openapi_schema import ImageUploadModel, OpenAPIMetaResponse, OpenAPIMetaResponseItem
+
+class FileUploadView(OpenAPIMethodViewMixin, MethodView):
+    @openapi_metadata(
+        summary="Upload an image",
+        description="Upload an image file",
+        tags=["files"],
+        operation_id="uploadImage",
+        responses=OpenAPIMetaResponse(
+            responses={
+                "201": OpenAPIMetaResponseItem(
+                    model=FileResponse,
+                    description="File uploaded successfully",
+                ),
+                "400": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Invalid file",
+                ),
+            }
+        ),
+    )
+    def post(self, _x_file: ImageUploadModel):
+        # The file is automatically injected into _x_file.file
+        file = _x_file.file
+        
+        # Access file properties
+        filename = file.filename
+        content_type = file.content_type
+        
+        # Save the file
+        file.save(f"uploads/{filename}")
+        
+        # Return response
+        return {
+            "filename": filename,
+            "content_type": content_type,
+            "size": os.path.getsize(f"uploads/{filename}"),
+        }, 201
+
+# Register the view
+FileUploadView.register_to_blueprint(blueprint, "/upload", "file_upload")
+```
+
+### With Flask-RESTful
 
 ```python
 from flask_restful import Resource
 from flask_x_openapi_schema.x.flask_restful import openapi_metadata
-from flask_x_openapi_schema import ImageUploadModel
+from flask_x_openapi_schema import DocumentUploadModel, OpenAPIMetaResponse, OpenAPIMetaResponseItem
 
-class ImageUploadResource(Resource):
+class DocumentUploadResource(Resource):
     @openapi_metadata(
-        summary="Upload an image",
-        description="Upload an image with validation",
-        tags=["Images"],
-        operation_id="uploadImage",
+        summary="Upload a document",
+        description="Upload a document file (PDF, DOCX, etc.)",
+        tags=["files"],
+        operation_id="uploadDocument",
+        responses=OpenAPIMetaResponse(
+            responses={
+                "201": OpenAPIMetaResponseItem(
+                    model=FileResponse,
+                    description="File uploaded successfully",
+                ),
+                "400": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Invalid file",
+                ),
+            }
+        ),
     )
-    def post(self, _x_file: ImageUploadModel):
-        """
-        Upload an image to the server.
-
-        This endpoint accepts an image upload and returns information about the uploaded image.
-        The image is automatically injected into the method via the _x_file parameter.
-        The image is validated to ensure it's a valid image file.
-        """
-        # The file is automatically injected and validated
+    def post(self, _x_file: DocumentUploadModel):
+        # The file is automatically injected into _x_file.file
         file = _x_file.file
-
-        # Process the file
+        
+        # Access file properties
         filename = file.filename
         content_type = file.content_type
-        file_content = file.read()
-        file_size = len(file_content)
-
-        # Return information about the uploaded file
+        
+        # Save the file
+        file.save(f"uploads/{filename}")
+        
+        # Return response
         return {
             "filename": filename,
-            "size": file_size,
             "content_type": content_type,
-        }
+            "size": os.path.getsize(f"uploads/{filename}"),
+        }, 201
+
+# Register the resource
+api.add_resource(DocumentUploadResource, "/upload/document")
 ```
 
-## Custom Validation
+## Advanced Usage
 
-You can create custom file upload models with specific validation requirements:
+### Custom File Parameter Names
+
+By default, Flask-X-OpenAPI-Schema uses the parameter name `_x_file` for file uploads. You can customize this by using a different parameter name with the `_x_file_` prefix:
 
 ```python
-from flask_x_openapi_schema.models import FileUploadModel
+@openapi_metadata(
+    summary="Upload a profile picture",
+    # ...
+)
+def post(self, _x_file_profile_picture: ImageUploadModel):
+    # The file is automatically injected into _x_file_profile_picture.file
+    file = _x_file_profile_picture.file
+    # ...
+```
+
+### Multiple File Uploads
+
+You can handle multiple file uploads by using different parameter names:
+
+```python
+@openapi_metadata(
+    summary="Upload product files",
+    # ...
+)
+def post(
+    self,
+    _x_file_image: ImageUploadModel,
+    _x_file_document: DocumentUploadModel,
+    _x_file_video: VideoUploadModel
+):
+    # Access each file
+    image = _x_file_image.file
+    document = _x_file_document.file
+    video = _x_file_video.file
+    
+    # Process files
+    # ...
+```
+
+### File Validation
+
+File upload models include built-in validation for content type and file size:
+
+```python
+from flask_x_openapi_schema import FileUploadModel
 from pydantic import Field, validator
-from werkzeug.datastructures import FileStorage
 
-class PDFUploadModel(FileUploadModel):
-    """Model for PDF file uploads."""
-
-    file: FileStorage = Field(..., description="The PDF file to upload")
-
+class StrictPDFUpload(FileUploadModel):
+    title: str = Field(..., description="Document title")
+    
+    # Define allowed content types
+    allowed_content_types = ["application/pdf"]
+    
+    # Define maximum file size (5 MB)
+    max_size = 5 * 1024 * 1024
+    
+    # Custom validation
     @validator("file")
-    def validate_pdf(cls, file):
-        """Validate that the file is a PDF."""
-        if not file:
-            raise ValueError("No file provided")
-
-        # Check file extension
+    def validate_file(cls, file):
+        if not file or not hasattr(file, "filename"):
+            raise ValueError("File is required")
+        
         if not file.filename.lower().endswith(".pdf"):
-            raise ValueError("File must be a PDF")
-
-        # Check content type
-        if file.content_type != "application/pdf":
-            raise ValueError("File must be a PDF")
-
-        # Check file size (max 10MB)
-        file.seek(0, 2)  # Seek to the end of the file
-        file_size = file.tell()  # Get the position (size)
-        file.seek(0)  # Rewind to the beginning
-
-        if file_size > 10 * 1024 * 1024:  # 10MB
-            raise ValueError("File size must be less than 10MB")
-
+            raise ValueError("Only PDF files are allowed")
+        
         return file
 ```
 
-## OpenAPI Documentation
+### Custom File Processing
 
-Flask-X-OpenAPI-Schema automatically generates OpenAPI documentation for file upload endpoints:
+You can add custom processing logic to your file upload models:
+
+```python
+from flask_x_openapi_schema import ImageUploadModel
+from PIL import Image
+import io
+
+class ResizedImageUpload(ImageUploadModel):
+    width: int = Field(..., description="Target width")
+    height: int = Field(..., description="Target height")
+    
+    def process_image(self):
+        """Resize the uploaded image to the specified dimensions."""
+        if not self.file:
+            return None
+        
+        # Read the image
+        img = Image.open(self.file)
+        
+        # Resize the image
+        resized_img = img.resize((self.width, self.height))
+        
+        # Save to a buffer
+        buffer = io.BytesIO()
+        resized_img.save(buffer, format=img.format)
+        buffer.seek(0)
+        
+        return buffer
+```
+
+## OpenAPI Schema Generation
+
+Flask-X-OpenAPI-Schema automatically generates the correct OpenAPI schema for file upload endpoints. File upload fields are rendered as file upload buttons in Swagger UI, making it easy for users to test your API.
+
+### Example Schema
 
 ```yaml
 paths:
   /upload:
     post:
-      summary: Upload a file
-      description: Upload a file to the server
+      summary: Upload an image
+      description: Upload an image file
       tags:
-        - Files
-      operationId: uploadFile
-      consumes:
-        - multipart/form-data
-      parameters:
-        - name: file
-          in: formData
-          required: true
-          type: file
-          description: File upload for file
+        - files
+      operationId: uploadImage
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file to upload
       responses:
-        '200':
+        '201':
           description: File uploaded successfully
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  filename:
-                    type: string
-                  size:
-                    type: integer
-                  content_type:
-                    type: string
+                $ref: '#/components/schemas/FileResponse'
         '400':
-          description: No file provided
+          description: Invalid file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 ```
 
-## Client-Side Implementation
+## Complete Example
 
-Here's an example of how to upload files to your API from a client:
-
-### HTML Form
-
-```html
-<form action="/upload" method="post" enctype="multipart/form-data">
-  <input type="file" name="file">
-  <button type="submit">Upload</button>
-</form>
-```
-
-### JavaScript (Fetch API)
-
-```javascript
-async function uploadFile(file) {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const response = await fetch('/upload', {
-    method: 'POST',
-    body: formData,
-  });
-
-  return response.json();
-}
-
-// Usage
-const fileInput = document.querySelector('input[type="file"]');
-const file = fileInput.files[0];
-uploadFile(file).then(result => {
-  console.log(result);
-});
-```
-
-### Python (Requests)
+Here's a complete example of a file upload endpoint with Flask.MethodView:
 
 ```python
-import requests
-
-def upload_file(file_path):
-    with open(file_path, 'rb') as f:
-        files = {'file': f}
-        response = requests.post('http://localhost:5000/upload', files=files)
-
-    return response.json()
-
-# Usage
-result = upload_file('example.pdf')
-print(result)
-```
-
-## Advanced Techniques
-
-### 1. File Processing with Context Managers
-
-Use context managers to ensure proper file handling:
-
-```python
-def process_file(file):
-    """Process an uploaded file."""
-    with tempfile.NamedTemporaryFile(delete=False) as temp:
-        # Save the file to a temporary location
-        file.save(temp.name)
-
-        # Process the file
-        # ...
-
-        # Return the result
-        return {
-            "filename": file.filename,
-            "size": os.path.getsize(temp.name),
-            "content_type": file.content_type,
-        }
-```
-
-### 2. Streaming Large Files
-
-For large files, use streaming to avoid loading the entire file into memory:
-
-```python
-def stream_large_file(file):
-    """Stream a large file to another location."""
-    chunk_size = 4096  # 4KB chunks
-
-    with open('destination.file', 'wb') as f:
-        # Read and write in chunks
-        chunk = file.read(chunk_size)
-        while chunk:
-            f.write(chunk)
-            chunk = file.read(chunk_size)
-```
-
-### 3. Background Processing
-
-For time-consuming file processing, use background tasks:
-
-```python
-from celery import Celery
-
-# Configure Celery
-celery = Celery('tasks', broker='redis://localhost:6379/0')
-
-@celery.task
-def process_file_task(file_path):
-    """Process a file in the background."""
-    # Process the file
-    # ...
-    return {"status": "completed"}
-
-def upload_and_process(file):
-    """Upload a file and process it in the background."""
-    # Save the file to a temporary location
-    temp_path = f"/tmp/{secure_filename(file.filename)}"
-    file.save(temp_path)
-
-    # Start background processing
-    task = process_file_task.delay(temp_path)
-
-    # Return the task ID
-    return {"task_id": task.id}
-```
-
-## Best Practices
-
-### 1. Always Validate Files
-
-Always validate uploaded files to prevent security issues:
-
-```python
-def validate_file(file):
-    """Validate an uploaded file."""
-    # Check if a file was provided
-    if not file:
-        return False, "No file provided"
-
-    # Check file extension
-    allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif'}
-    ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in allowed_extensions:
-        return False, f"File extension {ext} not allowed"
-
-    # Check content type
-    allowed_content_types = {'image/jpeg', 'image/png', 'image/gif'}
-    if file.content_type not in allowed_content_types:
-        return False, f"Content type {file.content_type} not allowed"
-
-    # Check file size
-    file.seek(0, 2)
-    size = file.tell()
-    file.seek(0)
-    if size > 5 * 1024 * 1024:  # 5MB
-        return False, "File too large (max 5MB)"
-
-    return True, "File is valid"
-```
-
-### 2. Use Secure Filenames
-
-Always use secure filenames to prevent path traversal attacks:
-
-```python
-from werkzeug.utils import secure_filename
-
-def save_file(file):
-    """Save an uploaded file with a secure filename."""
-    filename = secure_filename(file.filename)
-    file.save(os.path.join('uploads', filename))
-    return filename
-```
-
-### 3. Store Files Outside the Web Root
-
-Store uploaded files outside the web root to prevent direct access:
-
-```python
-UPLOAD_FOLDER = '/var/uploads'  # Outside web root
-
-def save_file(file):
-    """Save an uploaded file outside the web root."""
-    filename = secure_filename(file.filename)
-    file.save(os.path.join(UPLOAD_FOLDER, filename))
-    return filename
-```
-
-### 4. Use Content Type Verification
-
-Verify the content type of uploaded files to prevent MIME type spoofing:
-
-```python
-import magic
-
-def verify_content_type(file):
-    """Verify the content type of an uploaded file."""
-    # Read the first 2048 bytes
-    header = file.read(2048)
-    file.seek(0)
-
-    # Use python-magic to detect the content type
-    mime = magic.Magic(mime=True)
-    detected_type = mime.from_buffer(header)
-
-    # Compare with the declared content type
-    if detected_type != file.content_type:
-        return False, f"Content type mismatch: declared {file.content_type}, detected {detected_type}"
-
-    return True, "Content type verified"
-```
-
-### 5. Implement Rate Limiting
-
-Implement rate limiting to prevent abuse:
-
-```python
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-
-limiter = Limiter(
-    app,
-    key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"]
+import os
+import uuid
+from pathlib import Path
+from flask import Flask, Blueprint, url_for
+from flask.views import MethodView
+from flask_x_openapi_schema.x.flask import openapi_metadata, OpenAPIMethodViewMixin
+from flask_x_openapi_schema import (
+    ImageUploadModel,
+    OpenAPIMetaResponse,
+    OpenAPIMetaResponseItem,
+    BaseRespModel,
 )
+from pydantic import Field
+from datetime import datetime
 
-@app.route('/upload', methods=['POST'])
-@limiter.limit("10 per minute")
-def upload_file():
-    # Handle file upload
-    # ...
+# Create uploads directory
+uploads_dir = Path("uploads")
+uploads_dir.mkdir(exist_ok=True)
+
+# Define response model
+class FileResponse(BaseRespModel):
+    id: str = Field(..., description="File ID")
+    filename: str = Field(..., description="Original filename")
+    content_type: str = Field(..., description="File content type")
+    size: int = Field(..., description="File size in bytes")
+    upload_date: datetime = Field(..., description="Upload date and time")
+    url: str = Field(..., description="File download URL")
+
+# Define error response model
+class ErrorResponse(BaseRespModel):
+    error_code: str = Field(..., description="Error code")
+    message: str = Field(..., description="Error message")
+
+# Define custom image upload model
+class ProductImageUpload(ImageUploadModel):
+    description: str = Field(..., description="Image description")
+    is_primary: bool = Field(False, description="Whether this is the primary product image")
+
+# Create a view for image uploads
+class ProductImageView(OpenAPIMethodViewMixin, MethodView):
+    @openapi_metadata(
+        summary="Upload a product image",
+        description="Upload an image for a specific product",
+        tags=["files"],
+        operation_id="uploadProductImage",
+        responses=OpenAPIMetaResponse(
+            responses={
+                "201": OpenAPIMetaResponseItem(
+                    model=FileResponse,
+                    description="Image uploaded successfully",
+                ),
+                "400": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Invalid request data",
+                ),
+                "404": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Product not found",
+                ),
+            }
+        ),
+    )
+    def post(self, product_id: str, _x_file_image: ProductImageUpload):
+        # The file is automatically injected into _x_file_image.file
+        file = _x_file_image.file
+        
+        # Check if product exists (in a real app, you would query a database)
+        if product_id not in ["123", "456", "789"]:
+            error = ErrorResponse(
+                error_code="PRODUCT_NOT_FOUND",
+                message=f"Product with ID {product_id} not found",
+            )
+            return error.to_response(404)
+        
+        # Save the file
+        file_id = str(uuid.uuid4())
+        filename = file.filename
+        content_type = file.content_type or "application/octet-stream"
+        
+        # Create product-specific directory
+        product_dir = uploads_dir / product_id
+        product_dir.mkdir(exist_ok=True)
+        
+        # Save file to disk
+        file_path = product_dir / f"{file_id}_{filename}"
+        file.save(file_path)
+        
+        # Get file size
+        size = os.path.getsize(file_path)
+        
+        # Create response
+        response = FileResponse(
+            id=file_id,
+            filename=filename,
+            content_type=content_type,
+            size=size,
+            upload_date=datetime.now(),
+            url=url_for("api.download_file", file_id=file_id, _external=True),
+        )
+        
+        return response.to_response(201)
 ```
 
 ## Conclusion
 
-Flask-X-OpenAPI-Schema provides comprehensive support for handling file uploads in Flask-RESTful APIs. By using the `_x_file` parameter prefix and the built-in file upload models, you can easily implement file upload functionality with proper validation and documentation. The automatic OpenAPI schema generation ensures that your API documentation is always up-to-date with your implementation.
+Flask-X-OpenAPI-Schema provides comprehensive support for file uploads in both Flask and Flask-RESTful applications. By using the built-in file upload models and automatic file injection, you can easily handle file uploads in your API endpoints with minimal code. The library also generates the correct OpenAPI schema for file upload endpoints, making it easy for users to test your API.

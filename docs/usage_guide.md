@@ -1,26 +1,321 @@
-# Flask-X-OpenAPI-Schema Usage Guide
+# Usage Guide for Flask-X-OpenAPI-Schema
 
-This guide provides detailed instructions on how to use Flask-X-OpenAPI-Schema in your Flask applications.
+This guide provides comprehensive examples and best practices for using Flask-X-OpenAPI-Schema in your Flask and Flask-RESTful applications.
 
-## Installation
+## Table of Contents
 
-```bash
-# From the repository root
-pip install -e .
-
-# Or install from GitHub
-pip install git+https://github.com/langgenius/dify.git#subdirectory=api/core/openapi
-```
+- [Basic Setup](#basic-setup)
+- [Flask.MethodView Integration](#flaskmethodview-integration)
+- [Flask-RESTful Integration](#flask-restful-integration)
+- [Parameter Binding](#parameter-binding)
+- [Response Handling](#response-handling)
+- [File Uploads](#file-uploads)
+- [Internationalization](#internationalization)
+- [Schema Generation](#schema-generation)
+- [Best Practices](#best-practices)
 
 ## Basic Setup
 
-### 1. Initialize Your Flask Application
+### Installation
+
+```bash
+# Basic installation
+pip install flask-x-openapi-schema
+
+# With Flask-RESTful support
+pip install flask-x-openapi-schema[flask-restful]
+```
+
+### Project Structure
+
+A typical project structure might look like this:
+
+```
+my_api/
+├── __init__.py
+├── app.py
+├── models/
+│   ├── __init__.py
+│   ├── request_models.py
+│   └── response_models.py
+├── resources/
+│   ├── __init__.py
+│   ├── user_resource.py
+│   └── item_resource.py
+├── views/
+│   ├── __init__.py
+│   ├── user_view.py
+│   └── item_view.py
+└── utils/
+    ├── __init__.py
+    └── schema_utils.py
+```
+
+### Basic Configuration
 
 ```python
+# app.py
+from flask import Flask
+from flask_x_openapi_schema import configure_prefixes, ConventionalPrefixConfig
+
+# Create a Flask app
+app = Flask(__name__)
+
+# Configure parameter prefixes (optional)
+custom_config = ConventionalPrefixConfig(
+    request_body_prefix="_x_body",
+    request_query_prefix="_x_query",
+    request_path_prefix="_x_path",
+    request_file_prefix="_x_file"
+)
+configure_prefixes(custom_config)
+```
+
+## Flask.MethodView Integration
+
+### Basic MethodView Example
+
+```python
+# views/user_view.py
+from flask.views import MethodView
+from flask import jsonify
+from flask_x_openapi_schema.x.flask import openapi_metadata, OpenAPIMethodViewMixin
+from flask_x_openapi_schema import OpenAPIMetaResponse, OpenAPIMetaResponseItem
+
+from my_api.models.request_models import UserCreateRequest, UserUpdateRequest
+from my_api.models.response_models import UserResponse, ErrorResponse
+
+class UserView(OpenAPIMethodViewMixin, MethodView):
+    @openapi_metadata(
+        summary="Get all users",
+        description="Retrieve a list of all users",
+        tags=["users"],
+        operation_id="getUsers",
+        responses=OpenAPIMetaResponse(
+            responses={
+                "200": OpenAPIMetaResponseItem(
+                    model=UserResponse,
+                    description="List of users retrieved successfully",
+                ),
+                "500": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Internal server error",
+                ),
+            }
+        ),
+    )
+    def get(self):
+        # Implementation...
+        users = [
+            {"id": "1", "username": "user1", "email": "user1@example.com"},
+            {"id": "2", "username": "user2", "email": "user2@example.com"},
+        ]
+        return jsonify(users), 200
+
+    @openapi_metadata(
+        summary="Create a new user",
+        description="Create a new user with the provided information",
+        tags=["users"],
+        operation_id="createUser",
+        responses=OpenAPIMetaResponse(
+            responses={
+                "201": OpenAPIMetaResponseItem(
+                    model=UserResponse,
+                    description="User created successfully",
+                ),
+                "400": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Invalid request data",
+                ),
+                "500": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Internal server error",
+                ),
+            }
+        ),
+    )
+    def post(self, _x_body: UserCreateRequest):
+        # Implementation...
+        user = {
+            "id": "3",
+            "username": _x_body.username,
+            "email": _x_body.email,
+        }
+        return jsonify(user), 201
+```
+
+### Registering MethodViews
+
+```python
+# app.py
+from flask import Flask, Blueprint
+from my_api.views.user_view import UserView
+from my_api.views.item_view import ItemView, ItemDetailView
+
+# Create a Flask app
+app = Flask(__name__)
+
+# Create a blueprint
+blueprint = Blueprint("api", __name__, url_prefix="/api")
+
+# Register the views
+UserView.register_to_blueprint(blueprint, "/users", "users")
+ItemView.register_to_blueprint(blueprint, "/items", "items")
+ItemDetailView.register_to_blueprint(blueprint, "/items/<item_id>", "item_detail")
+
+# Register the blueprint
+app.register_blueprint(blueprint)
+```
+
+### Generating OpenAPI Schema
+
+```python
+# app.py
+from flask_x_openapi_schema.x.flask.views import MethodViewOpenAPISchemaGenerator
+import yaml
+
+@app.route("/openapi.yaml")
+def get_openapi_spec():
+    generator = MethodViewOpenAPISchemaGenerator(
+        title="My API",
+        version="1.0.0",
+        description="API for managing users and items",
+    )
+    
+    # Process MethodView resources
+    generator.process_methodview_resources(blueprint)
+    
+    # Generate the schema
+    schema = generator.generate_schema()
+    
+    # Convert to YAML
+    yaml_content = yaml.dump(
+        schema,
+        sort_keys=False,
+        default_flow_style=False,
+        allow_unicode=True,
+    )
+    
+    return yaml_content, 200, {"Content-Type": "text/yaml"}
+```
+
+## Flask-RESTful Integration
+
+### Basic Resource Example
+
+```python
+# resources/user_resource.py
+from flask_restful import Resource
+from flask_x_openapi_schema.x.flask_restful import openapi_metadata
+from flask_x_openapi_schema import OpenAPIMetaResponse, OpenAPIMetaResponseItem
+
+from my_api.models.request_models import UserCreateRequest, UserUpdateRequest
+from my_api.models.response_models import UserResponse, ErrorResponse
+
+class UserListResource(Resource):
+    @openapi_metadata(
+        summary="Get all users",
+        description="Retrieve a list of all users",
+        tags=["users"],
+        operation_id="getUsers",
+        responses=OpenAPIMetaResponse(
+            responses={
+                "200": OpenAPIMetaResponseItem(
+                    model=UserResponse,
+                    description="List of users retrieved successfully",
+                ),
+                "500": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Internal server error",
+                ),
+            }
+        ),
+    )
+    def get(self):
+        # Implementation...
+        users = [
+            {"id": "1", "username": "user1", "email": "user1@example.com"},
+            {"id": "2", "username": "user2", "email": "user2@example.com"},
+        ]
+        return users, 200
+
+    @openapi_metadata(
+        summary="Create a new user",
+        description="Create a new user with the provided information",
+        tags=["users"],
+        operation_id="createUser",
+        responses=OpenAPIMetaResponse(
+            responses={
+                "201": OpenAPIMetaResponseItem(
+                    model=UserResponse,
+                    description="User created successfully",
+                ),
+                "400": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Invalid request data",
+                ),
+                "500": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Internal server error",
+                ),
+            }
+        ),
+    )
+    def post(self, _x_body: UserCreateRequest):
+        # Implementation...
+        user = {
+            "id": "3",
+            "username": _x_body.username,
+            "email": _x_body.email,
+        }
+        return user, 201
+
+class UserResource(Resource):
+    @openapi_metadata(
+        summary="Get a user by ID",
+        description="Retrieve a user by its unique identifier",
+        tags=["users"],
+        operation_id="getUser",
+        responses=OpenAPIMetaResponse(
+            responses={
+                "200": OpenAPIMetaResponseItem(
+                    model=UserResponse,
+                    description="User retrieved successfully",
+                ),
+                "404": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="User not found",
+                ),
+                "500": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Internal server error",
+                ),
+            }
+        ),
+    )
+    def get(self, user_id: str):
+        # Implementation...
+        if user_id not in ["1", "2"]:
+            return {"error_code": "USER_NOT_FOUND", "message": "User not found"}, 404
+        
+        user = {
+            "id": user_id,
+            "username": f"user{user_id}",
+            "email": f"user{user_id}@example.com",
+        }
+        return user, 200
+```
+
+### Registering Resources
+
+```python
+# app.py
 from flask import Flask
 from flask_restful import Api
-# For Flask-RESTful
 from flask_x_openapi_schema.x.flask_restful import OpenAPIIntegrationMixin
+
+from my_api.resources.user_resource import UserListResource, UserResource
+from my_api.resources.item_resource import ItemListResource, ItemResource
 
 # Create a Flask app
 app = Flask(__name__)
@@ -29,442 +324,130 @@ app = Flask(__name__)
 class OpenAPIApi(OpenAPIIntegrationMixin, Api):
     pass
 
-# Initialize the API
 api = OpenAPIApi(app)
 
-# For Flask.MethodView
-from flask import Flask, Blueprint
-from flask.views import MethodView
-from flask_x_openapi_schema.x.flask import OpenAPIMethodViewMixin
-
-# Create a Flask app
-app = Flask(__name__)
-
-# Create a blueprint
-blueprint = Blueprint("api", __name__)
+# Register the resources
+api.add_resource(UserListResource, "/api/users")
+api.add_resource(UserResource, "/api/users/<string:user_id>")
+api.add_resource(ItemListResource, "/api/items")
+api.add_resource(ItemResource, "/api/items/<string:item_id>")
 ```
 
-### 2. Define Pydantic Models
+### Generating OpenAPI Schema
 
 ```python
-from pydantic import BaseModel, Field
-from flask_x_openapi_schema.models.base import BaseRespModel
-
-# Request model
-class ItemRequest(BaseModel):
-    """Request model for creating an item."""
-    name: str = Field(..., description="The name of the item")
-    price: float = Field(..., description="The price of the item")
-    description: str = Field("", description="The description of the item")
-
-# Response model
-class ItemResponse(BaseRespModel):
-    """Response model for an item."""
-    id: str = Field(..., description="The ID of the item")
-    name: str = Field(..., description="The name of the item")
-    price: float = Field(..., description="The price of the item")
-    created_at: str = Field(..., description="The creation timestamp")
-```
-
-### 3. Create API Resources
-
-```python
-# Flask-RESTful example
-from flask_restful import Resource
-from flask_x_openapi_schema.x.flask_restful import openapi_metadata
-from flask_x_openapi_schema import responses_schema, success_response
-
-class ItemResource(Resource):
-    @openapi_metadata(
-        summary="Create a new item",
-        description="Create a new item with the given data",
-        tags=["Items"],
-        operation_id="createItem",
-        responses=responses_schema(
-            success_responses={
-                "201": success_response(
-                    model=ItemResponse,
-                    description="Item created successfully",
-                ),
-            },
-            errors={
-                "400": "Invalid request",
-            },
-        ),
-    )
-    def post(self, _x_body: ItemRequest):
-        # Access the request body as a Pydantic model
-        name = _x_body.name
-        price = _x_body.price
-        description = _x_body.description
-
-        # Create the item (in a real app, this would interact with a database)
-        item_id = "123"  # Example ID
-        created_at = "2023-01-01T12:00:00Z"  # Example timestamp
-
-        # Return the created item using the response model
-        return ItemResponse(
-            id=item_id,
-            name=name,
-            price=price,
-            created_at=created_at,
-        ), 201
-
-# Flask.MethodView example
-from flask.views import MethodView
-from flask_x_openapi_schema.x.flask import openapi_metadata, OpenAPIMethodViewMixin
-
-class ItemView(OpenAPIMethodViewMixin, MethodView):
-    @openapi_metadata(
-        summary="Create a new item",
-        description="Create a new item with the given data",
-        tags=["Items"],
-        operation_id="createItem",
-        responses=responses_schema(
-            success_responses={
-                "201": success_response(
-                    model=ItemResponse,
-                    description="Item created successfully",
-                ),
-            },
-            errors={
-                "400": "Invalid request",
-            },
-        ),
-    )
-    def post(self, _x_body: ItemRequest):
-        # Access the request body as a Pydantic model
-        name = _x_body.name
-        price = _x_body.price
-        description = _x_body.description
-
-        # Create the item (in a real app, this would interact with a database)
-        item_id = "123"  # Example ID
-        created_at = "2023-01-01T12:00:00Z"  # Example timestamp
-
-        # Return the created item using the response model
-        return ItemResponse(
-            id=item_id,
-            name=name,
-            price=price,
-            created_at=created_at,
-        ), 201
-```
-
-### 4. Register Resources with the API
-
-```python
-# For Flask-RESTful
-api.add_resource(ItemResource, "/items")
-
-# For Flask.MethodView
-blueprint.add_url_rule("/items", view_func=ItemView.as_view("items"))
-app.register_blueprint(blueprint)
-```
-
-### 5. Generate OpenAPI Schema
-
-```python
-# For Flask-RESTful
-schema = api.generate_openapi_schema(
-    title="Items API",
-    version="1.0.0",
-    description="API for managing items",
-    output_format="yaml",  # or "json"
-)
-
-# Save the schema to a file
-with open("openapi.yaml", "w") as f:
-    f.write(schema)
-
-# For Flask.MethodView with OpenAPISchemaGenerator
-from flask_x_openapi_schema import OpenAPISchemaGenerator
-
-# Create a schema generator
-generator = OpenAPISchemaGenerator(
-    title="Items API",
-    version="1.0.0",
-    description="API for managing items"
-)
-
-# Scan the blueprint
-generator.scan_blueprint(blueprint)
-
-# Generate the schema
-schema = generator.generate_schema()
-
-# Convert to YAML or JSON
+# app.py
 import yaml
-with open("openapi.yaml", "w") as f:
-    yaml.dump(schema, f)
+
+@app.route("/openapi.yaml")
+def get_openapi_spec():
+    schema = api.generate_openapi_schema(
+        title="My API",
+        version="1.0.0",
+        description="API for managing users and items",
+        output_format="json",
+    )
+    
+    # Convert to YAML
+    yaml_content = yaml.dump(
+        schema,
+        sort_keys=False,
+        default_flow_style=False,
+        allow_unicode=True,
+    )
+    
+    return yaml_content, 200, {"Content-Type": "text/yaml"}
 ```
 
-## Advanced Usage
+## Parameter Binding
 
-### Parameter Binding with Special Prefixes
-
-The `openapi_metadata` decorator binds parameters with special prefixes:
-
-- `_x_body`: Binds the entire request body object
-- `_x_query`: Binds the entire query parameters object
-- `_x_path_<param_name>`: Binds a path parameter
-- `_x_file`: Binds a file object
-
-These prefixes can be customized using the `ConventionalPrefixConfig` class:
+### Request Body
 
 ```python
-# Query parameters
-class ItemQueryParams(BaseModel):
-    """Query parameters for item operations."""
-    skip: int = Field(0, description="Number of items to skip")
-    limit: int = Field(100, description="Maximum number of items to return")
-
 @openapi_metadata(
-    summary="Get items",
-    description="Get a list of items",
-    tags=["Items"],
-    operation_id="getItems",
+    summary="Create a new item",
+    # ...
 )
-def get(self, _x_query: ItemQueryParams):
-    # Access the query parameters as a Pydantic model
-    skip = _x_query.skip
-    limit = _x_query.limit
-
-    # Return a list of items
-    return {
-        "items": [...],
-        "pagination": {
-            "skip": skip,
-            "limit": limit
-        }
-    }, 200
-
-# Path parameters
-@openapi_metadata(
-    summary="Get an item",
-    description="Get an item by ID",
-    tags=["Items"],
-    operation_id="getItem",
-)
-def get(self, item_id: str, _x_path_item_id: str):
-    # Access the path parameter
-    item_id_from_path = _x_path_item_id
-
-    # Return the item
-    return {"id": item_id_from_path, "name": "Example Item"}, 200
+def post(self, _x_body: ItemCreateRequest):
+    # _x_body is automatically populated from the request JSON
+    item = {
+        "id": "123",
+        "name": _x_body.name,
+        "description": _x_body.description,
+        "price": _x_body.price,
+    }
+    return item, 201
 ```
 
-### Internationalization Support
+### Query Parameters
 
 ```python
-from flask_x_openapi_schema import I18nStr, set_current_language
-
-# Create internationalized strings
-summary = I18nStr({
-    "en-US": "Get an item",
-    "zh-Hans": "获取一个项目",
-    "ja-JP": "アイテムを取得する",
-})
-
-# Set the current language
-set_current_language("zh-Hans")
-
-# Use in decorator
 @openapi_metadata(
-    summary=summary,
-    description=I18nStr({
-        "en-US": "Get an item by ID from the database",
-        "zh-Hans": "通过ID从数据库获取一个项目",
-        "ja-JP": "IDからデータベースからアイテムを取得する",
-    }),
-    tags=["Items"],
-    operation_id="getItem",
+    summary="Get all items",
+    # ...
+)
+def get(self, _x_query: ItemFilterParams = None):
+    # _x_query is automatically populated from the query parameters
+    items = [...]
+    
+    if _x_query:
+        if _x_query.category:
+            items = [item for item in items if item["category"] == _x_query.category]
+        
+        if _x_query.min_price is not None:
+            items = [item for item in items if item["price"] >= _x_query.min_price]
+        
+        if _x_query.max_price is not None:
+            items = [item for item in items if item["price"] <= _x_query.max_price]
+        
+        # Apply pagination
+        items = items[_x_query.offset:_x_query.offset + _x_query.limit]
+    
+    return items, 200
+```
+
+### Path Parameters
+
+```python
+@openapi_metadata(
+    summary="Get an item by ID",
+    # ...
 )
 def get(self, item_id: str):
-    # ...
+    # item_id is automatically populated from the path parameter
+    if item_id not in ["123", "456"]:
+        return {"error_code": "ITEM_NOT_FOUND", "message": "Item not found"}, 404
+    
+    item = {
+        "id": item_id,
+        "name": f"Item {item_id}",
+        "description": f"Description for item {item_id}",
+        "price": float(item_id),
+    }
+    return item, 200
 ```
 
-### File Upload Handling
+### File Uploads
 
 ```python
-from werkzeug.datastructures import FileStorage
-from flask_x_openapi_schema import openapi_metadata, FileUploadModel
-
-# Simple file upload
 @openapi_metadata(
-    summary="Upload a file",
-    description="Upload a file to the server",
-    tags=["Files"],
-    operation_id="uploadFile",
+    summary="Upload an item image",
+    # ...
 )
-def post(self, _x_file: FileStorage):
-    # The file is automatically injected from request.files
-    filename = _x_file.filename
-    # Process the file...
-    return {"filename": filename}
-
-# Multiple file uploads
-@openapi_metadata(
-    summary="Upload multiple files",
-    description="Upload multiple files to the server",
-    tags=["Files"],
-    operation_id="uploadMultipleFiles",
-)
-def post(self, x_request_file_document: FileStorage, x_request_file_image: FileStorage):
-    # Process multiple files...
-    return {"files": [document_info, image_info]}
-
-# Using Pydantic models for file uploads
-@openapi_metadata(
-    summary="Upload an image",
-    description="Upload an image with validation",
-    tags=["Images"],
-    operation_id="uploadImage",
-)
-def post(self, _x_file: FileUploadModel):
-    # The file is automatically injected and validated
+def post(self, item_id: str, _x_file: ImageUploadModel):
+    # _x_file.file is automatically populated from the uploaded file
     file = _x_file.file
-    # Process the file...
-    return {"filename": file.filename}
+    
+    # Save the file
+    file.save(f"uploads/{item_id}_{file.filename}")
+    
+    return {"message": "File uploaded successfully"}, 201
 ```
 
-### Using Flask CLI Commands
-
-Flask-X-OpenAPI-Schema provides CLI commands for generating OpenAPI schemas:
-
-```bash
-# Generate OpenAPI schema for the service_api blueprint
-flask generate-openapi --blueprint service_api --output openapi.yaml
-
-# Generate OpenAPI schema in JSON format
-flask generate-openapi --blueprint service_api --output openapi.json --format json
-```
-
-To register the commands with your Flask application:
+### Custom Parameter Prefixes
 
 ```python
-from flask_x_openapi_schema.commands import register_commands
-
-# Register the commands with your Flask application
-register_commands(app)
-```
-
-## Best Practices
-
-### 1. Organize Models by Domain
-
-Group your Pydantic models by domain or functionality:
-
-```python
-# user_models.py
-class UserRequest(BaseModel):
-    # ...
-
-class UserResponse(BaseRespModel):
-    # ...
-
-# item_models.py
-class ItemRequest(BaseModel):
-    # ...
-
-class ItemResponse(BaseRespModel):
-    # ...
-```
-
-### 2. Use Descriptive Field Descriptions
-
-Always provide clear descriptions for your model fields:
-
-```python
-class UserRequest(BaseModel):
-    username: str = Field(..., description="The user's unique username (3-20 characters)")
-    email: str = Field(..., description="The user's email address for notifications and recovery")
-    password: str = Field(..., description="The user's password (min 8 characters)")
-```
-
-### 3. Leverage Response Schema Utilities
-
-Use the response schema utilities to create consistent responses:
-
-```python
-from flask_x_openapi_schema import responses_schema, success_response
-
-@openapi_metadata(
-    # ...
-    responses=responses_schema(
-        success_responses={
-            "200": success_response(
-                model=ItemResponse,
-                description="Item retrieved successfully",
-            ),
-            "201": success_response(
-                model=ItemCreatedResponse,
-                description="Item created successfully",
-            ),
-        },
-        errors={
-            "400": "Invalid request",
-            "404": "Item not found",
-            "500": "Internal server error",
-        },
-    ),
-)
-```
-
-### 4. Use BaseRespModel for Responses
-
-Always extend `BaseRespModel` for your response models to ensure proper conversion to Flask-RESTful responses:
-
-```python
-from flask_x_openapi_schema.models.base import BaseRespModel
-
-class ErrorResponse(BaseRespModel):
-    error: str = Field(..., description="Error message")
-    code: int = Field(..., description="Error code")
-
-class SuccessResponse(BaseRespModel):
-    message: str = Field(..., description="Success message")
-    data: dict = Field(..., description="Response data")
-```
-
-### 5. Implement Consistent Error Handling
-
-Create a consistent error handling approach:
-
-```python
-def handle_error(error_code: int, message: str) -> tuple:
-    """Handle API errors consistently."""
-    return ErrorResponse(
-        error=message,
-        code=error_code,
-    ), error_code
-```
-
-## Troubleshooting
-
-### Common Issues and Solutions
-
-1. **Issue**: Parameters not being bound correctly.
-   **Solution**: Ensure you're using the correct parameter prefixes (`_x_body`, `_x_query`, etc.) and that your parameters have type annotations.
-
-2. **Issue**: Pydantic models not showing up in the OpenAPI schema.
-   **Solution**: Make sure your models are properly registered with the schema generator by using them in the `openapi_metadata` decorator.
-
-3. **Issue**: File uploads not working.
-   **Solution**: Ensure your form is using `enctype="multipart/form-data"` and that you're using the correct parameter prefix (`_x_file`).
-
-4. **Issue**: Internationalized strings not showing up in the correct language.
-   **Solution**: Check that you've set the current language using `set_current_language()` before generating the schema.
-
-5. **Issue**: Response models not being converted properly.
-   **Solution**: Make sure your response models extend `BaseRespModel` and that you're returning them correctly from your resource methods.
-
-### Configurable Parameter Prefixes
-
-You can customize the parameter prefixes used for auto-detection using the `ConventionalPrefixConfig` class:
-
-```python
-from flask_x_openapi_schema import ConventionalPrefixConfig, configure_prefixes, reset_prefixes, GLOBAL_CONFIG_HOLDER
+from flask_x_openapi_schema import ConventionalPrefixConfig
 
 # Create a custom configuration
 custom_config = ConventionalPrefixConfig(
@@ -474,119 +457,510 @@ custom_config = ConventionalPrefixConfig(
     request_file_prefix="req_file"
 )
 
-# Configure globally
-configure_prefixes(custom_config)
-
-# Reset to default prefixes if needed
-reset_prefixes()
-
-# Configure at the API level
-api = OpenAPIApi(app)
-api.configure_openapi(prefix_config=custom_config)
-
-# Or using keyword arguments (for backward compatibility)
-api.configure_openapi(
-    request_body_prefix="req_body",
-    request_query_prefix="req_query"
-)
-
-# Configure at the Blueprint level
-blueprint = OpenAPIBlueprint('api', __name__)
-blueprint.configure_openapi(prefix_config=custom_config)
-
-# Configure per-function (recommended approach)
 @openapi_metadata(
-    summary="Test endpoint",
-    prefix_config=ConventionalPrefixConfig(
-        request_body_prefix="req_body",
-        request_query_prefix="req_query"
-    )
+    summary="Create a new item",
+    prefix_config=custom_config,
+    # ...
 )
-def my_function(req_body: MyModel, req_query: QueryModel):
-    # Use custom prefixes
-    return {"message": "Success"}
+def post(self, req_body: ItemCreateRequest):
+    # req_body is automatically populated from the request JSON
+    item = {
+        "id": "123",
+        "name": req_body.name,
+        "description": req_body.description,
+        "price": req_body.price,
+    }
+    return item, 201
 ```
 
-The per-function configuration is recommended as it only affects that specific function and doesn't change the global configuration. If you need to modify the global configuration, make sure to reset it to the default values when you're done to avoid affecting other parts of your application.
+## Response Handling
 
-## Advanced Topics
-
-### Custom Schema Generation
-
-You can customize the schema generation process by extending the `OpenAPISchemaGenerator` class:
+### Basic Responses
 
 ```python
-from flask_x_openapi_schema import OpenAPISchemaGenerator
-
-class CustomSchemaGenerator(OpenAPISchemaGenerator):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Add custom initialization
-
-    def generate_schema(self):
-        schema = super().generate_schema()
-        # Customize the schema
-        schema["info"]["x-custom-field"] = "Custom value"
-        return schema
+@openapi_metadata(
+    summary="Get all items",
+    # ...
+)
+def get(self):
+    # Implementation...
+    items = [
+        {"id": "123", "name": "Item 1", "price": 10.99},
+        {"id": "456", "name": "Item 2", "price": 20.99},
+    ]
+    return items, 200
 ```
 
-### Custom Response Formats
-
-You can create custom response formats by extending `BaseRespModel`:
+### Using BaseRespModel
 
 ```python
-class ApiResponse(BaseRespModel):
-    success: bool = Field(..., description="Whether the request was successful")
-    data: Optional[dict] = Field(None, description="Response data")
-    error: Optional[str] = Field(None, description="Error message")
+from flask_x_openapi_schema import BaseRespModel
+from pydantic import Field
 
-    def to_response(self, status_code: int = 200):
-        # Custom response formatting
-        response_data = {
-            "success": self.success,
-            "timestamp": datetime.now().isoformat(),
+class ItemResponse(BaseRespModel):
+    id: str = Field(..., description="Item ID")
+    name: str = Field(..., description="Item name")
+    description: str = Field(None, description="Item description")
+    price: float = Field(..., description="Item price")
+
+@openapi_metadata(
+    summary="Get an item by ID",
+    # ...
+)
+def get(self, item_id: str):
+    # Implementation...
+    if item_id not in ["123", "456"]:
+        error = ErrorResponse(
+            error_code="ITEM_NOT_FOUND",
+            message="Item not found",
+        )
+        return error.to_response(404)
+    
+    item = ItemResponse(
+        id=item_id,
+        name=f"Item {item_id}",
+        description=f"Description for item {item_id}",
+        price=float(item_id),
+    )
+    return item.to_response(200)
+```
+
+### Documenting Responses
+
+```python
+@openapi_metadata(
+    summary="Create a new item",
+    description="Create a new item with the provided information",
+    tags=["items"],
+    operation_id="createItem",
+    responses=OpenAPIMetaResponse(
+        responses={
+            "201": OpenAPIMetaResponseItem(
+                model=ItemResponse,
+                description="Item created successfully",
+            ),
+            "400": OpenAPIMetaResponseItem(
+                model=ErrorResponse,
+                description="Invalid request data",
+            ),
+            "500": OpenAPIMetaResponseItem(
+                model=ErrorResponse,
+                description="Internal server error",
+            ),
         }
-
-        if self.data:
-            response_data["data"] = self.data
-
-        if self.error:
-            response_data["error"] = self.error
-
-        return response_data, status_code
+    ),
+)
+def post(self, _x_body: ItemCreateRequest):
+    # Implementation...
 ```
 
-### Integration with Other Flask Extensions
+## File Uploads
 
-Flask-X-OpenAPI-Schema can be integrated with other Flask extensions:
+### Basic File Upload
 
 ```python
-from flask import Flask
-from flask_restful import Api
-from flask_cors import CORS
-from flask_jwt_extended import JWTManager
-from flask_x_openapi_schema import OpenAPIIntegrationMixin
+from flask_x_openapi_schema import ImageUploadModel
 
-app = Flask(__name__)
-
-# Configure extensions
-CORS(app)
-jwt = JWTManager(app)
-
-# Create OpenAPI-enabled API
-class OpenAPIApi(OpenAPIIntegrationMixin, Api):
-    pass
-
-api = OpenAPIApi(app)
-
-# Add JWT security scheme
-api.add_security_scheme("bearerAuth", {
-    "type": "http",
-    "scheme": "bearer",
-    "bearerFormat": "JWT",
-})
+@openapi_metadata(
+    summary="Upload an item image",
+    # ...
+)
+def post(self, item_id: str, _x_file: ImageUploadModel):
+    # _x_file.file is automatically populated from the uploaded file
+    file = _x_file.file
+    
+    # Save the file
+    file.save(f"uploads/{item_id}_{file.filename}")
+    
+    return {"message": "File uploaded successfully"}, 201
 ```
 
-## Conclusion
+### Custom File Upload Model
 
-Flask-X-OpenAPI-Schema provides a powerful yet easy-to-use solution for generating OpenAPI documentation from Flask-RESTful APIs. By following the guidelines in this document, you can create well-documented APIs with minimal effort.
+```python
+from flask_x_openapi_schema import ImageUploadModel
+from pydantic import Field
+
+class ItemImageUpload(ImageUploadModel):
+    description: str = Field(..., description="Image description")
+    is_primary: bool = Field(False, description="Whether this is the primary item image")
+
+@openapi_metadata(
+    summary="Upload an item image",
+    # ...
+)
+def post(self, item_id: str, _x_file: ItemImageUpload):
+    # _x_file.file is automatically populated from the uploaded file
+    file = _x_file.file
+    
+    # Access additional fields
+    description = _x_file.description
+    is_primary = _x_file.is_primary
+    
+    # Save the file
+    file.save(f"uploads/{item_id}_{file.filename}")
+    
+    return {
+        "message": "File uploaded successfully",
+        "description": description,
+        "is_primary": is_primary,
+    }, 201
+```
+
+### Multiple File Uploads
+
+```python
+@openapi_metadata(
+    summary="Upload item files",
+    # ...
+)
+def post(
+    self,
+    item_id: str,
+    _x_file_image: ImageUploadModel,
+    _x_file_document: DocumentUploadModel,
+):
+    # Access each file
+    image = _x_file_image.file
+    document = _x_file_document.file
+    
+    # Save the files
+    image.save(f"uploads/{item_id}_image_{image.filename}")
+    document.save(f"uploads/{item_id}_document_{document.filename}")
+    
+    return {"message": "Files uploaded successfully"}, 201
+```
+
+## Internationalization
+
+### Using I18nStr
+
+```python
+from flask_x_openapi_schema import I18nStr, set_current_language
+
+# Set the current language
+set_current_language("zh-Hans")
+
+@openapi_metadata(
+    summary=I18nStr({
+        "en-US": "Get an item",
+        "zh-Hans": "获取一个项目",
+        "ja-JP": "アイテムを取得する",
+    }),
+    description=I18nStr({
+        "en-US": "Get an item by ID from the database",
+        "zh-Hans": "通过ID从数据库获取一个项目",
+        "ja-JP": "IDからデータベースからアイテムを取得する",
+    }),
+    tags=["items"],
+    operation_id="getItem",
+    # ...
+)
+def get(self, item_id: str):
+    # Implementation...
+```
+
+### Language Switching
+
+```python
+import contextlib
+from flask_x_openapi_schema import set_current_language, get_current_language
+
+@contextlib.contextmanager
+def language_context(language):
+    """Temporarily switch to a different language."""
+    previous_language = get_current_language()
+    set_current_language(language)
+    try:
+        yield
+    finally:
+        set_current_language(previous_language)
+
+# Use the context manager
+with language_context("zh-Hans"):
+    # Generate schema in Chinese
+    schema_zh = generator.generate_schema()
+
+with language_context("ja-JP"):
+    # Generate schema in Japanese
+    schema_ja = generator.generate_schema()
+```
+
+## Schema Generation
+
+### Basic Schema Generation
+
+```python
+from flask_x_openapi_schema.x.flask.views import MethodViewOpenAPISchemaGenerator
+import yaml
+
+@app.route("/openapi.yaml")
+def get_openapi_spec():
+    generator = MethodViewOpenAPISchemaGenerator(
+        title="My API",
+        version="1.0.0",
+        description="API for managing resources",
+    )
+    
+    # Process MethodView resources
+    generator.process_methodview_resources(blueprint)
+    
+    # Generate the schema
+    schema = generator.generate_schema()
+    
+    # Convert to YAML
+    yaml_content = yaml.dump(
+        schema,
+        sort_keys=False,
+        default_flow_style=False,
+        allow_unicode=True,
+    )
+    
+    return yaml_content, 200, {"Content-Type": "text/yaml"}
+```
+
+### Serving Swagger UI
+
+```python
+@app.route("/")
+def index():
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>API Documentation</title>
+        <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.1/swagger-ui.min.css">
+    </head>
+    <body>
+        <div id="swagger-ui"></div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.1/swagger-ui-bundle.min.js"></script>
+        <script>
+            window.onload = function() {
+                SwaggerUIBundle({
+                    url: "/openapi.yaml",
+                    dom_id: "#swagger-ui",
+                    presets: [
+                        SwaggerUIBundle.presets.apis,
+                        SwaggerUIBundle.SwaggerUIStandalonePreset
+                    ],
+                    layout: "BaseLayout",
+                    validatorUrl: null,
+                    displayRequestDuration: true,
+                    syntaxHighlight: {
+                        activated: true,
+                        theme: "agate"
+                    }
+                });
+            }
+        </script>
+    </body>
+    </html>
+    """
+```
+
+## Best Practices
+
+### 1. Use Descriptive Operation IDs
+
+Operation IDs should be unique and descriptive:
+
+```python
+@openapi_metadata(
+    summary="Get all users",
+    operation_id="getAllUsers",  # Good
+    # ...
+)
+```
+
+Instead of:
+
+```python
+@openapi_metadata(
+    summary="Get all users",
+    operation_id="get",  # Bad - not descriptive
+    # ...
+)
+```
+
+### 2. Group Related Operations with Tags
+
+Use tags to group related operations:
+
+```python
+@openapi_metadata(
+    summary="Get all users",
+    tags=["users"],  # Group with other user operations
+    # ...
+)
+```
+
+### 3. Provide Comprehensive Response Documentation
+
+Document all possible response types:
+
+```python
+@openapi_metadata(
+    summary="Create a new user",
+    responses=OpenAPIMetaResponse(
+        responses={
+            "201": OpenAPIMetaResponseItem(
+                model=UserResponse,
+                description="User created successfully",
+            ),
+            "400": OpenAPIMetaResponseItem(
+                model=ErrorResponse,
+                description="Invalid request data",
+            ),
+            "409": OpenAPIMetaResponseItem(
+                model=ErrorResponse,
+                description="Username already exists",
+            ),
+            "500": OpenAPIMetaResponseItem(
+                model=ErrorResponse,
+                description="Internal server error",
+            ),
+        }
+    ),
+    # ...
+)
+```
+
+### 4. Use Pydantic Field Descriptions
+
+Add descriptions to all Pydantic fields:
+
+```python
+from pydantic import BaseModel, Field
+
+class UserCreateRequest(BaseModel):
+    username: str = Field(..., description="User's username")
+    email: str = Field(..., description="User's email address")
+    password: str = Field(..., description="User's password")
+    full_name: str = Field(None, description="User's full name")
+```
+
+### 5. Centralize Model Definitions
+
+Keep model definitions in a central location:
+
+```
+my_api/
+├── models/
+│   ├── __init__.py
+│   ├── request_models.py
+│   └── response_models.py
+```
+
+### 6. Use Consistent Naming Conventions
+
+Use consistent naming conventions for models and endpoints:
+
+- Request models: `{Resource}CreateRequest`, `{Resource}UpdateRequest`
+- Response models: `{Resource}Response`
+- Error models: `ErrorResponse`
+- List resources: `{Resource}ListResource`
+- Individual resources: `{Resource}Resource`
+
+### 7. Implement Proper Error Handling
+
+Use structured error responses:
+
+```python
+from flask_x_openapi_schema import BaseRespModel
+from pydantic import Field
+
+class ErrorResponse(BaseRespModel):
+    error_code: str = Field(..., description="Error code")
+    message: str = Field(..., description="Error message")
+    details: dict = Field(None, description="Additional error details")
+
+@openapi_metadata(
+    summary="Get a user by ID",
+    # ...
+)
+def get(self, user_id: str):
+    if user_id not in ["1", "2"]:
+        error = ErrorResponse(
+            error_code="USER_NOT_FOUND",
+            message=f"User with ID {user_id} not found",
+        )
+        return error.to_response(404)
+    
+    # ...
+```
+
+### 8. Use Pagination for List Endpoints
+
+Implement pagination for list endpoints:
+
+```python
+from pydantic import BaseModel, Field
+
+class PaginationParams(BaseModel):
+    page: int = Field(1, description="Page number")
+    per_page: int = Field(10, description="Items per page")
+
+class UserFilterParams(PaginationParams):
+    username: str = Field(None, description="Filter by username")
+    email: str = Field(None, description="Filter by email")
+
+@openapi_metadata(
+    summary="Get all users",
+    # ...
+)
+def get(self, _x_query: UserFilterParams = None):
+    # Implementation with pagination
+    # ...
+```
+
+### 9. Use Enums for Fixed Values
+
+Use enums for fields with fixed values:
+
+```python
+from enum import Enum
+from pydantic import BaseModel, Field
+
+class UserRole(str, Enum):
+    ADMIN = "admin"
+    USER = "user"
+    GUEST = "guest"
+
+class UserCreateRequest(BaseModel):
+    username: str = Field(..., description="User's username")
+    email: str = Field(..., description="User's email address")
+    password: str = Field(..., description="User's password")
+    role: UserRole = Field(UserRole.USER, description="User's role")
+```
+
+### 10. Implement Validation
+
+Use Pydantic validators for custom validation:
+
+```python
+from pydantic import BaseModel, Field, validator
+import re
+
+class UserCreateRequest(BaseModel):
+    username: str = Field(..., description="User's username")
+    email: str = Field(..., description="User's email address")
+    password: str = Field(..., description="User's password")
+    
+    @validator("username")
+    def username_must_be_valid(cls, v):
+        if not re.match(r"^[a-zA-Z0-9_]+$", v):
+            raise ValueError("Username must contain only letters, numbers, and underscores")
+        return v
+    
+    @validator("email")
+    def email_must_be_valid(cls, v):
+        if not re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", v):
+            raise ValueError("Email must be a valid email address")
+        return v
+    
+    @validator("password")
+    def password_must_be_strong(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        return v
+```
