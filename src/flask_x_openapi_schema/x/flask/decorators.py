@@ -111,59 +111,176 @@ class FlaskOpenAPIDecorator:
     def process_request_body(
         self, param_name: str, model: Type[BaseModel], kwargs: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Process request body parameters for Flask."""
+        """Process request body parameters for Flask.
+
+        Args:
+            param_name: The parameter name to bind the model instance to
+            model: The Pydantic model class to use for validation
+            kwargs: The keyword arguments to update
+
+        Returns:
+            Updated kwargs dictionary with the model instance
+        """
         from ...core.decorator_base import preprocess_request_data
+        from ...core.cache import MODEL_CACHE
+        import logging
 
+        logger = logging.getLogger(__name__)
+        logger.debug(
+            f"Processing request body for {param_name} with model {model.__name__}"
+        )
+        logger.debug(f"Request content type: {request.content_type}")
+        logger.debug(f"Request is_json: {request.is_json}")
+
+        # Skip processing if request is not JSON and not a form
+        if not request.is_json and not request.form and not request.files:
+            logger.warning(
+                f"Request is not JSON or form, skipping request body processing for {param_name}"
+            )
+            return kwargs
+
+        # Get data from request (JSON or form)
+        body_data = {}
         if request.is_json:
-            # Direct Flask approach
             body_data = request.get_json(silent=True) or {}
+        elif request.form:
+            # Convert form data to dict
+            body_data = {key: value for key, value in request.form.items()}
+            # Add files if present
+            if request.files:
+                for key, file in request.files.items():
+                    body_data[key] = file
+        logger.debug(f"Request body data: {body_data}")
 
-            # Pre-process the body data to handle list fields correctly
-            processed_body_data = preprocess_request_data(body_data, model)
+        # Create cache key for this request
+        from ...core.cache import make_cache_key
 
-            # Try to use model_validate first (better handling of complex types)
+        cache_key = make_cache_key(id(model), body_data)
+
+        # Check if we have a cached model instance
+        cached_instance = MODEL_CACHE.get(cache_key)
+        if cached_instance is not None:
+            logger.debug(f"Using cached model instance for {param_name}")
+            kwargs[param_name] = cached_instance
+            return kwargs
+
+        # Pre-process the body data to handle list fields correctly
+        processed_body_data = preprocess_request_data(body_data, model)
+        logger.debug(f"Processed body data: {processed_body_data}")
+
+        # Try to create model instance
+        try:
+            # Try model_validate first (better handling of complex types)
+            logger.debug(
+                f"Attempting to validate model {model.__name__} with processed data"
+            )
+            model_instance = model.model_validate(processed_body_data)
+            logger.debug(f"Model validation successful for {param_name}")
+        except Exception as e:
+            # Log the validation error and try fallback approach
+            logger.warning(
+                f"Validation error: {e}. Falling back to manual construction."
+            )
+
+            # Filter data to only include fields in the model
+            model_fields = model.model_fields
+            filtered_body_data = {
+                k: v for k, v in processed_body_data.items() if k in model_fields
+            }
+            logger.debug(f"Filtered body data: {filtered_body_data}")
+
+            # Create instance using constructor
             try:
-                model_instance = model.model_validate(processed_body_data)
-                kwargs[param_name] = model_instance
-            except Exception as e:
-                # Log the validation error for debugging
-                import logging
-
-                logging.getLogger(__name__).debug(
-                    f"Validation error: {e}. Falling back to manual construction."
-                )
-
-                # Fallback to the old approach if model_validate fails
-                # Filter body data to only include fields in the model
-                model_fields = model.model_fields
-                filtered_body_data = {
-                    k: v for k, v in processed_body_data.items() if k in model_fields
-                }
                 model_instance = model(**filtered_body_data)
-                kwargs[param_name] = model_instance
+                logger.debug(
+                    f"Created model instance using constructor for {param_name}"
+                )
+            except Exception as e2:
+                logger.error(f"Failed to create model instance: {e2}")
+                # Return empty model instance as fallback
+                try:
+                    # Try to create an empty instance with default values
+                    model_instance = model()
+                    logger.warning(
+                        f"Created empty model instance for {param_name} as fallback"
+                    )
+                except Exception as e3:
+                    logger.error(f"Failed to create empty model instance: {e3}")
+                    # Return kwargs unchanged if all attempts fail
+                    return kwargs
+
+        # Store in kwargs and cache
+        kwargs[param_name] = model_instance
+        MODEL_CACHE.set(cache_key, model_instance)
+        logger.debug(f"Stored model instance for {param_name} in kwargs and cache")
 
         return kwargs
 
     def process_query_params(
         self, param_name: str, model: Type[BaseModel], kwargs: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Process query parameters for Flask."""
-        # Direct Flask approach
+        """Process query parameters for Flask.
+
+        Args:
+            param_name: The parameter name to bind the model instance to
+            model: The Pydantic model class to use for validation
+            kwargs: The keyword arguments to update
+
+        Returns:
+            Updated kwargs dictionary with the model instance
+        """
+        from ...core.cache import MODEL_CACHE
+
+        # Extract query parameters from request
         query_data = {}
         model_fields = model.model_fields
+
+        # Only extract fields that exist in the model
         for field_name in model_fields:
             if field_name in request.args:
                 query_data[field_name] = request.args.get(field_name)
 
+        # Create cache key for this request
+        from ...core.cache import make_cache_key
+
+        cache_key = make_cache_key(id(model), query_data)
+
+        # Check if we have a cached model instance
+        cached_instance = MODEL_CACHE.get(cache_key)
+        if cached_instance is not None:
+            kwargs[param_name] = cached_instance
+            return kwargs
+
+        # Create model instance
         model_instance = model(**query_data)
+
+        # Store in kwargs and cache
         kwargs[param_name] = model_instance
+        MODEL_CACHE.set(cache_key, model_instance)
+
         return kwargs
 
     def process_additional_params(
         self, kwargs: Dict[str, Any], param_names: List[str]
     ) -> Dict[str, Any]:
-        """Process additional framework-specific parameters."""
+        """Process additional framework-specific parameters.
+
+        Args:
+            kwargs: The keyword arguments to update
+            param_names: List of parameter names that have been processed
+
+        Returns:
+            Updated kwargs dictionary
+        """
         # No additional processing needed for Flask
+        # Just log the parameters for debugging
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.debug(
+            f"Processing additional parameters with kwargs keys: {list(kwargs.keys())}"
+        )
+        logger.debug(f"Processed parameter names: {param_names}")
         return kwargs
 
 

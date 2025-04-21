@@ -129,17 +129,29 @@ def _extract_parameters_from_prefixes(
     Returns:
         Tuple of (request_body, query_model, path_params)
     """
-    # Create a cache key based on signature and type hints
+    # Create a cache key based on signature, type hints, and config prefixes
     # We use the signature's string representation and a frozenset of type hints items
+    # For config, we use the actual prefix values rather than the object identity
+    prefixes = get_parameter_prefixes(config)
     cache_key = (
         str(signature),
         str(frozenset(type_hints.items())),
-        id(config) if config else None,
+        prefixes,  # Use the actual prefix values for caching
+    )
+
+    # Debug information
+    import logging
+
+    logger = logging.getLogger(__name__)
+    logger.debug(
+        f"Extracting parameters with prefixes={prefixes}, signature={signature}, type_hints={type_hints}"
     )
 
     # Check if we've already cached this extraction
     if cache_key in PARAM_DETECTION_CACHE:
-        return PARAM_DETECTION_CACHE[cache_key]
+        cached_result = PARAM_DETECTION_CACHE[cache_key]
+        logger.debug(f"Using cached result: {cached_result}")
+        return cached_result
 
     request_body = None
     query_model = None
@@ -197,6 +209,11 @@ def _extract_parameters_from_prefixes(
     result = (request_body, query_model, path_params)
     PARAM_DETECTION_CACHE[cache_key] = result
 
+    # Debug information
+    logger.debug(
+        f"Extracted parameters: request_body={request_body}, query_model={query_model}, path_params={path_params}"
+    )
+
     return result
 
 
@@ -244,6 +261,11 @@ def _generate_openapi_metadata(
     Returns:
         OpenAPI metadata dictionary
     """
+    # Debug information
+    import logging
+
+    logger = logging.getLogger(__name__)
+    logger.debug(f"Generating OpenAPI metadata with request_body={actual_request_body}")
     metadata: Dict[str, Any] = {}
 
     # Use the specified language or get the current language
@@ -269,10 +291,14 @@ def _generate_openapi_metadata(
 
     # Handle request body
     if actual_request_body:
+        logger.debug(f"Processing request body: {actual_request_body}")
         if isinstance(actual_request_body, type) and issubclass(
             actual_request_body, BaseModel
         ):
             # It's a Pydantic model
+            logger.debug(
+                f"Request body is a Pydantic model: {actual_request_body.__name__}"
+            )
             # Check if the model has a Config with multipart/form-data flag
             is_multipart = False
             has_file_fields = False
@@ -280,22 +306,36 @@ def _generate_openapi_metadata(
             # Check model config for multipart/form-data flag
             if hasattr(actual_request_body, "model_config"):
                 config = getattr(actual_request_body, "model_config", {})
-                if isinstance(config, dict) and config.get("json_schema_extra", {}).get("multipart/form-data", False):
+                if isinstance(config, dict) and config.get("json_schema_extra", {}).get(
+                    "multipart/form-data", False
+                ):
                     is_multipart = True
-            elif hasattr(actual_request_body, "Config") and hasattr(actual_request_body.Config, "json_schema_extra"):
-                config_extra = getattr(actual_request_body.Config, "json_schema_extra", {})
+            elif hasattr(actual_request_body, "Config") and hasattr(
+                actual_request_body.Config, "json_schema_extra"
+            ):
+                config_extra = getattr(
+                    actual_request_body.Config, "json_schema_extra", {}
+                )
                 is_multipart = config_extra.get("multipart/form-data", False)
 
             # Check if model has any file fields
             if hasattr(actual_request_body, "model_fields"):
                 for field_name, field_info in actual_request_body.model_fields.items():
                     field_schema = getattr(field_info, "json_schema_extra", None)
-                    if field_schema is not None and field_schema.get("format") == "binary":
+                    if (
+                        field_schema is not None
+                        and field_schema.get("format") == "binary"
+                    ):
                         has_file_fields = True
                         break
 
             # If model has file fields or is explicitly marked as multipart/form-data, use multipart/form-data
-            content_type = "multipart/form-data" if (is_multipart or has_file_fields) else "application/json"
+            content_type = (
+                "multipart/form-data"
+                if (is_multipart or has_file_fields)
+                else "application/json"
+            )
+            logger.debug(f"Using content type: {content_type}")
 
             metadata["requestBody"] = {
                 "content": {
@@ -307,8 +347,10 @@ def _generate_openapi_metadata(
                 },
                 "required": True,
             }
+            logger.debug(f"Added requestBody to metadata: {metadata['requestBody']}")
         else:
             # It's a dict
+            logger.debug(f"Request body is a dict: {actual_request_body}")
             metadata["requestBody"] = actual_request_body
 
     # Handle responses
@@ -498,6 +540,13 @@ class OpenAPIDecoratorBase:
         if func in FUNCTION_METADATA_CACHE:
             cached_data = FUNCTION_METADATA_CACHE[func]
 
+            # Debug information
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Using cached metadata for function {func.__name__}")
+            logger.debug(f"Cached metadata: {cached_data['metadata']}")
+
             # Create a wrapper function that reuses the cached metadata
             @wraps(func)
             def cached_wrapper(*args, **kwargs):
@@ -548,6 +597,14 @@ class OpenAPIDecoratorBase:
             id(actual_query_model) if actual_query_model else None,
             str(actual_path_params) if actual_path_params else None,
             self.language,
+        )
+
+        # Debug information
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.debug(
+            f"Generating metadata with request_body={actual_request_body}, query_model={actual_query_model}, path_params={actual_path_params}"
         )
 
         # Check if we've already generated metadata for these parameters
@@ -623,10 +680,15 @@ class OpenAPIDecoratorBase:
 
                         model_parameters.append(param)
 
-                # Cache the result (limit cache size to prevent memory issues)
+                # Cache the parameters (limit cache size to prevent memory issues)
                 if len(OPENAPI_PARAMS_CACHE) > 1000:  # Limit cache size
                     OPENAPI_PARAMS_CACHE.clear()
                 OPENAPI_PARAMS_CACHE[cache_key] = model_parameters
+
+            # Add parameters to metadata
+            if model_parameters:
+                metadata["parameters"] = model_parameters
+                logger.debug(f"Added parameters to metadata: {model_parameters}")
 
             openapi_parameters.extend(model_parameters)
 

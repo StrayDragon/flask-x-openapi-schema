@@ -197,7 +197,9 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
             # This is an OpenAPIMetaResponse object
             for status_code, response_item in metadata["responses"].responses.items():
                 if response_item.model:
-                    print(f"Registering response model from _register_models_from_method: {response_item.model.__name__} for status code {status_code}")
+                    print(
+                        f"Registering response model from _register_models_from_method: {response_item.model.__name__} for status code {status_code}"
+                    )
                     # Register the response model
                     self._register_model(response_item.model)
 
@@ -276,11 +278,13 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
                     if "parameters" in metadata:
                         # Filter out any existing path parameters with the same name
                         existing_path_param_names = [
-                            p["name"] for p in metadata["parameters"]
+                            p["name"]
+                            for p in metadata["parameters"]
                             if p.get("in") == "path"
                         ]
                         new_path_params = [
-                            p for p in path_parameters
+                            p
+                            for p in path_parameters
                             if p["name"] not in existing_path_param_names
                         ]
                         metadata["parameters"].extend(new_path_params)
@@ -305,30 +309,44 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
                     # Check model config for multipart/form-data flag
                     if hasattr(param_type, "model_config"):
                         config = getattr(param_type, "model_config", {})
-                        if isinstance(config, dict) and config.get("json_schema_extra", {}).get("multipart/form-data", False):
+                        if isinstance(config, dict) and config.get(
+                            "json_schema_extra", {}
+                        ).get("multipart/form-data", False):
                             is_file_upload = True
-                    elif hasattr(param_type, "Config") and hasattr(param_type.Config, "json_schema_extra"):
-                        config_extra = getattr(param_type.Config, "json_schema_extra", {})
+                    elif hasattr(param_type, "Config") and hasattr(
+                        param_type.Config, "json_schema_extra"
+                    ):
+                        config_extra = getattr(
+                            param_type.Config, "json_schema_extra", {}
+                        )
                         is_file_upload = config_extra.get("multipart/form-data", False)
 
                     # Check if model has any binary fields
                     if hasattr(param_type, "model_fields"):
                         for field_name, field_info in param_type.model_fields.items():
-                            field_schema = getattr(field_info, "json_schema_extra", None)
-                            if field_schema is not None and field_schema.get("format") == "binary":
+                            field_schema = getattr(
+                                field_info, "json_schema_extra", None
+                            )
+                            if (
+                                field_schema is not None
+                                and field_schema.get("format") == "binary"
+                            ):
                                 has_binary_fields = True
                                 break
 
                     # If this is a file upload model, update the requestBody content type
                     if is_file_upload or has_binary_fields:
-                        if "requestBody" in metadata and "content" in metadata["requestBody"]:
+                        if (
+                            "requestBody" in metadata
+                            and "content" in metadata["requestBody"]
+                        ):
                             # Replace application/json with multipart/form-data
                             if "application/json" in metadata["requestBody"]["content"]:
-                                schema = metadata["requestBody"]["content"]["application/json"]["schema"]
+                                schema = metadata["requestBody"]["content"][
+                                    "application/json"
+                                ]["schema"]
                                 metadata["requestBody"]["content"] = {
-                                    "multipart/form-data": {
-                                        "schema": schema
-                                    }
+                                    "multipart/form-data": {"schema": schema}
                                 }
                             # If no content type is specified, add multipart/form-data
                             elif not metadata["requestBody"]["content"]:
@@ -349,44 +367,63 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
                                         }
                                     }
                                 },
-                                "required": True
+                                "required": True,
                             }
 
                         # Remove any file parameters from parameters as they will be included in the requestBody
                         if "parameters" in metadata:
                             # Keep only path and query parameters
                             metadata["parameters"] = [
-                                p for p in metadata["parameters"]
+                                p
+                                for p in metadata["parameters"]
                                 if p["in"] in ["path", "query"]
                             ]
 
             # Process responses in metadata
-            if "responses" in metadata and hasattr(metadata["responses"], "to_openapi_dict"):
+            if "responses" in metadata and hasattr(
+                metadata["responses"], "to_openapi_dict"
+            ):
                 # Register response models
                 if hasattr(metadata["responses"], "responses"):
-                    print(f"Found OpenAPIMetaResponse with {len(metadata['responses'].responses)} responses")
-                    for status_code, response_item in metadata["responses"].responses.items():
+                    print(
+                        f"Found OpenAPIMetaResponse with {len(metadata['responses'].responses)} responses"
+                    )
+                    for status_code, response_item in metadata[
+                        "responses"
+                    ].responses.items():
                         print(f"Processing response for status code {status_code}")
                         if response_item.model:
-                            print(f"Registering model from _process_methodview: {response_item.model.__name__}")
+                            print(
+                                f"Registering model from _process_methodview: {response_item.model.__name__}"
+                            )
                             # Force register the model and its nested models
                             self._register_model(response_item.model)
 
                             # Also register any enum types used in the model
                             if hasattr(response_item.model, "model_fields"):
-                                for field_name, field_info in response_item.model.model_fields.items():
+                                for (
+                                    field_name,
+                                    field_info,
+                                ) in response_item.model.model_fields.items():
                                     field_type = field_info.annotation
                                     # Check if field is an enum
-                                    if hasattr(field_type, "__origin__") and field_type.__origin__ is not None:
+                                    if (
+                                        hasattr(field_type, "__origin__")
+                                        and field_type.__origin__ is not None
+                                    ):
                                         # Handle container types like List[Enum]
                                         args = getattr(field_type, "__args__", [])
                                         for arg in args:
                                             if hasattr(arg, "__members__"):
-                                                print(f"Registering enum type: {arg.__name__}")
+                                                print(
+                                                    f"Registering enum type: {arg.__name__}"
+                                                )
                                                 self._register_model(arg)
                                     elif hasattr(field_type, "__members__"):
                                         # Direct enum type
-                                        print(f"Registering enum type: {field_type.__name__}")
+                                        print(
+                                            f"Registering enum type: {field_type.__name__}"
+                                        )
                                         self._register_model(field_type)
 
                 # Convert OpenAPIMetaResponse to dict

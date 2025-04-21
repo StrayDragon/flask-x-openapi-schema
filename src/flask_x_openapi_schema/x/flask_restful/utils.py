@@ -5,7 +5,7 @@ Utilities for integrating Pydantic models with Flask-RESTful.
 import inspect
 from collections.abc import Callable
 from enum import Enum
-from typing import Any, Optional, Union, Type, get_type_hints
+from typing import Any, Optional, Union
 
 try:
     from flask_restful import reqparse  # type: ignore
@@ -77,7 +77,9 @@ def pydantic_model_to_reqparse(
 
         # Check if this is a file field
         is_file_field = False
-        if inspect.isclass(field_info.annotation) and issubclass(field_info.annotation, FileField):
+        if inspect.isclass(field_info.annotation) and issubclass(
+            field_info.annotation, FileField
+        ):
             is_file_field = True
 
         # Add argument to parser with appropriate settings

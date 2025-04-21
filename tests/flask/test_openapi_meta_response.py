@@ -6,19 +6,27 @@ from flask import Blueprint
 from flask.views import MethodView
 from pydantic import BaseModel, Field
 
-from flask_x_openapi_schema import OpenAPIMethodViewMixin, OpenAPIMetaResponse, OpenAPIMetaResponseItem
+from flask_x_openapi_schema import (
+    OpenAPIMethodViewMixin,
+    OpenAPIMetaResponse,
+    OpenAPIMetaResponseItem,
+)
 from flask_x_openapi_schema.x.flask import openapi_metadata
 from flask_x_openapi_schema.x.flask.views import MethodViewOpenAPISchemaGenerator
 
 
-class TestModel(BaseModel):
+# Renamed to avoid pytest collection warning
+class SampleRequestModel(BaseModel):
     """Test model for request."""
+
     name: str = Field(..., description="The name")
     age: int = Field(..., description="The age")
 
 
-class TestResponseModel(BaseModel):
+# Renamed to avoid pytest collection warning
+class SampleResponseModel(BaseModel):
     """Test model for response."""
+
     id: str = Field(..., description="The ID")
     name: str = Field(..., description="The name")
     age: int = Field(..., description="The age")
@@ -26,6 +34,7 @@ class TestResponseModel(BaseModel):
 
 class ErrorResponseModel(BaseModel):
     """Error response model."""
+
     error_code: str = Field(..., description="Error code")
     message: str = Field(..., description="Error message")
 
@@ -45,7 +54,7 @@ class TestOpenAPIMetaResponse:
                 responses=OpenAPIMetaResponse(
                     responses={
                         "200": OpenAPIMetaResponseItem(
-                            model=TestResponseModel,
+                            model=SampleResponseModel,
                             description="Successful response",
                         ),
                         "400": OpenAPIMetaResponseItem(
@@ -59,7 +68,7 @@ class TestOpenAPIMetaResponse:
                     }
                 ),
             )
-            def get(self, _x_query: TestModel = None):
+            def get(self, _x_query: SampleRequestModel = None):
                 """Get test data."""
                 return {"id": "123", "name": "Test", "age": 30}
 
@@ -75,7 +84,7 @@ class TestOpenAPIMetaResponse:
         generator.process_methodview_resources(bp)
 
         # Manually register response models
-        generator._register_model(TestResponseModel)
+        generator._register_model(SampleResponseModel)
         generator._register_model(ErrorResponseModel)
 
         # Generate the schema
@@ -91,19 +100,25 @@ class TestOpenAPIMetaResponse:
         assert "get" in schema["paths"]["/api/test"]
 
         # Check that response models were registered in components/schemas
-        assert "TestResponseModel" in schema["components"]["schemas"]
+        assert "SampleResponseModel" in schema["components"]["schemas"]
         assert "ErrorResponseModel" in schema["components"]["schemas"]
 
         # Check that the response references are correct
         assert (
-            schema["paths"]["/api/test"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
-            == "#/components/schemas/TestResponseModel"
+            schema["paths"]["/api/test"]["get"]["responses"]["200"]["content"][
+                "application/json"
+            ]["schema"]["$ref"]
+            == "#/components/schemas/SampleResponseModel"
         )
         assert (
-            schema["paths"]["/api/test"]["get"]["responses"]["400"]["content"]["application/json"]["schema"]["$ref"]
+            schema["paths"]["/api/test"]["get"]["responses"]["400"]["content"][
+                "application/json"
+            ]["schema"]["$ref"]
             == "#/components/schemas/ErrorResponseModel"
         )
         assert (
-            schema["paths"]["/api/test"]["get"]["responses"]["500"]["content"]["application/json"]["schema"]["$ref"]
+            schema["paths"]["/api/test"]["get"]["responses"]["500"]["content"][
+                "application/json"
+            ]["schema"]["$ref"]
             == "#/components/schemas/ErrorResponseModel"
         )

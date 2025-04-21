@@ -2,12 +2,13 @@
 OpenAPI Schema Generator for API documentation.
 
 This module provides the main class for generating OpenAPI schemas from Flask-RESTful resources.
+It handles scanning resources, extracting metadata, and generating a complete OpenAPI schema.
 """
 
 import re
 import threading
 from functools import lru_cache
-from typing import Any, Dict, Optional, Set, get_type_hints
+from typing import Any, Dict, List, Optional, Set, Type, get_type_hints
 
 from flask import Blueprint
 from flask_restful import Resource  # type: ignore
@@ -15,7 +16,8 @@ from pydantic import BaseModel
 
 from ..i18n.i18n_model import I18nBaseModel
 from ..i18n.i18n_string import I18nStr, get_current_language
-from .utils import pydantic_to_openapi_schema
+from .config import get_openapi_config
+from .utils import pydantic_to_openapi_schema, process_i18n_dict, process_i18n_value
 
 
 class OpenAPISchemaGenerator:
@@ -28,38 +30,51 @@ class OpenAPISchemaGenerator:
 
     def __init__(
         self,
-        title: str,
-        version: str,
-        description: str = "",
+        title: Optional[str] = None,
+        version: Optional[str] = None,
+        description: Optional[str] = None,
         language: Optional[str] = None,
     ):
         """
         Initialize the OpenAPI schema generator.
 
         Args:
-            title: The title of the API
-            version: The version of the API
-            description: The description of the API
+            title: The title of the API (default: from config)
+            version: The version of the API (default: from config)
+            description: The description of the API (default: from config)
             language: The language to use for internationalized strings (default: current language)
         """
+        # Get defaults from config if not provided
+        config = get_openapi_config()
+
         # Handle I18nString for title and description
-        self.title = title.get(language) if isinstance(title, I18nStr) else title
-        self.version = version
+        self.title = title if title is not None else config.title
+        if isinstance(self.title, I18nStr):
+            self.title = self.title.get(language)
+
+        self.version = version if version is not None else config.version
+
         self.description = (
-            description.get(language)
-            if isinstance(description, I18nStr)
-            else description
+            description if description is not None else config.description
         )
+        if isinstance(self.description, I18nStr):
+            self.description = self.description.get(language)
+
         self.language = language or get_current_language()
-        self.paths: dict[str, dict[str, Any]] = {}
-        self.components: dict[str, dict[str, Any]] = {
+
+        # Initialize data structures
+        self.paths: Dict[str, Dict[str, Any]] = {}
+        self.components: Dict[str, Dict[str, Any]] = {
             "schemas": {},
-            "securitySchemes": {},
+            "securitySchemes": config.security_schemes.copy()
+            if config.security_schemes
+            else {},
         }
-        self.tags: list[dict[str, str]] = []
-        self._registered_models: Set[type[BaseModel]] = set()
+        self.tags: List[Dict[str, str]] = []
+        self._registered_models: Set[Type[BaseModel]] = set()
 
         # Thread safety locks
+        self._lock = threading.RLock()  # Main lock for coordinating access
         self._paths_lock = threading.RLock()
         self._components_lock = threading.RLock()
         self._tags_lock = threading.RLock()
@@ -141,7 +156,11 @@ class OpenAPISchemaGenerator:
                             operation["parameters"] = []
 
                         # Add path parameters without duplicates
-                        existing_param_names = {p["name"] for p in operation["parameters"] if p["in"] == "path"}
+                        existing_param_names = {
+                            p["name"]
+                            for p in operation["parameters"]
+                            if p["in"] == "path"
+                        }
                         for param in path_params:
                             if param["name"] not in existing_param_names:
                                 operation["parameters"].append(param)
@@ -325,9 +344,13 @@ class OpenAPISchemaGenerator:
                 # Check model config for multipart/form-data flag
                 if hasattr(param_type, "model_config"):
                     config = getattr(param_type, "model_config", {})
-                    if isinstance(config, dict) and config.get("json_schema_extra", {}).get("multipart/form-data", False):
+                    if isinstance(config, dict) and config.get(
+                        "json_schema_extra", {}
+                    ).get("multipart/form-data", False):
                         is_file_upload = True
-                elif hasattr(param_type, "Config") and hasattr(param_type.Config, "json_schema_extra"):
+                elif hasattr(param_type, "Config") and hasattr(
+                    param_type.Config, "json_schema_extra"
+                ):
                     config_extra = getattr(param_type.Config, "json_schema_extra", {})
                     is_file_upload = config_extra.get("multipart/form-data", False)
 
@@ -335,12 +358,19 @@ class OpenAPISchemaGenerator:
                 if hasattr(param_type, "model_fields"):
                     for field_name, field_info in param_type.model_fields.items():
                         field_schema = getattr(field_info, "json_schema_extra", None)
-                        if field_schema is not None and field_schema.get("format") == "binary":
+                        if (
+                            field_schema is not None
+                            and field_schema.get("format") == "binary"
+                        ):
                             has_binary_fields = True
                             break
 
                 # Determine content type based on model properties
-                content_type = "multipart/form-data" if (is_file_upload or has_binary_fields) else "application/json"
+                content_type = (
+                    "multipart/form-data"
+                    if (is_file_upload or has_binary_fields)
+                    else "application/json"
+                )
 
                 # Add request body with appropriate content type
                 operation["requestBody"] = {
@@ -360,7 +390,8 @@ class OpenAPISchemaGenerator:
                     if "parameters" in operation:
                         # Keep only path and query parameters
                         operation["parameters"] = [
-                            p for p in operation["parameters"]
+                            p
+                            for p in operation["parameters"]
                             if p["in"] in ["path", "query"]
                         ]
                 break
@@ -409,52 +440,43 @@ class OpenAPISchemaGenerator:
         Args:
             model: The model to register (Pydantic model or enum)
         """
-        print(f"Attempting to register model: {model.__name__}")
-
         with self._models_lock:
             # Skip if already registered
             if model in self._registered_models:
-                print(f"Model {model.__name__} already registered, skipping")
                 return
 
             # Add to registered models set
             self._registered_models.add(model)
-            print(f"Added {model.__name__} to registered models set")
 
         # Handle enum types
         if hasattr(model, "__members__"):
             # This is an enum type
             with self._components_lock:
-                enum_schema = {
-                    "type": "string",
-                    "enum": [e.value for e in model]
-                }
+                enum_schema = {"type": "string", "enum": [e.value for e in model]}
 
                 if model.__name__ not in self.components["schemas"]:
                     self.components["schemas"][model.__name__] = enum_schema
-                    print(f"Added enum {model.__name__} to components/schemas")
             return
 
         # Handle Pydantic models
         if not issubclass(model, BaseModel):
-            print(f"Warning: {model.__name__} is not a BaseModel or enum, skipping")
             return
 
         # Generate schema (thread-safe via utils.py caching)
-        if issubclass(model, I18nBaseModel):
-            # Create a language-specific version of the model
-            language_model = model.for_language(self.language)
-            schema = pydantic_to_openapi_schema(language_model)
-            print(f"Generated schema for I18nBaseModel {model.__name__}")
-        else:
-            # Use the cached version from utils.py
-            schema = pydantic_to_openapi_schema(model)
-            print(f"Generated schema for BaseModel {model.__name__}")
+        try:
+            if issubclass(model, I18nBaseModel):
+                # Create a language-specific version of the model
+                language_model = model.for_language(self.language)
+                schema = pydantic_to_openapi_schema(language_model)
+            else:
+                # Use the cached version from utils.py
+                schema = pydantic_to_openapi_schema(model)
 
-        # Update components in a thread-safe manner
-        with self._components_lock:
-            self.components["schemas"][model.__name__] = schema
-            print(f"Added {model.__name__} to components/schemas")
+            # Update components in a thread-safe manner
+            with self._components_lock:
+                self.components["schemas"][model.__name__] = schema
+        except Exception as e:
+            print(f"Error registering model {model.__name__}: {e}")
 
         # Register nested models
         self._register_nested_models(model)
@@ -473,11 +495,9 @@ class OpenAPISchemaGenerator:
         # Check each field for nested models
         for field_name, field_info in model.model_fields.items():
             field_type = field_info.annotation
-            print(f"Checking field {field_name} with type {field_type}")
 
             # Handle direct BaseModel references
             if isinstance(field_type, type) and issubclass(field_type, BaseModel):
-                print(f"Found nested model {field_type.__name__} in field {field_name}")
                 self._register_model(field_type)
                 continue
 
@@ -488,16 +508,14 @@ class OpenAPISchemaGenerator:
             if origin and args:
                 for arg in args:
                     if isinstance(arg, type) and issubclass(arg, BaseModel):
-                        print(f"Found nested model {arg.__name__} in container field {field_name}")
                         self._register_model(arg)
                     elif hasattr(arg, "__members__"):
                         # Handle enum types
-                        print(f"Found enum type {arg.__name__} in container field {field_name}")
                         # Register enum in components/schemas
                         with self._components_lock:
                             enum_schema = {
                                 "type": "string",
-                                "enum": [e.value for e in arg]
+                                "enum": [e.value for e in arg],
                             }
 
                             if arg.__name__ not in self.components["schemas"]:
@@ -505,12 +523,11 @@ class OpenAPISchemaGenerator:
 
             # Handle enum types directly
             elif hasattr(field_type, "__members__"):
-                print(f"Found enum type {field_type.__name__} in field {field_name}")
                 # Register enum in components/schemas
                 with self._components_lock:
                     enum_schema = {
                         "type": "string",
-                        "enum": [e.value for e in field_type]
+                        "enum": [e.value for e in field_type],
                     }
 
                     if field_type.__name__ not in self.components["schemas"]:
@@ -526,17 +543,7 @@ class OpenAPISchemaGenerator:
         Returns:
             A new dictionary with I18nString values converted to strings
         """
-        result = {}
-        for key, value in data.items():
-            if isinstance(value, I18nStr):
-                result[key] = value.get(self.language)
-            elif isinstance(value, dict):
-                result[key] = self._process_i18n_dict(value)
-            elif isinstance(value, list):
-                result[key] = [self._process_i18n_value(item) for item in value]
-            else:
-                result[key] = value
-        return result
+        return process_i18n_dict(data, self.language)
 
     def _process_i18n_value(self, value: Any) -> Any:
         """
@@ -548,30 +555,25 @@ class OpenAPISchemaGenerator:
         Returns:
             The processed value
         """
-        if isinstance(value, I18nStr):
-            return value.get(self.language)
-        elif isinstance(value, dict):
-            return self._process_i18n_dict(value)
-        elif isinstance(value, list):
-            return [self._process_i18n_value(item) for item in value]
-        else:
-            return value
+        return process_i18n_value(value, self.language)
 
-    def generate_schema(self) -> dict[str, Any]:
+    def generate_schema(self) -> Dict[str, Any]:
         """
         Generate the complete OpenAPI schema.
 
         Returns:
             The OpenAPI schema as a dictionary
         """
-        return {
-            "openapi": "3.0.3",
-            "info": {
-                "title": self.title,
-                "version": self.version,
-                "description": self.description,
-            },
-            "paths": self.paths,
-            "components": self.components,
-            "tags": self.tags,
-        }
+        # Use a lock to ensure consistent state during schema generation
+        with self._lock:
+            return {
+                "openapi": "3.0.3",
+                "info": {
+                    "title": self.title,
+                    "version": self.version,
+                    "description": self.description,
+                },
+                "paths": self.paths,
+                "components": self.components,
+                "tags": self.tags,
+            }

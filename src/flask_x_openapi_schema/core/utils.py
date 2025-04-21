@@ -1,22 +1,27 @@
 """
 Utility functions for OpenAPI schema generation.
+
+This module provides utility functions for converting Pydantic models to OpenAPI schemas,
+handling references, and processing internationalized strings.
 """
 
 import inspect
 from datetime import date, datetime, time
 from enum import Enum
 from functools import lru_cache
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Tuple, Type, Union
 from uuid import UUID
 
 from pydantic import BaseModel
 
-from .cache import MODEL_SCHEMA_CACHE
+from .cache import MODEL_SCHEMA_CACHE, make_cache_key
 
 
-def pydantic_to_openapi_schema(model: type[BaseModel]) -> dict[str, Any]:
+@lru_cache(maxsize=256)
+def pydantic_to_openapi_schema(model: Type[BaseModel]) -> Dict[str, Any]:
     """
     Convert a Pydantic model to an OpenAPI schema.
+    This function is cached to improve performance for frequently used models.
 
     Args:
         model: The Pydantic model to convert
@@ -30,41 +35,39 @@ def pydantic_to_openapi_schema(model: type[BaseModel]) -> dict[str, Any]:
     if cached_schema is not None:
         return cached_schema
 
-    schema: dict[str, Any] = {"type": "object", "properties": {}, "required": []}
+    # Initialize schema with default values
+    schema: Dict[str, Any] = {"type": "object", "properties": {}, "required": []}
 
-    # Get model schema from Pydantic
-    model_schema = model.model_json_schema()
+    try:
+        # Get model schema from Pydantic
+        model_schema = model.model_json_schema()
 
-    # Extract properties and required fields
-    if "properties" in model_schema:
-        # Process properties to fix references
-        properties = {}
-        for prop_name, prop_schema in model_schema["properties"].items():
-            properties[prop_name] = _fix_references(prop_schema)
-        schema["properties"] = properties
-    else:
-        schema["properties"] = {}
+        # Extract properties and required fields
+        if "properties" in model_schema:
+            # Process properties to fix references
+            properties = {}
+            for prop_name, prop_schema in model_schema["properties"].items():
+                properties[prop_name] = _fix_references(prop_schema)
+            schema["properties"] = properties
 
-    # Handle $defs in Pydantic v2
-    if "$defs" in model_schema:
-        # We don't need to include $defs in our schema, as we'll register these models separately
-        # But we do need to fix references to them
-        pass
+        # Copy required fields if present
+        if "required" in model_schema:
+            schema["required"] = model_schema["required"]
 
-    if "required" in model_schema:
-        schema["required"] = model_schema["required"]
+        # Add description if available
+        if model.__doc__:
+            schema["description"] = model.__doc__.strip()
 
-    # Add description if available
-    if model.__doc__:
-        schema["description"] = model.__doc__.strip()
-
-    # Cache the schema
-    MODEL_SCHEMA_CACHE.set(model_key, schema)
+        # Cache the schema
+        MODEL_SCHEMA_CACHE.set(model_key, schema)
+    except Exception as e:
+        # Log error but continue with default schema
+        print(f"Error generating schema for {model.__name__}: {e}")
 
     return schema
 
 
-def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
+def _fix_references(schema: Dict[str, Any]) -> Dict[str, Any]:
     """
     Fix references in a schema to use components/schemas instead of $defs.
     Also applies any json_schema_extra attributes to the schema.
@@ -75,9 +78,34 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
     Returns:
         The fixed schema
     """
+    # Handle non-dict inputs
     if not isinstance(schema, dict):
         return schema
 
+    # Fast path for schemas without references or special handling
+    has_ref = (
+        "$ref" in schema
+        and isinstance(schema["$ref"], str)
+        and "#/$defs/" in schema["$ref"]
+    )
+    has_extra = "json_schema_extra" in schema
+    has_file = (
+        "type" in schema
+        and schema["type"] == "string"
+        and "format" in schema
+        and schema["format"] == "binary"
+    )
+
+    # Check for nested structures only if needed
+    has_nested = False
+    if not (has_ref or has_extra or has_file):
+        has_nested = any(isinstance(v, (dict, list)) for v in schema.values())
+
+    # If no special handling needed, return schema as is
+    if not (has_ref or has_extra or has_nested or has_file):
+        return schema.copy()
+
+    # Process schema with special handling
     result = {}
     for key, value in schema.items():
         if key == "$ref" and isinstance(value, str) and "#/$defs/" in value:
@@ -87,30 +115,39 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
         elif key == "json_schema_extra" and isinstance(value, dict):
             # Apply json_schema_extra attributes directly to the schema
             for extra_key, extra_value in value.items():
-                if extra_key == "multipart/form-data":
-                    # Skip this key, it's handled elsewhere
-                    continue
-                result[extra_key] = extra_value
+                if (
+                    extra_key != "multipart/form-data"
+                ):  # Skip this key, it's handled elsewhere
+                    result[extra_key] = extra_value
         elif isinstance(value, dict):
             result[key] = _fix_references(value)
-        elif isinstance(value, list):
-            result[key] = [_fix_references(item) if isinstance(item, dict) else item for item in value]
+        elif isinstance(value, list) and any(isinstance(item, dict) for item in value):
+            # Process lists containing dictionaries
+            result[key] = [
+                _fix_references(item) if isinstance(item, dict) else item
+                for item in value
+            ]
         else:
-            result[key] = value
+            # Copy lists or use value directly for other types
+            result[key] = (
+                value.copy()
+                if isinstance(value, list) and hasattr(value, "copy")
+                else value
+            )
 
-    # Check if this is a file field
-    if "type" in result and result["type"] == "string" and "format" in result and result["format"] == "binary":
-        # This is a file field, ensure it has the correct format
+    # Ensure file fields have the correct format
+    if has_file:
         result["type"] = "string"
         result["format"] = "binary"
 
     return result
 
 
-@lru_cache(maxsize=128)
-def python_type_to_openapi_type(python_type: Any) -> dict[str, Any]:
+@lru_cache(maxsize=256)
+def python_type_to_openapi_type(python_type: Any) -> Dict[str, Any]:
     """
     Convert a Python type to an OpenAPI type.
+    This function is cached to improve performance for frequently used types.
 
     Args:
         python_type: The Python type to convert
@@ -118,7 +155,7 @@ def python_type_to_openapi_type(python_type: Any) -> dict[str, Any]:
     Returns:
         The OpenAPI type definition
     """
-    # Handle primitive types
+    # Fast lookup for common primitive types
     if python_type is str:
         return {"type": "string"}
     elif python_type is int:
@@ -127,17 +164,24 @@ def python_type_to_openapi_type(python_type: Any) -> dict[str, Any]:
         return {"type": "number"}
     elif python_type is bool:
         return {"type": "boolean"}
-    elif python_type is list or getattr(python_type, "__origin__", None) is list:
+    elif python_type is None or python_type is type(None):
+        return {"type": "null"}
+
+    # Handle container types
+    origin = getattr(python_type, "__origin__", None)
+    if python_type is list or origin is list:
         # Handle List[X]
         args = getattr(python_type, "__args__", [])
         if args:
             item_type = python_type_to_openapi_type(args[0])
             return {"type": "array", "items": item_type}
         return {"type": "array"}
-    elif python_type is dict or getattr(python_type, "__origin__", None) is dict:
+    elif python_type is dict or origin is dict:
         # Handle Dict[X, Y]
         return {"type": "object"}
-    elif python_type == UUID:
+
+    # Handle special types
+    if python_type == UUID:
         return {"type": "string", "format": "uuid"}
     elif python_type == datetime:
         return {"type": "string", "format": "date-time"}
@@ -145,12 +189,24 @@ def python_type_to_openapi_type(python_type: Any) -> dict[str, Any]:
         return {"type": "string", "format": "date"}
     elif python_type == time:
         return {"type": "string", "format": "time"}
-    elif inspect.isclass(python_type) and issubclass(python_type, Enum):
-        # Handle Enum types
-        return {"type": "string", "enum": [e.value for e in python_type]}
-    elif inspect.isclass(python_type) and issubclass(python_type, BaseModel):
-        # Handle Pydantic models
-        return {"$ref": f"#/components/schemas/{python_type.__name__}"}
+
+    # Handle class types
+    if inspect.isclass(python_type):
+        if issubclass(python_type, Enum):
+            # Handle Enum types
+            return {"type": "string", "enum": [e.value for e in python_type]}
+        elif issubclass(python_type, BaseModel):
+            # Handle Pydantic models
+            return {"$ref": f"#/components/schemas/{python_type.__name__}"}
+
+    # Handle Optional[X] types
+    if origin is Union:
+        args = getattr(python_type, "__args__", [])
+        if len(args) == 2 and args[1] is type(None):
+            # This is Optional[X]
+            inner_type = python_type_to_openapi_type(args[0])
+            inner_type["nullable"] = True
+            return inner_type
 
     # Default to string for unknown types
     return {"type": "string"}
@@ -250,9 +306,15 @@ def responses_schema(
     return responses
 
 
+# Cache for i18n processing to avoid repeated conversions
+_I18N_CACHE: Dict[Tuple, Any] = {}
+MAX_I18N_CACHE_SIZE = 1000
+
+
 def process_i18n_value(value: Any, language: str) -> Any:
     """
     Process a value that might be an I18nString or contain I18nString values.
+    Uses caching to improve performance for repeated conversions.
 
     Args:
         value: The value to process
@@ -263,19 +325,37 @@ def process_i18n_value(value: Any, language: str) -> Any:
     """
     from ..i18n.i18n_string import I18nStr
 
-    if isinstance(value, I18nStr):
-        return value.get(language)
-    elif isinstance(value, dict):
-        return process_i18n_dict(value, language)
-    elif isinstance(value, list):
-        return [process_i18n_value(item, language) for item in value]
-    else:
+    # Fast path for non-container types that aren't I18nStr
+    if not isinstance(value, (I18nStr, dict, list)):
         return value
+
+    # Try to use cached result
+    cache_key = make_cache_key(id(value), language)
+    if cache_key in _I18N_CACHE:
+        return _I18N_CACHE[cache_key]
+
+    # Process based on type
+    result = None
+    if isinstance(value, I18nStr):
+        result = value.get(language)
+    elif isinstance(value, dict):
+        result = process_i18n_dict(value, language)
+    elif isinstance(value, list):
+        result = [process_i18n_value(item, language) for item in value]
+    else:
+        result = value
+
+    # Cache the result if cache isn't too large
+    if len(_I18N_CACHE) < MAX_I18N_CACHE_SIZE:
+        _I18N_CACHE[cache_key] = result
+
+    return result
 
 
 def process_i18n_dict(data: Dict[str, Any], language: str) -> Dict[str, Any]:
     """
     Process a dictionary that might contain I18nString values.
+    Uses caching to improve performance for repeated conversions.
 
     Args:
         data: The dictionary to process
@@ -286,6 +366,12 @@ def process_i18n_dict(data: Dict[str, Any], language: str) -> Dict[str, Any]:
     """
     from ..i18n.i18n_string import I18nStr
 
+    # Try to use cached result
+    cache_key = make_cache_key(id(data), language)
+    if cache_key in _I18N_CACHE:
+        return _I18N_CACHE[cache_key]
+
+    # Process dictionary
     result = {}
     for key, value in data.items():
         if isinstance(value, I18nStr):
@@ -296,4 +382,14 @@ def process_i18n_dict(data: Dict[str, Any], language: str) -> Dict[str, Any]:
             result[key] = [process_i18n_value(item, language) for item in value]
         else:
             result[key] = value
+
+    # Cache the result if cache isn't too large
+    if len(_I18N_CACHE) < MAX_I18N_CACHE_SIZE:
+        _I18N_CACHE[cache_key] = result
+
     return result
+
+
+def clear_i18n_cache() -> None:
+    """Clear the i18n processing cache."""
+    _I18N_CACHE.clear()

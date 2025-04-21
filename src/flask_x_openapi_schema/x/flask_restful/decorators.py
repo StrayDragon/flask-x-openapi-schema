@@ -10,11 +10,8 @@ from ...core.config import ConventionalPrefixConfig
 from ...i18n.i18n_string import I18nStr
 from ...models.responses import OpenAPIMetaResponse
 
-# Cache for reqparse objects
-_REQPARSE_CACHE = {}
-
-# Cache for model instances
-_MODEL_INSTANCE_CACHE = {}
+# These caches have been moved to core.cache module
+# and are now using ThreadSafeCache implementation
 
 
 class FlaskRestfulOpenAPIDecorator:
@@ -117,139 +114,243 @@ class FlaskRestfulOpenAPIDecorator:
     def process_request_body(
         self, param_name: str, model: Type[BaseModel], kwargs: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Process request body parameters for Flask-RESTful."""
-        from ..flask_restful.utils import create_reqparse_from_pydantic
+        """Process request body parameters for Flask-RESTful.
+
+        Args:
+            param_name: The parameter name to bind the model instance to
+            model: The Pydantic model class to use for validation
+            kwargs: The keyword arguments to update
+
+        Returns:
+            Updated kwargs dictionary with the model instance
+        """
         from flask import request
-        import inspect
-        from ...models.file_models import FileField
+        from ...core.cache import MODEL_CACHE, make_cache_key
 
         # Check if this is a file upload model
-        has_file_fields = False
-        if hasattr(model, "model_fields"):
-            for field_name, field_info in model.model_fields.items():
-                field_type = field_info.annotation
-                if inspect.isclass(field_type) and issubclass(field_type, FileField):
-                    has_file_fields = True
-                    break
+        has_file_fields = self._check_for_file_fields(model)
 
-        # If this is a file upload model, handle it differently
+        # Handle file upload models
         if has_file_fields and request.files:
-            # Create model data from form and files
-            model_data = {}
-            # Add form data
-            for field_name, field_value in request.form.items():
-                model_data[field_name] = field_value
-            # Add file data
-            for field_name, field_info in model.model_fields.items():
-                field_type = field_info.annotation
-                if inspect.isclass(field_type) and issubclass(field_type, FileField):
-                    # Check if file exists in request
-                    if field_name in request.files:
-                        model_data[field_name] = request.files[field_name]
-                    elif "file" in request.files and field_name == "file":
-                        model_data[field_name] = request.files["file"]
-
-            # Create model instance
-            model_instance = model(**model_data)
+            model_instance = self._process_file_upload_model(model)
             kwargs[param_name] = model_instance
             return kwargs
 
         # Standard handling for non-file models
-        # Check if we've already created a reqparse for this model
-        if id(model) in _REQPARSE_CACHE:
-            parser = _REQPARSE_CACHE[model]
-        else:
-            # Flask-RESTful approach using reqparse
-            parser = create_reqparse_from_pydantic(body_model=model, query_model=None)
-            # Cache the parser for future use (limit cache size to prevent memory issues)
-            if len(_REQPARSE_CACHE) > 100:
-                _REQPARSE_CACHE.clear()
-            _REQPARSE_CACHE[id(model)] = parser
+        # Get or create reqparse parser
+        parser = self._get_or_create_parser(model)
 
+        # Parse arguments
         self.parsed_args = parser.parse_args()
 
-        # Create a cache key based on the parsed arguments
-        cache_key = (id(model), str(frozenset(self.parsed_args.items())))
+        # Create cache key based on model and parsed arguments
+        cache_key = make_cache_key(id(model), self.parsed_args)
 
-        # Check if we've already created a model instance for these arguments
-        if cache_key in _MODEL_INSTANCE_CACHE:
-            model_instance = _MODEL_INSTANCE_CACHE[cache_key]
-            kwargs[param_name] = model_instance
+        # Check for cached model instance
+        cached_instance = MODEL_CACHE.get(cache_key)
+        if cached_instance is not None:
+            kwargs[param_name] = cached_instance
             return kwargs
 
-        # Create from parsed arguments
-        body_data = {}
-        model_fields = model.model_fields
-        for field_name in model_fields:
-            if field_name in self.parsed_args:
-                body_data[field_name] = self.parsed_args[field_name]
-
-        model_instance = model(**body_data)
+        # Create model instance from parsed arguments
+        model_instance = self._create_model_from_args(model, self.parsed_args)
         kwargs[param_name] = model_instance
 
-        # Cache the model instance for future use (limit cache size to prevent memory issues)
-        if len(_MODEL_INSTANCE_CACHE) > 1000:
-            _MODEL_INSTANCE_CACHE.clear()
-        _MODEL_INSTANCE_CACHE[cache_key] = model_instance
+        # Cache the model instance
+        MODEL_CACHE.set(cache_key, model_instance)
 
         return kwargs
+
+    def _check_for_file_fields(self, model: Type[BaseModel]) -> bool:
+        """Check if a model contains file upload fields.
+
+        Args:
+            model: The model to check
+
+        Returns:
+            True if the model has file fields, False otherwise
+        """
+        import inspect
+        from ...models.file_models import FileField
+
+        if not hasattr(model, "model_fields"):
+            return False
+
+        for field_name, field_info in model.model_fields.items():
+            field_type = field_info.annotation
+            if inspect.isclass(field_type) and issubclass(field_type, FileField):
+                return True
+
+        return False
+
+    def _process_file_upload_model(self, model: Type[BaseModel]) -> BaseModel:
+        """Process a file upload model with form data and files.
+
+        Args:
+            model: The model class to instantiate
+
+        Returns:
+            An instance of the model with file data
+        """
+        from flask import request
+        import inspect
+        from ...models.file_models import FileField
+
+        # Create model data from form and files
+        model_data = {}
+
+        # Add form data
+        for field_name, field_value in request.form.items():
+            model_data[field_name] = field_value
+
+        # Add file data
+        for field_name, field_info in model.model_fields.items():
+            field_type = field_info.annotation
+            if inspect.isclass(field_type) and issubclass(field_type, FileField):
+                # Check if file exists in request
+                if field_name in request.files:
+                    model_data[field_name] = request.files[field_name]
+                elif "file" in request.files and field_name == "file":
+                    model_data[field_name] = request.files["file"]
+
+        # Create and return model instance
+        return model(**model_data)
+
+    def _get_or_create_parser(self, model: Type[BaseModel]):
+        """Get an existing parser or create a new one for the model.
+
+        Args:
+            model: The model to create a parser for
+
+        Returns:
+            A RequestParser instance for the model
+        """
+        from ..flask_restful.utils import create_reqparse_from_pydantic
+        from ...core.cache import REQPARSE_CACHE
+
+        # Use model's id as cache key
+        model_id = id(model)
+
+        # Check if we've already created a reqparse for this model
+        if model_id in REQPARSE_CACHE:
+            return REQPARSE_CACHE.get(model_id)
+
+        # Create new parser
+        parser = create_reqparse_from_pydantic(body_model=model, query_model=None)
+
+        # Cache the parser
+        REQPARSE_CACHE[model_id] = parser
+        return parser
+
+    def _create_model_from_args(self, model: Type[BaseModel], args: dict) -> BaseModel:
+        """Create a model instance from parsed arguments.
+
+        Args:
+            model: The model class to instantiate
+            args: The parsed arguments
+
+        Returns:
+            An instance of the model
+        """
+        # Extract fields that exist in the model
+        body_data = {}
+        model_fields = model.model_fields
+
+        for field_name in model_fields:
+            if field_name in args:
+                body_data[field_name] = args[field_name]
+
+        # Create and return model instance
+        return model(**body_data)
 
     def process_query_params(
         self, param_name: str, model: Type[BaseModel], kwargs: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Process query parameters for Flask-RESTful."""
-        from ..flask_restful.utils import create_reqparse_from_pydantic
+        """Process query parameters for Flask-RESTful.
 
-        if not self.parsed_args:
-            # Check if we've already created a reqparse for this model
-            if id(model) in _REQPARSE_CACHE:
-                parser = _REQPARSE_CACHE[model]
-            else:
-                # Flask-RESTful approach using reqparse
-                parser = create_reqparse_from_pydantic(
-                    query_model=model, body_model=None
-                )
-                # Cache the parser for future use (limit cache size to prevent memory issues)
-                if len(_REQPARSE_CACHE) > 100:
-                    _REQPARSE_CACHE.clear()
-                _REQPARSE_CACHE[id(model)] = parser
+        Args:
+            param_name: The parameter name to bind the model instance to
+            model: The Pydantic model class to use for validation
+            kwargs: The keyword arguments to update
 
-            self.parsed_args = parser.parse_args()
+        Returns:
+            Updated kwargs dictionary with the model instance
+        """
+        from ...core.cache import MODEL_CACHE, make_cache_key
 
-            # Create a cache key based on the parsed arguments
-            cache_key = (id(model), str(frozenset(self.parsed_args.items())))
+        # Skip if we already have parsed arguments
+        if self.parsed_args:
+            return kwargs
 
-            # Check if we've already created a model instance for these arguments
-            if cache_key in _MODEL_INSTANCE_CACHE:
-                model_instance = _MODEL_INSTANCE_CACHE[cache_key]
-                kwargs[param_name] = model_instance
-                return kwargs
+        # Get or create reqparse parser for query parameters
+        parser = self._get_or_create_query_parser(model)
 
-            # Create from parsed arguments
-            query_data = {}
-            model_fields = model.model_fields
-            for field_name in model_fields:
-                if field_name in self.parsed_args:
-                    query_data[field_name] = self.parsed_args[field_name]
+        # Parse arguments
+        self.parsed_args = parser.parse_args()
 
-            model_instance = model(**query_data)
-            kwargs[param_name] = model_instance
+        # Create cache key based on model and parsed arguments
+        cache_key = make_cache_key(id(model), self.parsed_args)
 
-            # Cache the model instance for future use (limit cache size to prevent memory issues)
-            if len(_MODEL_INSTANCE_CACHE) > 1000:
-                _MODEL_INSTANCE_CACHE.clear()
-            _MODEL_INSTANCE_CACHE[cache_key] = model_instance
+        # Check for cached model instance
+        cached_instance = MODEL_CACHE.get(cache_key)
+        if cached_instance is not None:
+            kwargs[param_name] = cached_instance
+            return kwargs
+
+        # Create model instance from parsed arguments
+        model_instance = self._create_model_from_args(model, self.parsed_args)
+        kwargs[param_name] = model_instance
+
+        # Cache the model instance
+        MODEL_CACHE.set(cache_key, model_instance)
 
         return kwargs
+
+    def _get_or_create_query_parser(self, model: Type[BaseModel]):
+        """Get an existing query parser or create a new one for the model.
+
+        Args:
+            model: The model to create a parser for
+
+        Returns:
+            A RequestParser instance for the model
+        """
+        from ..flask_restful.utils import create_reqparse_from_pydantic
+        from ...core.cache import REQPARSE_CACHE
+
+        # Create a unique key for query parsers
+        model_id = (id(model), "query")
+
+        # Check if we've already created a reqparse for this model
+        if model_id in REQPARSE_CACHE:
+            return REQPARSE_CACHE.get(model_id)
+
+        # Create new parser
+        parser = create_reqparse_from_pydantic(query_model=model, body_model=None)
+
+        # Cache the parser
+        REQPARSE_CACHE[model_id] = parser
+        return parser
 
     def process_additional_params(
         self, kwargs: Dict[str, Any], param_names: List[str]
     ) -> Dict[str, Any]:
-        """Process additional framework-specific parameters."""
+        """Process additional framework-specific parameters.
+
+        Args:
+            kwargs: The keyword arguments to update
+            param_names: List of parameter names that have been processed
+
+        Returns:
+            Updated kwargs dictionary
+        """
         # Add all parsed arguments to kwargs for regular parameters
+        # This allows Flask-RESTful to access parameters directly without
+        # requiring the use of the model instance
         if self.parsed_args:
+            # Only add arguments that haven't been processed yet
             for arg_name, arg_value in self.parsed_args.items():
-                if arg_name not in kwargs:
+                if arg_name not in kwargs and arg_name not in param_names:
                     kwargs[arg_name] = arg_value
         return kwargs
 

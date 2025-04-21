@@ -11,6 +11,11 @@ from flask_x_openapi_schema.core.config import (
     ConventionalPrefixConfig,
     GLOBAL_CONFIG_HOLDER,
     configure_prefixes,
+    reset_prefixes,
+    reset_all_config,
+    OpenAPIConfig,
+    configure_openapi,
+    get_openapi_config,
 )
 from flask_x_openapi_schema.x.flask import openapi_metadata
 from flask_x_openapi_schema.x.flask_restful.resources import (
@@ -76,7 +81,10 @@ def test_openapi_metadata_with_custom_prefixes():
     try:
         # Create a custom config
         custom_config = ConventionalPrefixConfig(
-            request_body_prefix="req_body", request_query_prefix="req_query"
+            request_body_prefix="req_body",
+            request_query_prefix="req_query",
+            request_path_prefix="req_path",
+            request_file_prefix="req_file",
         )
 
         # Apply the decorator with custom config
@@ -84,28 +92,25 @@ def test_openapi_metadata_with_custom_prefixes():
         def test_function(
             req_body: ConfigTestRequestModel, req_query: ConfigTestQueryModel
         ):
-            return {"message": "Success"}
+            # Use parameters to avoid linter warnings
+            return {"body": str(req_body), "query": str(req_query)}
 
         # Check metadata
         metadata = test_function._openapi_metadata
 
-        # The implementation currently doesn't apply the config correctly for the first test
-        # This is a known issue that will be fixed in a future update
-        # For now, we'll just check that the metadata exists
+        # Verify metadata exists
         assert metadata is not None
-
-        # Now use the correct parameter names with the custom prefixes
-        @openapi_metadata(summary="Test endpoint", prefix_config=custom_config)
-        def test_function_with_custom_prefixes(
-            req_body: ConfigTestRequestModel, req_query: ConfigTestQueryModel
-        ):
-            return {"message": "Success"}
-
-        # Check metadata
-        metadata = test_function_with_custom_prefixes._openapi_metadata
+        assert "summary" in metadata
+        assert metadata["summary"] == "Test endpoint"
 
         # Check request body
         assert "requestBody" in metadata
+        assert "content" in metadata["requestBody"]
+        assert "application/json" in metadata["requestBody"]["content"]
+        assert "schema" in metadata["requestBody"]["content"]["application/json"]
+        assert (
+            "$ref" in metadata["requestBody"]["content"]["application/json"]["schema"]
+        )
         assert (
             metadata["requestBody"]["content"]["application/json"]["schema"]["$ref"]
             == "#/components/schemas/ConfigTestRequestModel"
@@ -116,6 +121,11 @@ def test_openapi_metadata_with_custom_prefixes():
         query_params = [p for p in metadata["parameters"] if p["in"] == "query"]
         assert len(query_params) == 2
 
+        # Verify parameter names
+        param_names = [p["name"] for p in query_params]
+        assert "sort" in param_names
+        assert "limit" in param_names
+
     finally:
         # Restore original global config
         configure_prefixes(original_config)
@@ -123,49 +133,92 @@ def test_openapi_metadata_with_custom_prefixes():
 
 def test_openapi_metadata_with_per_function_config():
     """Test openapi_metadata decorator with per-function configuration."""
-    # Define a function with custom prefixes
-    custom_config = ConventionalPrefixConfig(
-        request_body_prefix="custom_body", request_query_prefix="custom_query"
-    )
+    # Save original global config
+    original_config = GLOBAL_CONFIG_HOLDER.get()
 
-    @openapi_metadata(summary="Test endpoint", prefix_config=custom_config)
-    def test_function(
-        custom_body: ConfigTestRequestModel, custom_query: ConfigTestQueryModel
-    ):
-        return {"message": "Success"}
+    try:
+        # Define a function with custom prefixes
+        custom_config = ConventionalPrefixConfig(
+            request_body_prefix="custom_body",
+            request_query_prefix="custom_query",
+            request_path_prefix="custom_path",
+            request_file_prefix="custom_file",
+        )
 
-    # Check metadata
-    metadata = test_function._openapi_metadata
+        @openapi_metadata(summary="Test endpoint", prefix_config=custom_config)
+        def test_function(
+            custom_body: ConfigTestRequestModel, custom_query: ConfigTestQueryModel
+        ):
+            # Use parameters to avoid linter warnings
+            return {"body": str(custom_body), "query": str(custom_query)}
 
-    # Check request body
-    assert "requestBody" in metadata
-    assert (
-        metadata["requestBody"]["content"]["application/json"]["schema"]["$ref"]
-        == "#/components/schemas/ConfigTestRequestModel"
-    )
+        # Check metadata
+        metadata = test_function._openapi_metadata
 
-    # Check parameters
-    assert "parameters" in metadata
-    query_params = [p for p in metadata["parameters"] if p["in"] == "query"]
-    assert len(query_params) == 2
+        # Verify metadata exists
+        assert metadata is not None
+        assert "summary" in metadata
+        assert metadata["summary"] == "Test endpoint"
 
-    # Define another function with default prefixes
-    @openapi_metadata(summary="Test endpoint")
-    def test_function_default(
-        _x_body: ConfigTestRequestModel, _x_query: ConfigTestQueryModel
-    ):
-        return {"message": "Success"}
+        # Check request body
+        assert "requestBody" in metadata
+        assert "content" in metadata["requestBody"]
+        assert "application/json" in metadata["requestBody"]["content"]
+        assert "schema" in metadata["requestBody"]["content"]["application/json"]
+        assert (
+            "$ref" in metadata["requestBody"]["content"]["application/json"]["schema"]
+        )
+        assert (
+            metadata["requestBody"]["content"]["application/json"]["schema"]["$ref"]
+            == "#/components/schemas/ConfigTestRequestModel"
+        )
 
-    # Check metadata
-    metadata = test_function_default._openapi_metadata
+        # Check parameters
+        assert "parameters" in metadata
+        query_params = [p for p in metadata["parameters"] if p["in"] == "query"]
+        assert len(query_params) == 2
 
-    # The implementation currently doesn't apply the config correctly for this test
-    # This is a known issue that will be fixed in a future update
-    # For now, we'll just check that the metadata exists
-    assert metadata is not None
+        # Verify parameter names
+        param_names = [p["name"] for p in query_params]
+        assert "sort" in param_names
+        assert "limit" in param_names
 
-    # The implementation currently doesn't apply the config correctly for this test
-    # This is a known issue that will be fixed in a future update
+        # Define another function with default prefixes
+        @openapi_metadata(summary="Default endpoint")
+        def test_function_default(
+            _x_body: ConfigTestRequestModel, _x_query: ConfigTestQueryModel
+        ):
+            # Use parameters to avoid linter warnings
+            return {"body": str(_x_body), "query": str(_x_query)}
+
+        # Check metadata
+        metadata = test_function_default._openapi_metadata
+
+        # Verify metadata exists
+        assert metadata is not None
+        assert "summary" in metadata
+        assert metadata["summary"] == "Default endpoint"
+
+        # Check request body
+        assert "requestBody" in metadata
+        assert "content" in metadata["requestBody"]
+        assert "application/json" in metadata["requestBody"]["content"]
+        assert "schema" in metadata["requestBody"]["content"]["application/json"]
+        assert (
+            "$ref" in metadata["requestBody"]["content"]["application/json"]["schema"]
+        )
+        assert (
+            metadata["requestBody"]["content"]["application/json"]["schema"]["$ref"]
+            == "#/components/schemas/ConfigTestRequestModel"
+        )
+
+        # Check parameters
+        assert "parameters" in metadata
+        query_params = [p for p in metadata["parameters"] if p["in"] == "query"]
+        assert len(query_params) == 2
+    finally:
+        # Restore original global config
+        configure_prefixes(original_config)
 
 
 class MockApi(OpenAPIIntegrationMixin):
@@ -222,3 +275,68 @@ def test_openapi_blueprint_mixin_configure():
     blueprint.configure_openapi(
         request_body_prefix="bp_body2", request_query_prefix="bp_query2"
     )
+
+
+def test_reset_config_functions():
+    """Test the reset_prefixes and reset_all_config functions."""
+    # Save original global config
+    original_config = GLOBAL_CONFIG_HOLDER.get()
+
+    try:
+        # Create and apply a custom config
+        custom_config = ConventionalPrefixConfig(
+            request_body_prefix="test_body",
+            request_query_prefix="test_query",
+            request_path_prefix="test_path",
+            request_file_prefix="test_file",
+        )
+        configure_prefixes(custom_config)
+
+        # Verify the config was applied
+        current_config = GLOBAL_CONFIG_HOLDER.get()
+        assert current_config.request_body_prefix == "test_body"
+        assert current_config.request_query_prefix == "test_query"
+        assert current_config.request_path_prefix == "test_path"
+        assert current_config.request_file_prefix == "test_file"
+
+        # Reset prefixes
+        reset_prefixes()
+
+        # Verify the config was reset
+        reset_config = GLOBAL_CONFIG_HOLDER.get()
+        assert reset_config.request_body_prefix == "_x_body"
+        assert reset_config.request_query_prefix == "_x_query"
+        assert reset_config.request_path_prefix == "_x_path"
+        assert reset_config.request_file_prefix == "_x_file"
+
+        # Create and apply a custom OpenAPI config
+        openapi_config = OpenAPIConfig(
+            title="Test API",
+            version="2.0.0",
+            description="Test API Description",
+            prefix_config=custom_config,
+        )
+        configure_openapi(openapi_config)
+
+        # Verify the config was applied
+        current_openapi_config = get_openapi_config()
+        assert current_openapi_config.title == "Test API"
+        assert current_openapi_config.version == "2.0.0"
+        assert current_openapi_config.description == "Test API Description"
+        assert current_openapi_config.prefix_config.request_body_prefix == "test_body"
+
+        # Reset all config
+        reset_all_config()
+
+        # Verify all config was reset
+        reset_openapi_config = get_openapi_config()
+        assert reset_openapi_config.title == "API Documentation"
+        assert reset_openapi_config.version == "1.0.0"
+        assert (
+            reset_openapi_config.description
+            == "API Documentation generated by flask-x-openapi-schema"
+        )
+        assert reset_openapi_config.prefix_config.request_body_prefix == "_x_body"
+    finally:
+        # Restore original global config
+        configure_prefixes(original_config)
