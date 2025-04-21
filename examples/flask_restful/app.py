@@ -54,6 +54,7 @@ app.config["UPLOAD_FOLDER"] = "uploads"
 uploads_dir = Path(app.config["UPLOAD_FOLDER"])
 uploads_dir.mkdir(exist_ok=True)
 
+
 # Create an OpenAPI-enabled API
 class OpenAPIApi(OpenAPIIntegrationMixin, Api):
     pass
@@ -534,7 +535,9 @@ class ProductImageResource(Resource):
             path=f"/products/{product_id}/images",
             path_params={"product_id": product_id},
             file={
-                "filename": file.filename if file and hasattr(file, 'filename') else None,
+                "filename": file.filename
+                if file and hasattr(file, "filename")
+                else None,
                 "description": _x_file.description,
                 "is_primary": _x_file.is_primary,
             },
@@ -648,7 +651,9 @@ class ProductDocumentResource(Resource):
             path=f"/products/{product_id}/documents",
             path_params={"product_id": product_id},
             file={
-                "filename": file.filename if file and hasattr(file, 'filename') else None,
+                "filename": file.filename
+                if file and hasattr(file, "filename")
+                else None,
                 "title": _x_file.title,
                 "document_type": _x_file.document_type,
             },
@@ -746,7 +751,7 @@ def get_openapi_spec():
         title="Product API",
         version="1.0.0",
         description="API for managing products",
-        output_format="json"
+        output_format="json",
     )
 
     # Manually register file upload models
@@ -756,7 +761,13 @@ def get_openapi_spec():
         schema["components"]["schemas"] = {}
 
     # Register file models
-    for model in [ProductImageUpload, ProductDocumentUpload, ProductAudioUpload, ProductVideoUpload, FileResponse]:
+    for model in [
+        ProductImageUpload,
+        ProductDocumentUpload,
+        ProductAudioUpload,
+        ProductVideoUpload,
+        FileResponse,
+    ]:
         model_schema = pydantic_to_openapi_schema(model)
         schema["components"]["schemas"][model.__name__] = model_schema
 
@@ -765,14 +776,16 @@ def get_openapi_spec():
     print(f"openapi version: {schema.get('openapi', 'NOT FOUND')}")
     print(f"info: {schema.get('info', {})}")
     print(f"paths: {len(schema.get('paths', {}))} endpoints")
-    for path in schema.get('paths', {}):
+    for path in schema.get("paths", {}):
         print(f"  - {path}")
     print(f"components: {len(schema.get('components', {}).get('schemas', {}))} schemas")
-    for schema_name in schema.get('components', {}).get('schemas', {}):
+    for schema_name in schema.get("components", {}).get("schemas", {}):
         print(f"  - {schema_name}")
 
     # Convert to YAML with proper settings
-    yaml_content = yaml.dump(schema, sort_keys=False, default_flow_style=False, allow_unicode=True)
+    yaml_content = yaml.dump(
+        schema, sort_keys=False, default_flow_style=False, allow_unicode=True
+    )
 
     return yaml_content, 200, {"Content-Type": "text/yaml"}
 

@@ -461,7 +461,9 @@ class ProductImageView(OpenAPIMethodViewMixin, MethodView):
             path=f"/api/products/{product_id}/images",
             path_params={"product_id": product_id},
             file={
-                "filename": file.filename if file and hasattr(file, 'filename') else None,
+                "filename": file.filename
+                if file and hasattr(file, "filename")
+                else None,
                 "description": _x_file_image.description,
                 "is_primary": _x_file_image.is_primary,
             },
@@ -575,7 +577,9 @@ class ProductDocumentView(OpenAPIMethodViewMixin, MethodView):
             path=f"/api/products/{product_id}/documents",
             path_params={"product_id": product_id},
             file={
-                "filename": file.filename if file and hasattr(file, 'filename') else None,
+                "filename": file.filename
+                if file and hasattr(file, "filename")
+                else None,
                 "title": _x_file_document.title,
                 "document_type": _x_file_document.document_type,
             },
@@ -736,7 +740,9 @@ class ProductAudioView(OpenAPIMethodViewMixin, MethodView):
             path=f"/api/products/{product_id}/audio",
             path_params={"product_id": product_id},
             file={
-                "filename": file.filename if file and hasattr(file, 'filename') else None,
+                "filename": file.filename
+                if file and hasattr(file, "filename")
+                else None,
                 "title": _x_file_audio.title,
                 "duration_seconds": _x_file_audio.duration_seconds,
             },
@@ -850,7 +856,9 @@ class ProductVideoView(OpenAPIMethodViewMixin, MethodView):
             path=f"/api/products/{product_id}/video",
             path_params={"product_id": product_id},
             file={
-                "filename": file.filename if file and hasattr(file, 'filename') else None,
+                "filename": file.filename
+                if file and hasattr(file, "filename")
+                else None,
                 "title": _x_file_video.title,
                 "duration_seconds": _x_file_video.duration_seconds,
                 "resolution": _x_file_video.resolution,
@@ -928,11 +936,21 @@ class ProductVideoView(OpenAPIMethodViewMixin, MethodView):
 
 # Register the views using OpenAPIMethodViewMixin's register_to_blueprint method
 ProductView.register_to_blueprint(blueprint, "/products", "products")
-ProductDetailView.register_to_blueprint(blueprint, "/products/<product_id>", "product_detail")
-ProductImageView.register_to_blueprint(blueprint, "/products/<product_id>/images", "product_images")
-ProductDocumentView.register_to_blueprint(blueprint, "/products/<product_id>/documents", "product_documents")
-ProductAudioView.register_to_blueprint(blueprint, "/products/<product_id>/audio", "product_audio")
-ProductVideoView.register_to_blueprint(blueprint, "/products/<product_id>/video", "product_video")
+ProductDetailView.register_to_blueprint(
+    blueprint, "/products/<product_id>", "product_detail"
+)
+ProductImageView.register_to_blueprint(
+    blueprint, "/products/<product_id>/images", "product_images"
+)
+ProductDocumentView.register_to_blueprint(
+    blueprint, "/products/<product_id>/documents", "product_documents"
+)
+ProductAudioView.register_to_blueprint(
+    blueprint, "/products/<product_id>/audio", "product_audio"
+)
+ProductVideoView.register_to_blueprint(
+    blueprint, "/products/<product_id>/video", "product_video"
+)
 
 # Register the blueprint
 app.register_blueprint(blueprint)
@@ -972,14 +990,16 @@ def get_openapi_spec():
     print(f"openapi version: {schema.get('openapi', 'NOT FOUND')}")
     print(f"info: {schema.get('info', {})}")
     print(f"paths: {len(schema.get('paths', {}))} endpoints")
-    for path in schema.get('paths', {}):
+    for path in schema.get("paths", {}):
         print(f"  - {path}")
     print(f"components: {len(schema.get('components', {}).get('schemas', {}))} schemas")
-    for schema_name in schema.get('components', {}).get('schemas', {}):
+    for schema_name in schema.get("components", {}).get("schemas", {}):
         print(f"  - {schema_name}")
 
     # Convert to YAML with proper settings
-    yaml_content = yaml.dump(schema, sort_keys=False, default_flow_style=False, allow_unicode=True)
+    yaml_content = yaml.dump(
+        schema, sort_keys=False, default_flow_style=False, allow_unicode=True
+    )
 
     return yaml_content, 200, {"Content-Type": "text/yaml"}
 

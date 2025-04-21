@@ -11,7 +11,12 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from flask_x_openapi_schema import BaseRespModel, I18nStr
-from flask_x_openapi_schema.models.file_models import ImageField, PDFField, AudioField, VideoField
+from flask_x_openapi_schema.models.file_models import (
+    ImageField,
+    PDFField,
+    AudioField,
+    VideoField,
+)
 
 
 class ProductCategory(str, Enum):
@@ -92,11 +97,15 @@ class ErrorResponse(BaseRespModel):
 
 # File upload models
 
+
 class ProductImageUpload(BaseModel):
     """Model for product image uploads."""
+
     file: ImageField = Field(..., description="The image file to upload")
     description: Optional[str] = Field(None, description="Image description")
-    is_primary: Optional[str] = Field("false", description="Whether this is the primary product image (true/false)")
+    is_primary: Optional[str] = Field(
+        "false", description="Whether this is the primary product image (true/false)"
+    )
     allowed_extensions: Optional[str] = Field(
         default="jpg,jpeg,png,gif,webp,svg",
         description="Allowed file extensions (comma-separated)",
@@ -106,33 +115,36 @@ class ProductImageUpload(BaseModel):
         arbitrary_types_allowed=True,
         json_schema_extra={
             "multipart/form-data": True  # Indicate this model is for multipart/form-data
-        }
+        },
     )
 
-    @field_validator('is_primary')
+    @field_validator("is_primary")
     def parse_is_primary(cls, v):
         """Convert string boolean to actual boolean."""
         if v is None:
             return False
         if isinstance(v, str):
-            return v.lower() in ('true', 't', 'yes', 'y', '1')
+            return v.lower() in ("true", "t", "yes", "y", "1")
         return bool(v)
 
-    @field_validator('allowed_extensions')
+    @field_validator("allowed_extensions")
     def parse_allowed_extensions(cls, v):
         """Convert comma-separated string to list if needed."""
         if v is None:
             return ["jpg", "jpeg", "png", "gif", "webp", "svg"]
         if isinstance(v, str):
-            return [ext.strip() for ext in v.split(',')]
+            return [ext.strip() for ext in v.split(",")]
         return v
 
 
 class ProductDocumentUpload(BaseModel):
     """Model for product document uploads (manuals, specifications, etc.)."""
+
     file: PDFField = Field(..., description="The document file to upload")
     title: str = Field(..., description="Document title")
-    document_type: str = Field(..., description="Type of document (manual, spec sheet, etc.)")
+    document_type: str = Field(
+        ..., description="Type of document (manual, spec sheet, etc.)"
+    )
     allowed_extensions: Optional[str] = Field(
         default="pdf,doc,docx,txt,rtf,md",
         description="Allowed file extensions (comma-separated)",
@@ -142,21 +154,22 @@ class ProductDocumentUpload(BaseModel):
         arbitrary_types_allowed=True,
         json_schema_extra={
             "multipart/form-data": True  # Indicate this model is for multipart/form-data
-        }
+        },
     )
 
-    @field_validator('allowed_extensions')
+    @field_validator("allowed_extensions")
     def parse_allowed_extensions(cls, v):
         """Convert comma-separated string to list if needed."""
         if v is None:
             return ["pdf", "doc", "docx", "txt", "rtf", "md"]
         if isinstance(v, str):
-            return [ext.strip() for ext in v.split(',')]
+            return [ext.strip() for ext in v.split(",")]
         return v
 
 
 class ProductAudioUpload(BaseModel):
     """Model for product audio uploads (sound samples, etc.)."""
+
     file: AudioField = Field(..., description="The audio file to upload")
     title: str = Field(..., description="Audio title")
     duration_seconds: Optional[str] = Field(None, description="Duration in seconds")
@@ -169,13 +182,13 @@ class ProductAudioUpload(BaseModel):
         arbitrary_types_allowed=True,
         json_schema_extra={
             "multipart/form-data": True  # Indicate this model is for multipart/form-data
-        }
+        },
     )
 
-    @field_validator('duration_seconds')
+    @field_validator("duration_seconds")
     def parse_duration_seconds(cls, v):
         """Convert string number to integer."""
-        if v is None or v == '':
+        if v is None or v == "":
             return None
         if isinstance(v, str):
             try:
@@ -184,22 +197,25 @@ class ProductAudioUpload(BaseModel):
                 return None
         return v
 
-    @field_validator('allowed_extensions')
+    @field_validator("allowed_extensions")
     def parse_allowed_extensions(cls, v):
         """Convert comma-separated string to list if needed."""
         if v is None:
             return ["mp3", "wav", "ogg", "m4a", "flac"]
         if isinstance(v, str):
-            return [ext.strip() for ext in v.split(',')]
+            return [ext.strip() for ext in v.split(",")]
         return v
 
 
 class ProductVideoUpload(BaseModel):
     """Model for product video uploads (demos, tutorials, etc.)."""
+
     file: VideoField = Field(..., description="The video file to upload")
     title: str = Field(..., description="Video title")
     duration_seconds: Optional[str] = Field(None, description="Duration in seconds")
-    resolution: Optional[str] = Field(None, description="Video resolution (e.g., 1080p, 4K)")
+    resolution: Optional[str] = Field(
+        None, description="Video resolution (e.g., 1080p, 4K)"
+    )
     allowed_extensions: Optional[str] = Field(
         default="mp4,mov,avi,mkv,webm",
         description="Allowed file extensions (comma-separated)",
@@ -209,13 +225,13 @@ class ProductVideoUpload(BaseModel):
         arbitrary_types_allowed=True,
         json_schema_extra={
             "multipart/form-data": True  # Indicate this model is for multipart/form-data
-        }
+        },
     )
 
-    @field_validator('duration_seconds')
+    @field_validator("duration_seconds")
     def parse_duration_seconds(cls, v):
         """Convert string number to integer."""
-        if v is None or v == '':
+        if v is None or v == "":
             return None
         if isinstance(v, str):
             try:
@@ -224,18 +240,19 @@ class ProductVideoUpload(BaseModel):
                 return None
         return v
 
-    @field_validator('allowed_extensions')
+    @field_validator("allowed_extensions")
     def parse_allowed_extensions(cls, v):
         """Convert comma-separated string to list if needed."""
         if v is None:
             return ["mp4", "mov", "avi", "mkv", "webm"]
         if isinstance(v, str):
-            return [ext.strip() for ext in v.split(',')]
+            return [ext.strip() for ext in v.split(",")]
         return v
 
 
 class FileResponse(BaseRespModel):
     """Response model for file metadata."""
+
     id: str = Field(..., description="File ID")
     filename: str = Field(..., description="Original filename")
     content_type: str = Field(..., description="File content type")
