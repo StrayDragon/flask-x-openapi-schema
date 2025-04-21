@@ -72,7 +72,7 @@ jobs:
           verbose: true
 
   check-build:
-    name: Build distribution 📦
+    name: Check Build distribution
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
