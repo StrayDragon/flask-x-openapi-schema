@@ -70,3 +70,19 @@ run-example-flask:
 run-example-flask-restful:
 	uv run python -m examples.flask_restful.app
 
+docs:
+	mkdir -p docs/api
+	uv run pdoc -o docs/api src/flask_x_openapi_schema \
+		--show-source \
+		--mermaid \
+		--search \
+		--favicon "https://flask.palletsprojects.com/en/3.0.x/_static/flask-icon.png" \
+		--footer-text "flask-x-openapi-schema - 自动生成OpenAPI文档的Flask工具"
+	echo "API文档已生成在 docs/api 目录中"
+	# 尝试打开文档（如果支持）
+	xdg-open docs/api/flask_x_openapi_schema.html &> /dev/null || open docs/api/flask_x_openapi_schema.html &> /dev/null || echo "无法自动打开文档，请手动打开 docs/api/flask_x_openapi_schema.html"
+
+docs-markdown:
+	mkdir -p docs/markdown
+	uv run pdoc -o docs/markdown -d markdown src/flask_x_openapi_schema
+
