@@ -6,7 +6,7 @@ This module contains Pydantic models used in benchmarks.
 
 from enum import Enum
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, EmailStr
 
 from flask_x_openapi_schema.models.base import BaseRespModel
 
@@ -37,7 +37,7 @@ class ContactInfo(BaseModel):
     """Contact information model."""
 
     phone: Optional[str] = Field(None, description="Phone number")
-    alternative_email: Optional[str] = Field(None, description="Alternative email")
+    alternative_email: Optional[EmailStr] = Field(None, description="Alternative email")
     emergency_contact: Optional[str] = Field(None, description="Emergency contact")
 
     model_config = {"arbitrary_types_allowed": True}
@@ -61,7 +61,7 @@ class UserRequest(BaseModel):
     """Request model for creating a user."""
 
     username: str = Field(..., description="The username", min_length=3, max_length=50)
-    email: str = Field(..., description="The email address")
+    email: EmailStr = Field(..., description="The email address")
     full_name: str = Field(..., description="The full name")
     age: int = Field(..., description="The age", ge=18, le=120)
     is_active: bool = Field(True, description="Whether the user is active")
@@ -99,11 +99,9 @@ class UserQueryParams(BaseModel):
     search: Optional[str] = Field(
         None, description="Search term for username or full name"
     )
-    min_age: Optional[int] = Field(None, description="Minimum age", ge=18, le=120)
-    max_age: Optional[int] = Field(None, description="Maximum age", ge=18, le=120)
-    tags: Optional[List[str]] = Field(
-        None, description="Filter by tags (comma-separated)"
-    )
+    min_age: Optional[int] = Field(None, description="Minimum age", ge=1, le=120)
+    max_age: Optional[int] = Field(None, description="Maximum age", ge=1, le=120)
+    tags: Optional[str] = Field(None, description="Filter by tags (comma-separated)")
     created_after: Optional[str] = Field(
         None, description="Filter by creation date (ISO format)"
     )
@@ -131,7 +129,7 @@ class UserResponse(BaseRespModel):
 
     id: str = Field(..., description="The user ID")
     username: str = Field(..., description="The username")
-    email: str = Field(..., description="The email address")
+    email: EmailStr = Field(..., description="The email address")
     full_name: str = Field(..., description="The full name")
     age: int = Field(..., description="The age")
     is_active: bool = Field(True, description="Whether the user is active")
@@ -152,3 +150,7 @@ class UserResponse(BaseRespModel):
     updated_at: Optional[str] = Field(None, description="Last update timestamp")
 
     model_config = {"arbitrary_types_allowed": True}
+
+
+class Error400Resp(BaseModel):
+    error: str = ""

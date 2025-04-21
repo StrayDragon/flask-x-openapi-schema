@@ -23,7 +23,6 @@ benchmark-report:
 	uv run python benchmarks/generate_report.py
 	# Display the performance chart if available
 	if [ -f benchmarks/results/performance_charts.png ]; then
-		echo "\nOpening performance chart..."
 		xdg-open benchmarks/results/performance_charts.png &> /dev/null || open benchmarks/results/performance_charts.png &> /dev/null || echo "Could not open performance chart automatically."
 	fi
 
@@ -60,7 +59,6 @@ benchmark:
 	just benchmark-flask-restful
 	just benchmark-report
 	# Show the report location
-	echo "\nBenchmark report generated at: benchmarks/results/report.txt"
 	echo "Performance charts (if available) at: benchmarks/results/performance_charts.png"
 
 

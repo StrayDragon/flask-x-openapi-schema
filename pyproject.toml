@@ -37,10 +37,14 @@ flask-restful = ["flask-restful>=0.3.9"]
 
 [dependency-groups]
 dev = [
+    "email-validator>=2.2.0",
+    "flask-restful>=0.3.10",
     "locust>=2.25.0",
     "matplotlib>=3.7.5",
     "numpy>=1.24.4",
     "pandas>=2.0.3",
+    "pdoc>=14.1.0",
+    "polyfactory>=2.21.0",
     "pydantic[email]>=2.10.6",
     "pytest>=8.3.5",
     "pytest-benchmark>=4.0.0",

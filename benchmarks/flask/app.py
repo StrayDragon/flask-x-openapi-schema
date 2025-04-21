@@ -10,8 +10,10 @@ from datetime import datetime
 
 from flask import Flask, request, jsonify, Response
 
+from flask_x_openapi_schema import OpenAPIMetaResponse, OpenAPIMetaResponseItem
 from flask_x_openapi_schema.x.flask import openapi_metadata
 from benchmarks.common.models import (
+    Error400Resp,
     UserRequest,
     UserQueryParams,
     UserResponse,
@@ -263,17 +265,18 @@ def create_openapi_flask_app():
         summary="Create a new user",
         description="Create a new user with the given ID",
         tags=["users"],
-        responses={
-            "201": {
-                "description": "User created successfully",
-                "content": {
-                    "application/json": {
-                        "schema": {"$ref": "#/components/schemas/UserResponse"}
-                    }
-                },
-            },
-            "400": {"description": "Bad request"},
-        },
+        responses=OpenAPIMetaResponse(
+            responses={
+                "201": OpenAPIMetaResponseItem(
+                    model=UserResponse,
+                    description="User created successfully",
+                ),
+                "400": OpenAPIMetaResponseItem(
+                    model=Error400Resp,
+                    description="Bad request",
+                ),
+            }
+        ),
     )
     def openapi_create_user(
         user_id: str, _x_body: UserRequest = None, _x_query: UserQueryParams = None
