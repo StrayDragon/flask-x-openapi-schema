@@ -69,7 +69,7 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "--cov=src/flask_x_openapi_schema --cov-report=term-missing --cov-report=html -v"
+addopts = "--cov=src/flask_x_openapi_schema --cov-report=term-missing --cov-report=html --cov-report=xml -v"
 xfail_strict = true
 filterwarnings = [
     # "ignore::pytest.PytestCollectionWarning",
