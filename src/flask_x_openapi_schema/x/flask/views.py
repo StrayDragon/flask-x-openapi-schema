@@ -290,6 +290,76 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
             # Register Pydantic models from type hints
             self._register_models_from_method(method_func)
 
+            # Check for file upload models in method parameters
+            type_hints = get_type_hints(method_func)
+            for param_name, param_type in type_hints.items():
+                if param_name == "return":
+                    continue
+
+                # Check if the parameter is a Pydantic model
+                if isinstance(param_type, type) and issubclass(param_type, BaseModel):
+                    # Check if this is a file upload model
+                    is_file_upload = False
+                    has_binary_fields = False
+
+                    # Check model config for multipart/form-data flag
+                    if hasattr(param_type, "model_config"):
+                        config = getattr(param_type, "model_config", {})
+                        if isinstance(config, dict) and config.get("json_schema_extra", {}).get("multipart/form-data", False):
+                            is_file_upload = True
+                    elif hasattr(param_type, "Config") and hasattr(param_type.Config, "json_schema_extra"):
+                        config_extra = getattr(param_type.Config, "json_schema_extra", {})
+                        is_file_upload = config_extra.get("multipart/form-data", False)
+
+                    # Check if model has any binary fields
+                    if hasattr(param_type, "model_fields"):
+                        for field_name, field_info in param_type.model_fields.items():
+                            field_schema = getattr(field_info, "json_schema_extra", None)
+                            if field_schema is not None and field_schema.get("format") == "binary":
+                                has_binary_fields = True
+                                break
+
+                    # If this is a file upload model, update the requestBody content type
+                    if is_file_upload or has_binary_fields:
+                        if "requestBody" in metadata and "content" in metadata["requestBody"]:
+                            # Replace application/json with multipart/form-data
+                            if "application/json" in metadata["requestBody"]["content"]:
+                                schema = metadata["requestBody"]["content"]["application/json"]["schema"]
+                                metadata["requestBody"]["content"] = {
+                                    "multipart/form-data": {
+                                        "schema": schema
+                                    }
+                                }
+                            # If no content type is specified, add multipart/form-data
+                            elif not metadata["requestBody"]["content"]:
+                                metadata["requestBody"]["content"] = {
+                                    "multipart/form-data": {
+                                        "schema": {
+                                            "$ref": f"#/components/schemas/{param_type.__name__}"
+                                        }
+                                    }
+                                }
+                        # If no requestBody is specified, add one
+                        elif "requestBody" not in metadata:
+                            metadata["requestBody"] = {
+                                "content": {
+                                    "multipart/form-data": {
+                                        "schema": {
+                                            "$ref": f"#/components/schemas/{param_type.__name__}"
+                                        }
+                                    }
+                                },
+                                "required": True
+                            }
+
+                        # Remove any file parameters from parameters as they will be included in the requestBody
+                        if "parameters" in metadata:
+                            # Keep only path and query parameters
+                            metadata["parameters"] = [
+                                p for p in metadata["parameters"]
+                                if p["in"] in ["path", "query"]
+                            ]
+
             # Process responses in metadata
             if "responses" in metadata and hasattr(metadata["responses"], "to_openapi_dict"):
                 # Register response models

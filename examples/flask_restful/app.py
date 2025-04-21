@@ -4,10 +4,12 @@ Flask-RESTful example for Flask-X-OpenAPI-Schema.
 This example demonstrates how to use Flask-X-OpenAPI-Schema with Flask-RESTful.
 """
 
+import os
 import uuid
 from datetime import datetime
+from pathlib import Path
 
-from flask import Flask
+from flask import Flask, send_file
 from flask_restful import Resource, Api
 import yaml
 
@@ -28,6 +30,11 @@ from examples.common.models import (
     ProductCategory,
     ProductStatus,
     ErrorResponse,
+    ProductImageUpload,
+    ProductDocumentUpload,
+    ProductAudioUpload,
+    ProductVideoUpload,
+    FileResponse,
 )
 from examples.common.utils import (
     print_request_info,
@@ -39,6 +46,13 @@ from examples.common.utils import (
 # Create a Flask app
 app = Flask(__name__)
 
+# Configure file uploads
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB max upload size
+app.config["UPLOAD_FOLDER"] = "uploads"
+
+# Create uploads directory if it doesn't exist
+uploads_dir = Path(app.config["UPLOAD_FOLDER"])
+uploads_dir.mkdir(exist_ok=True)
 
 # Create an OpenAPI-enabled API
 class OpenAPIApi(OpenAPIIntegrationMixin, Api):
@@ -47,8 +61,9 @@ class OpenAPIApi(OpenAPIIntegrationMixin, Api):
 
 api = OpenAPIApi(app)
 
-# In-memory database for products
+# In-memory databases
 products_db = {}
+files_db = {}
 
 
 class ProductListResource(Resource):
@@ -410,9 +425,309 @@ class ProductResource(Resource):
         return "", 204
 
 
+class FileDownloadResource(Resource):
+    """Resource for downloading files."""
+
+    @openapi_metadata(
+        summary="Download a file",
+        description="Download a file by its ID",
+        tags=["files"],
+        operation_id="downloadFile",
+        responses=OpenAPIMetaResponse(
+            responses={
+                "200": OpenAPIMetaResponseItem(
+                    description="File downloaded successfully",
+                ),
+                "404": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="File not found",
+                ),
+                "500": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Internal server error",
+                ),
+            }
+        ),
+    )
+    def get(self, file_id: str):
+        """Download a file by its ID."""
+        # Print request information
+        print_request_info(
+            method="GET",
+            path=f"/files/{file_id}",
+            path_params={"file_id": file_id},
+        )
+
+        # Check if file exists
+        if file_id not in files_db:
+            error = ErrorResponse(
+                error_code="FILE_NOT_FOUND",
+                message=f"File with ID {file_id} not found",
+            )
+
+            # Print response information
+            print_response_info(
+                status_code=404,
+                data=error.model_dump(),
+            )
+
+            return error.to_response(404)
+
+        # Get file metadata
+        file_data = files_db[file_id]
+        file_path = file_data["path"]
+        filename = file_data["filename"]
+        content_type = file_data["content_type"]
+
+        # Print response information
+        print_response_info(
+            status_code=200,
+            data={"file": filename, "content_type": content_type},
+        )
+
+        # Send the file
+        return send_file(
+            file_path,
+            mimetype=content_type,
+            as_attachment=True,
+            download_name=filename,
+        )
+
+
+class ProductImageResource(Resource):
+    """Resource for uploading product images."""
+
+    @openapi_metadata(
+        summary="Upload a product image",
+        description="Upload an image for a specific product",
+        tags=["files"],
+        operation_id="uploadProductImage",
+        responses=OpenAPIMetaResponse(
+            responses={
+                "201": OpenAPIMetaResponseItem(
+                    model=FileResponse,
+                    description="Image uploaded successfully",
+                ),
+                "400": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Invalid request data",
+                ),
+                "404": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Product not found",
+                ),
+                "500": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Internal server error",
+                ),
+            }
+        ),
+    )
+    def post(self, product_id: str, _x_file: ProductImageUpload):
+        """Upload a product image file."""
+        # The file is automatically injected into _x_file.file by the decorator
+        file = _x_file.file
+
+        # Print request information
+        print_request_info(
+            method="POST",
+            path=f"/products/{product_id}/images",
+            path_params={"product_id": product_id},
+            file={
+                "filename": file.filename if file and hasattr(file, 'filename') else None,
+                "description": _x_file.description,
+                "is_primary": _x_file.is_primary,
+            },
+        )
+
+        # Check if product exists
+        if product_id not in products_db:
+            error = ErrorResponse(
+                error_code="PRODUCT_NOT_FOUND",
+                message=f"Product with ID {product_id} not found",
+            )
+
+            # Print response information
+            print_response_info(
+                status_code=404,
+                data=error.model_dump(),
+            )
+
+            return error.to_response(404)
+
+        # Save the file
+        file_id = str(uuid.uuid4())
+        filename = file.filename
+        content_type = file.content_type or "application/octet-stream"
+
+        # Create product-specific directory
+        product_dir = uploads_dir / product_id
+        product_dir.mkdir(exist_ok=True)
+
+        # Save file to disk
+        file_path = product_dir / f"{file_id}_{filename}"
+        file.save(file_path)
+
+        # Get file size
+        size = os.path.getsize(file_path)
+
+        # Create file metadata
+        now = datetime.now()
+        file_data = {
+            "id": file_id,
+            "product_id": product_id,
+            "filename": filename,
+            "content_type": content_type,
+            "size": size,
+            "path": str(file_path),
+            "upload_date": now,
+            "description": _x_file.description,
+            "is_primary": _x_file.is_primary,
+            "type": "image",
+        }
+
+        # Save to in-memory database
+        files_db[file_id] = file_data
+
+        # Create response
+        response = FileResponse(
+            id=file_id,
+            filename=filename,
+            content_type=content_type,
+            size=size,
+            upload_date=now,
+            url=f"/files/{file_id}",
+        )
+
+        # Print response information
+        print_response_info(
+            status_code=201,
+            data=response.model_dump(),
+        )
+
+        return response.to_response(201)
+
+
+class ProductDocumentResource(Resource):
+    """Resource for uploading product documents."""
+
+    @openapi_metadata(
+        summary="Upload a product document",
+        description="Upload a document (manual, spec sheet, etc.) for a specific product",
+        tags=["files"],
+        operation_id="uploadProductDocument",
+        responses=OpenAPIMetaResponse(
+            responses={
+                "201": OpenAPIMetaResponseItem(
+                    model=FileResponse,
+                    description="Document uploaded successfully",
+                ),
+                "400": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Invalid request data",
+                ),
+                "404": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Product not found",
+                ),
+                "500": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Internal server error",
+                ),
+            }
+        ),
+    )
+    def post(self, product_id: str, _x_file: ProductDocumentUpload):
+        """Upload a product document file."""
+        # The file is automatically injected into _x_file.file by the decorator
+        file = _x_file.file
+
+        # Print request information
+        print_request_info(
+            method="POST",
+            path=f"/products/{product_id}/documents",
+            path_params={"product_id": product_id},
+            file={
+                "filename": file.filename if file and hasattr(file, 'filename') else None,
+                "title": _x_file.title,
+                "document_type": _x_file.document_type,
+            },
+        )
+
+        # Check if product exists
+        if product_id not in products_db:
+            error = ErrorResponse(
+                error_code="PRODUCT_NOT_FOUND",
+                message=f"Product with ID {product_id} not found",
+            )
+
+            # Print response information
+            print_response_info(
+                status_code=404,
+                data=error.model_dump(),
+            )
+
+            return error.to_response(404)
+
+        # Save the file
+        file_id = str(uuid.uuid4())
+        filename = file.filename
+        content_type = file.content_type or "application/octet-stream"
+
+        # Create product-specific directory
+        product_dir = uploads_dir / product_id
+        product_dir.mkdir(exist_ok=True)
+
+        # Save file to disk
+        file_path = product_dir / f"{file_id}_{filename}"
+        file.save(file_path)
+
+        # Get file size
+        size = os.path.getsize(file_path)
+
+        # Create file metadata
+        now = datetime.now()
+        file_data = {
+            "id": file_id,
+            "product_id": product_id,
+            "filename": filename,
+            "content_type": content_type,
+            "size": size,
+            "path": str(file_path),
+            "upload_date": now,
+            "title": _x_file.title,
+            "document_type": _x_file.document_type,
+            "type": "document",
+        }
+
+        # Save to in-memory database
+        files_db[file_id] = file_data
+
+        # Create response
+        response = FileResponse(
+            id=file_id,
+            filename=filename,
+            content_type=content_type,
+            size=size,
+            upload_date=now,
+            url=f"/files/{file_id}",
+        )
+
+        # Print response information
+        print_response_info(
+            status_code=201,
+            data=response.model_dump(),
+        )
+
+        return response.to_response(201)
+
+
 # Register the resources
 api.add_resource(ProductListResource, "/products")
 api.add_resource(ProductResource, "/products/<string:product_id>")
+api.add_resource(ProductImageResource, "/products/<string:product_id>/images")
+api.add_resource(ProductDocumentResource, "/products/<string:product_id>/documents")
+api.add_resource(FileDownloadResource, "/files/<string:file_id>")
 
 # Debug: Print registered resources
 print("\nRegistered Resources:")
@@ -423,6 +738,9 @@ for resource, urls, _ in api.resources:
 @app.route("/openapi.yaml")
 def get_openapi_spec():
     """Generate and return the OpenAPI specification."""
+    # Manually register models
+    from flask_x_openapi_schema.core.utils import pydantic_to_openapi_schema
+
     # Generate the schema with output_format="json" to get a dictionary
     schema = api.generate_openapi_schema(
         title="Product API",
@@ -430,6 +748,17 @@ def get_openapi_spec():
         description="API for managing products",
         output_format="json"
     )
+
+    # Manually register file upload models
+    if "components" not in schema:
+        schema["components"] = {}
+    if "schemas" not in schema["components"]:
+        schema["components"]["schemas"] = {}
+
+    # Register file models
+    for model in [ProductImageUpload, ProductDocumentUpload, ProductAudioUpload, ProductVideoUpload, FileResponse]:
+        model_schema = pydantic_to_openapi_schema(model)
+        schema["components"]["schemas"][model.__name__] = model_schema
 
     # Debug: Print the schema to console
     print("\nOpenAPI Schema:")
@@ -456,11 +785,11 @@ def index():
     <html>
     <head>
         <title>Product API Documentation</title>
-        <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css">
+        <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.1/swagger-ui.min.css">
     </head>
     <body>
         <div id="swagger-ui"></div>
-        <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.1/swagger-ui-bundle.min.js"></script>
         <script>
             window.onload = function() {
                 SwaggerUIBundle({
@@ -529,15 +858,15 @@ def add_sample_products():
     ]
 
     for product_data in sample_products:
-        # Create a request model
-        request = ProductRequest(**product_data)
+        # Create a product request model
+        product_request = ProductRequest(**product_data)
 
         # Create a product
         product_id = str(uuid.uuid4())
         now = datetime.now()
 
         # Determine product status
-        if not request.in_stock or request.quantity == 0:
+        if not product_request.in_stock or product_request.quantity == 0:
             status = ProductStatus.OUT_OF_STOCK
         else:
             status = ProductStatus.AVAILABLE
@@ -545,15 +874,15 @@ def add_sample_products():
         # Create the product
         product = {
             "id": product_id,
-            "name": request.name,
-            "description": request.description,
-            "price": request.price,
-            "category": request.category,
+            "name": product_request.name,
+            "description": product_request.description,
+            "price": product_request.price,
+            "category": product_request.category,
             "status": status,
-            "tags": request.tags,
-            "in_stock": request.in_stock,
-            "quantity": request.quantity,
-            "attributes": request.attributes,
+            "tags": product_request.tags,
+            "in_stock": product_request.in_stock,
+            "quantity": product_request.quantity,
+            "attributes": product_request.attributes,
             "created_at": now,
             "updated_at": None,
         }

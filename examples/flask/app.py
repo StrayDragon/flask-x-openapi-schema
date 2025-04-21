@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from flask import Flask, Blueprint, jsonify, request, send_file, url_for
+from flask import Flask, Blueprint, jsonify, send_file, url_for
 from flask.views import MethodView
 import yaml
 
@@ -29,6 +29,8 @@ from examples.common.models import (
     ErrorResponse,
     ProductImageUpload,
     ProductDocumentUpload,
+    ProductAudioUpload,
+    ProductVideoUpload,
     FileResponse,
 )
 from examples.common.utils import (
@@ -447,33 +449,22 @@ class ProductImageView(OpenAPIMethodViewMixin, MethodView):
                 ),
             }
         ),
-        # Set content type to multipart/form-data for file uploads
-        content_type="multipart/form-data",
     )
     def post(self, product_id: str, _x_file_image: ProductImageUpload):
         """Upload a product image."""
-        # Get file from request
-        file = request.files.get('file')
-        if not file:
-            error = ErrorResponse(
-                error_code="FILE_REQUIRED",
-                message="File is required",
-            )
-
-            # Print response information
-            print_response_info(
-                status_code=400,
-                data=error.model_dump(),
-            )
-
-            return error.to_response(400)
+        # The file is automatically injected into _x_file_image.file by the decorator
+        file = _x_file_image.file
 
         # Print request information
         print_request_info(
             method="POST",
             path=f"/api/products/{product_id}/images",
             path_params={"product_id": product_id},
-            file={"filename": file.filename},
+            file={
+                "filename": file.filename if file and hasattr(file, 'filename') else None,
+                "description": _x_file_image.description,
+                "is_primary": _x_file_image.is_primary,
+            },
         )
 
         # Check if product exists
@@ -572,26 +563,11 @@ class ProductDocumentView(OpenAPIMethodViewMixin, MethodView):
                 ),
             }
         ),
-        # Set content type to multipart/form-data for file uploads
-        content_type="multipart/form-data",
     )
     def post(self, product_id: str, _x_file_document: ProductDocumentUpload):
         """Upload a product document."""
-        # Get file from request
-        file = request.files.get('file')
-        if not file:
-            error = ErrorResponse(
-                error_code="FILE_REQUIRED",
-                message="File is required",
-            )
-
-            # Print response information
-            print_response_info(
-                status_code=400,
-                data=error.model_dump(),
-            )
-
-            return error.to_response(400)
+        # The file is automatically injected into _x_file_document.file by the decorator
+        file = _x_file_document.file
 
         # Print request information
         print_request_info(
@@ -599,7 +575,7 @@ class ProductDocumentView(OpenAPIMethodViewMixin, MethodView):
             path=f"/api/products/{product_id}/documents",
             path_params={"product_id": product_id},
             file={
-                "filename": file.filename,
+                "filename": file.filename if file and hasattr(file, 'filename') else None,
                 "title": _x_file_document.title,
                 "document_type": _x_file_document.document_type,
             },
@@ -720,11 +696,243 @@ def download_file(file_id):
     )
 
 
+class ProductAudioView(OpenAPIMethodViewMixin, MethodView):
+    """Product audio upload and download endpoints."""
+
+    @openapi_metadata(
+        summary="Upload a product audio",
+        description="Upload an audio file for a specific product",
+        tags=["files"],
+        operation_id="uploadProductAudio",
+        responses=OpenAPIMetaResponse(
+            responses={
+                "201": OpenAPIMetaResponseItem(
+                    model=FileResponse,
+                    description="Audio uploaded successfully",
+                ),
+                "400": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Invalid request data",
+                ),
+                "404": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Product not found",
+                ),
+                "500": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Internal server error",
+                ),
+            }
+        ),
+    )
+    def post(self, product_id: str, _x_file_audio: ProductAudioUpload):
+        """Upload a product audio file."""
+        # The file is automatically injected into _x_file_audio.file by the decorator
+        file = _x_file_audio.file
+
+        # Print request information
+        print_request_info(
+            method="POST",
+            path=f"/api/products/{product_id}/audio",
+            path_params={"product_id": product_id},
+            file={
+                "filename": file.filename if file and hasattr(file, 'filename') else None,
+                "title": _x_file_audio.title,
+                "duration_seconds": _x_file_audio.duration_seconds,
+            },
+        )
+
+        # Check if product exists
+        if product_id not in products_db:
+            error = ErrorResponse(
+                error_code="PRODUCT_NOT_FOUND",
+                message=f"Product with ID {product_id} not found",
+            )
+
+            # Print response information
+            print_response_info(
+                status_code=404,
+                data=error.model_dump(),
+            )
+
+            return error.to_response(404)
+
+        # Save the file
+        file_id = str(uuid.uuid4())
+        filename = file.filename
+        content_type = file.content_type or "application/octet-stream"
+
+        # Create product-specific directory
+        product_dir = uploads_dir / product_id
+        product_dir.mkdir(exist_ok=True)
+
+        # Save file to disk
+        file_path = product_dir / f"{file_id}_{filename}"
+        file.save(file_path)
+
+        # Get file size
+        size = os.path.getsize(file_path)
+
+        # Create file metadata
+        now = datetime.now()
+        file_data = {
+            "id": file_id,
+            "product_id": product_id,
+            "filename": filename,
+            "content_type": content_type,
+            "size": size,
+            "path": str(file_path),
+            "upload_date": now,
+            "title": _x_file_audio.title,
+            "duration_seconds": _x_file_audio.duration_seconds,
+            "type": "audio",
+        }
+
+        # Save to in-memory database
+        files_db[file_id] = file_data
+
+        # Create response
+        response = FileResponse(
+            id=file_id,
+            filename=filename,
+            content_type=content_type,
+            size=size,
+            upload_date=now,
+            url=url_for("api.download_file", file_id=file_id, _external=True),
+        )
+
+        # Print response information
+        print_response_info(
+            status_code=201,
+            data=response.model_dump(),
+        )
+
+        return response.to_response(201)
+
+
+class ProductVideoView(OpenAPIMethodViewMixin, MethodView):
+    """Product video upload and download endpoints."""
+
+    @openapi_metadata(
+        summary="Upload a product video",
+        description="Upload a video file for a specific product",
+        tags=["files"],
+        operation_id="uploadProductVideo",
+        responses=OpenAPIMetaResponse(
+            responses={
+                "201": OpenAPIMetaResponseItem(
+                    model=FileResponse,
+                    description="Video uploaded successfully",
+                ),
+                "400": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Invalid request data",
+                ),
+                "404": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Product not found",
+                ),
+                "500": OpenAPIMetaResponseItem(
+                    model=ErrorResponse,
+                    description="Internal server error",
+                ),
+            }
+        ),
+    )
+    def post(self, product_id: str, _x_file_video: ProductVideoUpload):
+        """Upload a product video file."""
+        # The file is automatically injected into _x_file_video.file by the decorator
+        file = _x_file_video.file
+
+        # Print request information
+        print_request_info(
+            method="POST",
+            path=f"/api/products/{product_id}/video",
+            path_params={"product_id": product_id},
+            file={
+                "filename": file.filename if file and hasattr(file, 'filename') else None,
+                "title": _x_file_video.title,
+                "duration_seconds": _x_file_video.duration_seconds,
+                "resolution": _x_file_video.resolution,
+            },
+        )
+
+        # Check if product exists
+        if product_id not in products_db:
+            error = ErrorResponse(
+                error_code="PRODUCT_NOT_FOUND",
+                message=f"Product with ID {product_id} not found",
+            )
+
+            # Print response information
+            print_response_info(
+                status_code=404,
+                data=error.model_dump(),
+            )
+
+            return error.to_response(404)
+
+        # Save the file
+        file_id = str(uuid.uuid4())
+        filename = file.filename
+        content_type = file.content_type or "application/octet-stream"
+
+        # Create product-specific directory
+        product_dir = uploads_dir / product_id
+        product_dir.mkdir(exist_ok=True)
+
+        # Save file to disk
+        file_path = product_dir / f"{file_id}_{filename}"
+        file.save(file_path)
+
+        # Get file size
+        size = os.path.getsize(file_path)
+
+        # Create file metadata
+        now = datetime.now()
+        file_data = {
+            "id": file_id,
+            "product_id": product_id,
+            "filename": filename,
+            "content_type": content_type,
+            "size": size,
+            "path": str(file_path),
+            "upload_date": now,
+            "title": _x_file_video.title,
+            "duration_seconds": _x_file_video.duration_seconds,
+            "resolution": _x_file_video.resolution,
+            "type": "video",
+        }
+
+        # Save to in-memory database
+        files_db[file_id] = file_data
+
+        # Create response
+        response = FileResponse(
+            id=file_id,
+            filename=filename,
+            content_type=content_type,
+            size=size,
+            upload_date=now,
+            url=url_for("api.download_file", file_id=file_id, _external=True),
+        )
+
+        # Print response information
+        print_response_info(
+            status_code=201,
+            data=response.model_dump(),
+        )
+
+        return response.to_response(201)
+
+
 # Register the views using OpenAPIMethodViewMixin's register_to_blueprint method
 ProductView.register_to_blueprint(blueprint, "/products", "products")
 ProductDetailView.register_to_blueprint(blueprint, "/products/<product_id>", "product_detail")
 ProductImageView.register_to_blueprint(blueprint, "/products/<product_id>/images", "product_images")
 ProductDocumentView.register_to_blueprint(blueprint, "/products/<product_id>/documents", "product_documents")
+ProductAudioView.register_to_blueprint(blueprint, "/products/<product_id>/audio", "product_audio")
+ProductVideoView.register_to_blueprint(blueprint, "/products/<product_id>/video", "product_video")
 
 # Register the blueprint
 app.register_blueprint(blueprint)
@@ -749,6 +957,8 @@ def get_openapi_spec():
     generator._register_model(ProductStatus)
     generator._register_model(ProductImageUpload)
     generator._register_model(ProductDocumentUpload)
+    generator._register_model(ProductAudioUpload)
+    generator._register_model(ProductVideoUpload)
     generator._register_model(FileResponse)
 
     # Process MethodView resources
@@ -782,11 +992,11 @@ def index():
     <html>
     <head>
         <title>Product API Documentation</title>
-        <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css">
+        <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.1/swagger-ui.min.css">
     </head>
     <body>
         <div id="swagger-ui"></div>
-        <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.9.1/swagger-ui-bundle.min.js"></script>
         <script>
             window.onload = function() {
                 SwaggerUIBundle({

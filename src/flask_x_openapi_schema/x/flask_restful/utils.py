@@ -5,7 +5,7 @@ Utilities for integrating Pydantic models with Flask-RESTful.
 import inspect
 from collections.abc import Callable
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, Type, get_type_hints
 
 try:
     from flask_restful import reqparse  # type: ignore
@@ -28,6 +28,8 @@ except ImportError:
 
 
 from pydantic import BaseModel
+
+from ...models.file_models import FileField
 
 
 def pydantic_model_to_reqparse(
@@ -73,15 +75,32 @@ def pydantic_model_to_reqparse(
         # Get field description
         description = field_schema.get("description", "")
 
-        # Add argument to parser
-        parser.add_argument(
-            field_name,
-            type=field_type,
-            required=is_required,
-            location=location,
-            help=description,
-            nullable=not is_required,
-        )
+        # Check if this is a file field
+        is_file_field = False
+        if inspect.isclass(field_info.annotation) and issubclass(field_info.annotation, FileField):
+            is_file_field = True
+
+        # Add argument to parser with appropriate settings
+        if is_file_field and location == "files":
+            # For file uploads, we don't need type conversion
+            parser.add_argument(
+                field_name,
+                type=field_type,
+                required=is_required,
+                location="files",  # Always use 'files' location for file fields
+                help=description,
+                nullable=not is_required,
+            )
+        else:
+            # For regular fields
+            parser.add_argument(
+                field_name,
+                type=field_type,
+                required=is_required,
+                location=location,
+                help=description,
+                nullable=not is_required,
+            )
 
     return parser
 
@@ -122,6 +141,11 @@ def _get_field_type(annotation: Any) -> Callable:
     if inspect.isclass(annotation) and issubclass(annotation, Enum):
         return lambda x: annotation(x)
 
+    # Handle FileField types
+    if inspect.isclass(annotation) and issubclass(annotation, FileField):
+        # For file uploads, we don't need to convert the type
+        return lambda x: x
+
     # Default to string
     return str
 
@@ -130,6 +154,7 @@ def create_reqparse_from_pydantic(
     query_model: Optional[type[BaseModel]] = None,
     body_model: Optional[type[BaseModel]] = None,
     form_model: Optional[type[BaseModel]] = None,
+    file_model: Optional[type[BaseModel]] = None,
 ) -> reqparse.RequestParser:
     """
     Create a Flask-RESTful RequestParser from Pydantic models.
@@ -138,6 +163,7 @@ def create_reqparse_from_pydantic(
         query_model: Pydantic model for query parameters
         body_model: Pydantic model for request body
         form_model: Pydantic model for form data
+        file_model: Pydantic model for file uploads
 
     Returns:
         A Flask-RESTful RequestParser
@@ -153,13 +179,32 @@ def create_reqparse_from_pydantic(
             parser.args.append(arg)
 
     if body_model:
-        body_parser = pydantic_model_to_reqparse(body_model, location="json")
+        # Check if this is a file upload model
+        has_file_fields = False
+        if hasattr(body_model, "model_fields"):
+            for field_name, field_info in body_model.model_fields.items():
+                field_type = field_info.annotation
+                if inspect.isclass(field_type) and issubclass(field_type, FileField):
+                    has_file_fields = True
+                    break
+
+        # If model has file fields, use form location
+        if has_file_fields:
+            body_parser = pydantic_model_to_reqparse(body_model, location="files")
+        else:
+            body_parser = pydantic_model_to_reqparse(body_model, location="json")
+
         for arg in body_parser.args:
             parser.args.append(arg)
 
     if form_model:
         form_parser = pydantic_model_to_reqparse(form_model, location="form")
         for arg in form_parser.args:
+            parser.args.append(arg)
+
+    if file_model:
+        file_parser = pydantic_model_to_reqparse(file_model, location="files")
+        for arg in file_parser.args:
             parser.args.append(arg)
 
     return parser

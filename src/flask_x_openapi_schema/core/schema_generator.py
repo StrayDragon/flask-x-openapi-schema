@@ -139,7 +139,13 @@ class OpenAPISchemaGenerator:
                     if path_params:
                         if "parameters" not in operation:
                             operation["parameters"] = []
-                        operation["parameters"].extend(path_params)
+
+                        # Add path parameters without duplicates
+                        existing_param_names = {p["name"] for p in operation["parameters"] if p["in"] == "path"}
+                        for param in path_params:
+                            if param["name"] not in existing_param_names:
+                                operation["parameters"].append(param)
+                                existing_param_names.add(param["name"])
 
                     operations[method_name] = operation
 
@@ -312,10 +318,34 @@ class OpenAPISchemaGenerator:
             if isinstance(param_type, type) and issubclass(param_type, BaseModel):
                 self._register_model(param_type)
 
-                # Add request body
+                # Check if this is a file upload model
+                is_file_upload = False
+                has_binary_fields = False
+
+                # Check model config for multipart/form-data flag
+                if hasattr(param_type, "model_config"):
+                    config = getattr(param_type, "model_config", {})
+                    if isinstance(config, dict) and config.get("json_schema_extra", {}).get("multipart/form-data", False):
+                        is_file_upload = True
+                elif hasattr(param_type, "Config") and hasattr(param_type.Config, "json_schema_extra"):
+                    config_extra = getattr(param_type.Config, "json_schema_extra", {})
+                    is_file_upload = config_extra.get("multipart/form-data", False)
+
+                # Check if model has any binary fields
+                if hasattr(param_type, "model_fields"):
+                    for field_name, field_info in param_type.model_fields.items():
+                        field_schema = getattr(field_info, "json_schema_extra", None)
+                        if field_schema is not None and field_schema.get("format") == "binary":
+                            has_binary_fields = True
+                            break
+
+                # Determine content type based on model properties
+                content_type = "multipart/form-data" if (is_file_upload or has_binary_fields) else "application/json"
+
+                # Add request body with appropriate content type
                 operation["requestBody"] = {
                     "content": {
-                        "application/json": {
+                        content_type: {
                             "schema": {
                                 "$ref": f"#/components/schemas/{param_type.__name__}"
                             }
@@ -323,6 +353,16 @@ class OpenAPISchemaGenerator:
                     },
                     "required": True,
                 }
+
+                # If this is a file upload model, remove any file parameters from parameters
+                # as they will be included in the requestBody
+                if is_file_upload or has_binary_fields:
+                    if "parameters" in operation:
+                        # Keep only path and query parameters
+                        operation["parameters"] = [
+                            p for p in operation["parameters"]
+                            if p["in"] in ["path", "query"]
+                        ]
                 break
 
     def _add_response_schema(self, method: Any, operation: dict[str, Any]) -> None:

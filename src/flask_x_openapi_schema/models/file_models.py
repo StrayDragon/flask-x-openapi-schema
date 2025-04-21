@@ -2,12 +2,93 @@
 Pydantic models for file uploads in OpenAPI.
 
 These models provide a structured way to handle file uploads with validation and type hints.
+The models are designed to work with OpenAPI 3.0.x specification.
 """
 
-from typing import Any, List, Optional
+from enum import Enum
+from typing import Any, Dict, List, Optional, Type, Union, Annotated, ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic_core import core_schema
 from werkzeug.datastructures import FileStorage
+
+
+class FileType(str, Enum):
+    """Enumeration of file types for OpenAPI schema."""
+    BINARY = "binary"  # For any binary file
+    IMAGE = "image"    # For image files
+    AUDIO = "audio"    # For audio files
+    VIDEO = "video"    # For video files
+    PDF = "pdf"        # For PDF files
+    TEXT = "text"      # For text files
+
+
+class FileField(str):
+    """Field for file uploads in OpenAPI schema.
+
+    This class is used as a type annotation for file upload fields in Pydantic models.
+    It is a subclass of str, but with additional metadata for OpenAPI schema generation.
+    """
+    @classmethod
+    def __get_pydantic_core_schema__(cls, _source_type, _handler):
+        """Define the Pydantic core schema for this type.
+
+        This is the recommended way to define custom types in Pydantic v2.
+        """
+        return core_schema.with_info_plain_validator_function(
+            cls._validate,
+            serialization=core_schema.str_schema(),
+        )
+
+    @classmethod
+    def _validate(cls, v, info):
+        """Validate the value according to Pydantic v2 requirements."""
+        if v is None:
+            raise ValueError('File is required')
+        return v
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, _schema_generator, _field_schema):
+        """Define the JSON schema for OpenAPI."""
+        return {
+            "type": "string",
+            "format": "binary"
+        }
+
+    def __new__(cls, *args, **kwargs):
+        """Create a new instance of the class.
+
+        If a file object is provided, return it directly.
+        """
+        file_obj = kwargs.get('file')
+        if file_obj is not None:
+            return file_obj
+        return str.__new__(cls, '')
+
+
+class ImageField(FileField):
+    """Field for image file uploads in OpenAPI schema."""
+    pass
+
+
+class AudioField(FileField):
+    """Field for audio file uploads in OpenAPI schema."""
+    pass
+
+
+class VideoField(FileField):
+    """Field for video file uploads in OpenAPI schema."""
+    pass
+
+
+class PDFField(FileField):
+    """Field for PDF file uploads in OpenAPI schema."""
+    pass
+
+
+class TextField(FileField):
+    """Field for text file uploads in OpenAPI schema."""
+    pass
 
 
 class FileUploadModel(BaseModel):
@@ -16,7 +97,12 @@ class FileUploadModel(BaseModel):
     file: FileStorage = Field(..., description="The uploaded file")
 
     # Allow arbitrary types for FileStorage
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        json_schema_extra={
+            "multipart/form-data": True
+        }
+    )
 
     @field_validator("file")
     def validate_file(cls, v: Any) -> FileStorage:

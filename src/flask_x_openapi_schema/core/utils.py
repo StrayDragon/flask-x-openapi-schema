@@ -67,6 +67,7 @@ def pydantic_to_openapi_schema(model: type[BaseModel]) -> dict[str, Any]:
 def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
     """
     Fix references in a schema to use components/schemas instead of $defs.
+    Also applies any json_schema_extra attributes to the schema.
 
     Args:
         schema: The schema to fix
@@ -83,12 +84,25 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
             # Replace $defs with components/schemas
             model_name = value.split("/")[-1]
             result[key] = f"#/components/schemas/{model_name}"
+        elif key == "json_schema_extra" and isinstance(value, dict):
+            # Apply json_schema_extra attributes directly to the schema
+            for extra_key, extra_value in value.items():
+                if extra_key == "multipart/form-data":
+                    # Skip this key, it's handled elsewhere
+                    continue
+                result[extra_key] = extra_value
         elif isinstance(value, dict):
             result[key] = _fix_references(value)
         elif isinstance(value, list):
             result[key] = [_fix_references(item) if isinstance(item, dict) else item for item in value]
         else:
             result[key] = value
+
+    # Check if this is a file field
+    if "type" in result and result["type"] == "string" and "format" in result and result["format"] == "binary":
+        # This is a file field, ensure it has the correct format
+        result["type"] = "string"
+        result["format"] = "binary"
 
     return result
 

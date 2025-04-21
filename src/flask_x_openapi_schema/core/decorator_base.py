@@ -273,9 +273,33 @@ def _generate_openapi_metadata(
             actual_request_body, BaseModel
         ):
             # It's a Pydantic model
+            # Check if the model has a Config with multipart/form-data flag
+            is_multipart = False
+            has_file_fields = False
+
+            # Check model config for multipart/form-data flag
+            if hasattr(actual_request_body, "model_config"):
+                config = getattr(actual_request_body, "model_config", {})
+                if isinstance(config, dict) and config.get("json_schema_extra", {}).get("multipart/form-data", False):
+                    is_multipart = True
+            elif hasattr(actual_request_body, "Config") and hasattr(actual_request_body.Config, "json_schema_extra"):
+                config_extra = getattr(actual_request_body.Config, "json_schema_extra", {})
+                is_multipart = config_extra.get("multipart/form-data", False)
+
+            # Check if model has any file fields
+            if hasattr(actual_request_body, "model_fields"):
+                for field_name, field_info in actual_request_body.model_fields.items():
+                    field_schema = getattr(field_info, "json_schema_extra", None)
+                    if field_schema is not None and field_schema.get("format") == "binary":
+                        has_file_fields = True
+                        break
+
+            # If model has file fields or is explicitly marked as multipart/form-data, use multipart/form-data
+            content_type = "multipart/form-data" if (is_multipart or has_file_fields) else "application/json"
+
             metadata["requestBody"] = {
                 "content": {
-                    "application/json": {
+                    content_type: {
                         "schema": {
                             "$ref": f"#/components/schemas/{actual_request_body.__name__}"
                         }
@@ -763,32 +787,63 @@ class OpenAPIDecoratorBase:
 
                     # Extract the file parameter name
                     param_suffix = param_name[file_prefix_len:]
-                    if "_" in param_suffix:
-                        file_param_name = param_suffix.split("_", 1)[1]
-                        if file_param_name in request.files:
-                            file_obj = request.files[file_param_name]
-                            if is_pydantic_model:
-                                # Create a Pydantic model instance with the file
-                                kwargs[param_name] = param_type(file=file_obj)
-                            else:
-                                # Just pass the file directly
-                                kwargs[param_name] = file_obj
+
+                    # Handle _x_file (default to 'file' parameter)
+                    if param_suffix == "":
+                        file_param_name = "file"
+                    # Handle _x_file_XXX (extract XXX as parameter name)
+                    elif param_suffix.startswith("_"):
+                        file_param_name = param_suffix[1:]
                     else:
-                        # If no specific file name is provided, use 'file' as the default
+                        file_param_name = param_suffix
+
+                    # Check if the file exists in request.files
+                    if file_param_name in request.files:
+                        file_obj = request.files[file_param_name]
+                        if is_pydantic_model:
+                            # Create a Pydantic model instance with the file and other form data
+                            model_data = {}
+                            # Add form data to model_data
+                            for field_name, field_value in request.form.items():
+                                model_data[field_name] = field_value
+                            # Add file to model_data
+                            model_data["file"] = file_obj
+                            # Create model instance
+                            kwargs[param_name] = param_type(**model_data)
+                        else:
+                            # Just pass the file directly
+                            kwargs[param_name] = file_obj
+                    else:
+                        # If the specific file name is not found, try fallbacks
+                        # First try 'file' as a common default
                         if "file" in request.files:
                             file_obj = request.files["file"]
                             if is_pydantic_model:
-                                # Create a Pydantic model instance with the file
-                                kwargs[param_name] = param_type(file=file_obj)
+                                # Create a Pydantic model instance with the file and other form data
+                                model_data = {}
+                                # Add form data to model_data
+                                for field_name, field_value in request.form.items():
+                                    model_data[field_name] = field_value
+                                # Add file to model_data
+                                model_data["file"] = file_obj
+                                # Create model instance
+                                kwargs[param_name] = param_type(**model_data)
                             else:
                                 # Just pass the file directly
                                 kwargs[param_name] = file_obj
-                        # If there's only one file, use that
+                        # If there's only one file, use that as a last resort
                         elif len(request.files) == 1:
                             file_obj = next(iter(request.files.values()))
                             if is_pydantic_model:
-                                # Create a Pydantic model instance with the file
-                                kwargs[param_name] = param_type(file=file_obj)
+                                # Create a Pydantic model instance with the file and other form data
+                                model_data = {}
+                                # Add form data to model_data
+                                for field_name, field_value in request.form.items():
+                                    model_data[field_name] = field_value
+                                # Add file to model_data
+                                model_data["file"] = file_obj
+                                # Create model instance
+                                kwargs[param_name] = param_type(**model_data)
                             else:
                                 # Just pass the file directly
                                 kwargs[param_name] = file_obj

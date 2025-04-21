@@ -119,7 +119,42 @@ class FlaskRestfulOpenAPIDecorator:
     ) -> Dict[str, Any]:
         """Process request body parameters for Flask-RESTful."""
         from ..flask_restful.utils import create_reqparse_from_pydantic
+        from flask import request
+        import inspect
+        from ...models.file_models import FileField
 
+        # Check if this is a file upload model
+        has_file_fields = False
+        if hasattr(model, "model_fields"):
+            for field_name, field_info in model.model_fields.items():
+                field_type = field_info.annotation
+                if inspect.isclass(field_type) and issubclass(field_type, FileField):
+                    has_file_fields = True
+                    break
+
+        # If this is a file upload model, handle it differently
+        if has_file_fields and request.files:
+            # Create model data from form and files
+            model_data = {}
+            # Add form data
+            for field_name, field_value in request.form.items():
+                model_data[field_name] = field_value
+            # Add file data
+            for field_name, field_info in model.model_fields.items():
+                field_type = field_info.annotation
+                if inspect.isclass(field_type) and issubclass(field_type, FileField):
+                    # Check if file exists in request
+                    if field_name in request.files:
+                        model_data[field_name] = request.files[field_name]
+                    elif "file" in request.files and field_name == "file":
+                        model_data[field_name] = request.files["file"]
+
+            # Create model instance
+            model_instance = model(**model_data)
+            kwargs[param_name] = model_instance
+            return kwargs
+
+        # Standard handling for non-file models
         # Check if we've already created a reqparse for this model
         if id(model) in _REQPARSE_CACHE:
             parser = _REQPARSE_CACHE[model]
