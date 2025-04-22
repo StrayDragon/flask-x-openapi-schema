@@ -1,13 +1,14 @@
 # Flask-X-OpenAPI-Schema
 
-[![Python](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org/)
+![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FStrayDragon%2Fflask-x-openapi-schema%2Frefs%2Fheads%2Fmain%2Fpyproject.toml%3Ftoken%3DGHSAT0AAAAAACXCLWMTUK6B6EI7XGMEEZHI2AHLBYA)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Coverage](https://img.shields.io/badge/coverage-TODO-yellow.svg)](htmlcov/index.html)
 [![GitHub](https://img.shields.io/badge/github-flask--x--openapi--schema-lightgrey.svg)](https://github.com/StrayDragon/flask-x-openapi-schema)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![CI](https://github.com/StrayDragon/flask-x-openapi-schema/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/StrayDragon/flask-x-openapi-schema/actions/workflows/ci.yaml)
+[![Codecov](https://codecov.io/gh/straydragon/flask-x-openapi-schema/branch/main/graph/badge.svg)](https://codecov.io/gh/straydragon/flask-x-openapi-schema)
 
-A powerful utility for automatically generating OpenAPI schemas from Flask and Flask-RESTful applications. Seamlessly integrates with Flask.MethodView classes and Pydantic models to simplify API documentation with minimal effort.
+A powerful utility for automatically generating OpenAPI schemas support Flask(MethodView) and Flask-RESTful(Resource) applications and Pydantic models to simplify API documentation with minimal effort.
 
 ## 📚 Documentation
 
