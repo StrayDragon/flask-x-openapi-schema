@@ -52,14 +52,8 @@ benchmark-flask-restful:
 	kill $SERVER_PID || true
 	sleep 1
 
-benchmark:
-	#!/usr/bin/env bash
-	# Run all benchmarks
-	just benchmark-flask
-	just benchmark-flask-restful
-	just benchmark-report
-	# Show the report location
-	echo "Performance charts (if available) at: benchmarks/results/performance_charts.png"
+benchmark: benchmark-flask benchmark-flask-restful benchmark-report
+	@echo Done
 
 
 run-example-flask:
