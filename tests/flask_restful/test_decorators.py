@@ -6,7 +6,7 @@ This module tests the openapi_metadata decorator for Flask-RESTful and its funct
 
 import pytest
 from flask import Flask
-from flask_restful import Api, Resource
+from flask_x_openapi_schema._opt_deps._flask_restful import Api, Resource
 from pydantic import BaseModel, Field
 from typing import Optional
 

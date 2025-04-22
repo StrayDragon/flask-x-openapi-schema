@@ -9,7 +9,7 @@ import json
 import pytest
 
 from flask import Flask
-from flask_restful import Api, Resource
+from flask_x_openapi_schema._opt_deps._flask_restful import Api, Resource
 from werkzeug.datastructures import FileStorage
 
 from flask_x_openapi_schema import (

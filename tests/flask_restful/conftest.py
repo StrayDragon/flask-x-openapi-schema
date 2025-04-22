@@ -4,7 +4,7 @@ Shared fixtures for Flask-RESTful specific tests.
 
 import pytest
 from flask import Flask, Blueprint
-from flask_restful import Api
+from flask_x_openapi_schema._opt_deps._flask_restful import Api
 
 
 @pytest.fixture

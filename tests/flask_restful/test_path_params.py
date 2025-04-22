@@ -4,7 +4,7 @@ Tests for path parameter handling in Flask-RESTful.
 
 import pytest
 from flask import Flask
-from flask_restful import Resource
+from flask_x_openapi_schema._opt_deps._flask_restful import Resource
 
 from flask_x_openapi_schema.x.flask_restful import (
     openapi_metadata,

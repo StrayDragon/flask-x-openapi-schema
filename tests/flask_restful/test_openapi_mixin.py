@@ -8,7 +8,7 @@ import pytest
 from typing import List, Optional
 
 from flask import Flask
-from flask_restful import Api, Resource
+from flask_x_openapi_schema._opt_deps._flask_restful import Api, Resource
 from pydantic import BaseModel, Field
 
 from flask_x_openapi_schema import (
