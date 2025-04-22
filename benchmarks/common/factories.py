@@ -4,7 +4,6 @@ Factory classes for generating valid test data.
 This module contains factory classes for generating valid test data using polyfactory.
 """
 
-import random
 from polyfactory.factories.pydantic_factory import ModelFactory
 from benchmarks.common.models import (
     UserRequest,
