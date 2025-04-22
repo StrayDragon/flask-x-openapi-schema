@@ -30,7 +30,11 @@ def pydantic_model_to_reqparse(
         A Flask-RESTful RequestParser
     """
     if not HAS_FLASK_RESTFUL:
-        raise ImportError("Flask-RESTful is not installed")
+        raise ImportError(
+            "The 'Flask-RESTful integration' feature requires the 'flask-restful' package, "
+            "which is not installed. Please install it with: pip install flask-restful or "
+            "pip install flask-x-openapi-schema[flask-restful]"
+        )
 
     parser = reqparse.RequestParser()
     exclude = exclude or []
@@ -154,7 +158,11 @@ def create_reqparse_from_pydantic(
         A Flask-RESTful RequestParser
     """
     if not HAS_FLASK_RESTFUL:
-        raise ImportError("Flask-RESTful is not installed")
+        raise ImportError(
+            "The 'Flask-RESTful integration' feature requires the 'flask-restful' package, "
+            "which is not installed. Please install it with: pip install flask-restful or "
+            "pip install flask-x-openapi-schema[flask-restful]"
+        )
 
     parser = reqparse.RequestParser()
 

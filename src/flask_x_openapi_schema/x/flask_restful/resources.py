@@ -6,7 +6,7 @@ from typing import Any, Literal, Optional, Union
 
 import yaml
 
-from flask_x_openapi_schema._opt_deps._flask_restful import Api, HAS_FLASK_RESTFUL
+from flask_x_openapi_schema._opt_deps._flask_restful import Api
 
 
 from ...core.config import (

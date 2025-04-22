@@ -5,16 +5,13 @@ This module provides a centralized way to handle optional dependencies.
 It allows the library to work even when optional dependencies are not installed.
 """
 
-from typing import Any, Dict, List, Optional, Set, Type, Union
+from .._import_utils import import_optional_dependency
 
-# Flag to indicate if flask-restful is installed
-HAS_FLASK_RESTFUL = False
-
-try:
-    import flask_x_openapi_schema._opt_deps._flask_restful.real as real  # noqa: F401
-    HAS_FLASK_RESTFUL = True
-except ImportError:
-    pass
+# 检测 flask_restful 是否已安装
+flask_restful = import_optional_dependency(
+    "flask_restful", "Flask-RESTful integration", raise_error=False
+)
+HAS_FLASK_RESTFUL = flask_restful is not None
 
 # Re-export flask-restful components if available
 if HAS_FLASK_RESTFUL:
