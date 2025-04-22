@@ -11,7 +11,7 @@ from functools import lru_cache
 from typing import Any, Dict, List, Optional, Set, Type, get_type_hints
 
 from flask import Blueprint
-from flask_restful import Resource  # type: ignore
+from flask_x_openapi_schema._opt_deps._flask_restful import Resource
 from pydantic import BaseModel
 
 from ..i18n.i18n_model import I18nBaseModel

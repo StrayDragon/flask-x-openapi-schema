@@ -7,24 +7,7 @@ from collections.abc import Callable
 from enum import Enum
 from typing import Any, Optional, Union
 
-try:
-    from flask_restful import reqparse  # type: ignore
-
-    HAS_FLASK_RESTFUL = True
-except ImportError:
-    HAS_FLASK_RESTFUL = False
-
-    # Create a placeholder class for when Flask-RESTful is not available
-    class reqparse:
-        class RequestParser:
-            def __init__(self):
-                self.args = []
-
-            def add_argument(self, *args, **kwargs):
-                pass
-
-            def parse_args(self):
-                return {}
+from flask_x_openapi_schema._opt_deps._flask_restful import reqparse, HAS_FLASK_RESTFUL
 
 
 from pydantic import BaseModel

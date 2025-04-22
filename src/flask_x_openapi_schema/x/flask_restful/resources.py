@@ -6,16 +6,7 @@ from typing import Any, Literal, Optional, Union
 
 import yaml
 
-try:
-    from flask_restful import Api
-
-    HAS_FLASK_RESTFUL = True
-except ImportError:
-    HAS_FLASK_RESTFUL = False
-
-    # Create a placeholder class for when Flask-RESTful is not available
-    class Api:
-        pass
+from flask_x_openapi_schema._opt_deps._flask_restful import Api, HAS_FLASK_RESTFUL
 
 
 from ...core.config import (
