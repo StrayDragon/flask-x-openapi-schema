@@ -38,31 +38,27 @@ def pydantic_to_openapi_schema(model: Type[BaseModel]) -> Dict[str, Any]:
     # Initialize schema with default values
     schema: Dict[str, Any] = {"type": "object", "properties": {}, "required": []}
 
-    try:
-        # Get model schema from Pydantic
-        model_schema = model.model_json_schema()
+    # Get model schema from Pydantic
+    model_schema = model.model_json_schema()
 
-        # Extract properties and required fields
-        if "properties" in model_schema:
-            # Process properties to fix references
-            properties = {}
-            for prop_name, prop_schema in model_schema["properties"].items():
-                properties[prop_name] = _fix_references(prop_schema)
-            schema["properties"] = properties
+    # Extract properties and required fields
+    if "properties" in model_schema:
+        # Process properties to fix references
+        properties = {}
+        for prop_name, prop_schema in model_schema["properties"].items():
+            properties[prop_name] = _fix_references(prop_schema)
+        schema["properties"] = properties
 
-        # Copy required fields if present
-        if "required" in model_schema:
-            schema["required"] = model_schema["required"]
+    # Copy required fields if present
+    if "required" in model_schema:
+        schema["required"] = model_schema["required"]
 
-        # Add description if available
-        if model.__doc__:
-            schema["description"] = model.__doc__.strip()
+    # Add description if available
+    if model.__doc__:
+        schema["description"] = model.__doc__.strip()
 
-        # Cache the schema
-        MODEL_SCHEMA_CACHE.set(model_key, schema)
-    except Exception as e:
-        # Log error but continue with default schema
-        print(f"Error generating schema for {model.__name__}: {e}")
+    # Cache the schema
+    MODEL_SCHEMA_CACHE.set(model_key, schema)
 
     return schema
 

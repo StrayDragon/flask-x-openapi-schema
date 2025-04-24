@@ -197,9 +197,6 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
             # This is an OpenAPIMetaResponse object
             for status_code, response_item in metadata["responses"].responses.items():
                 if response_item.model:
-                    print(
-                        f"Registering response model from _register_models_from_method: {response_item.model.__name__} for status code {status_code}"
-                    )
                     # Register the response model
                     self._register_model(response_item.model)
 
@@ -385,17 +382,10 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
             ):
                 # Register response models
                 if hasattr(metadata["responses"], "responses"):
-                    print(
-                        f"Found OpenAPIMetaResponse with {len(metadata['responses'].responses)} responses"
-                    )
                     for status_code, response_item in metadata[
                         "responses"
                     ].responses.items():
-                        print(f"Processing response for status code {status_code}")
                         if response_item.model:
-                            print(
-                                f"Registering model from _process_methodview: {response_item.model.__name__}"
-                            )
                             # Force register the model and its nested models
                             self._register_model(response_item.model)
 
@@ -415,15 +405,9 @@ class MethodViewOpenAPISchemaGenerator(OpenAPISchemaGenerator):
                                         args = getattr(field_type, "__args__", [])
                                         for arg in args:
                                             if hasattr(arg, "__members__"):
-                                                print(
-                                                    f"Registering enum type: {arg.__name__}"
-                                                )
                                                 self._register_model(arg)
                                     elif hasattr(field_type, "__members__"):
                                         # Direct enum type
-                                        print(
-                                            f"Registering enum type: {field_type.__name__}"
-                                        )
                                         self._register_model(field_type)
 
                 # Convert OpenAPIMetaResponse to dict

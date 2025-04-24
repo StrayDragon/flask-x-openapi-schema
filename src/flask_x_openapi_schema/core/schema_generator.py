@@ -462,21 +462,17 @@ class OpenAPISchemaGenerator:
         if not issubclass(model, BaseModel):
             return
 
-        # Generate schema (thread-safe via utils.py caching)
-        try:
-            if issubclass(model, I18nBaseModel):
-                # Create a language-specific version of the model
-                language_model = model.for_language(self.language)
-                schema = pydantic_to_openapi_schema(language_model)
-            else:
-                # Use the cached version from utils.py
-                schema = pydantic_to_openapi_schema(model)
+        if issubclass(model, I18nBaseModel):
+            # Create a language-specific version of the model
+            language_model = model.for_language(self.language)
+            schema = pydantic_to_openapi_schema(language_model)
+        else:
+            # Use the cached version from utils.py
+            schema = pydantic_to_openapi_schema(model)
 
-            # Update components in a thread-safe manner
-            with self._components_lock:
-                self.components["schemas"][model.__name__] = schema
-        except Exception as e:
-            print(f"Error registering model {model.__name__}: {e}")
+        # Update components in a thread-safe manner
+        with self._components_lock:
+            self.components["schemas"][model.__name__] = schema
 
         # Register nested models
         self._register_nested_models(model)

@@ -38,9 +38,6 @@ class OpenAPIMetaResponseItem(BaseModel):
 
         # Add content if model is provided
         if self.model:
-            print(
-                f"OpenAPIMetaResponseItem.to_openapi_dict: model={self.model.__name__}"
-            )
             response["content"] = {
                 self.content_type: {
                     "schema": {"$ref": f"#/components/schemas/{self.model.__name__}"}
