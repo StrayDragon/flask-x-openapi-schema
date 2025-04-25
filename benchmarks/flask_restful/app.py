@@ -4,7 +4,7 @@ Flask-RESTful benchmark applications.
 This module contains Flask-RESTful applications for benchmarking with and without flask-x-openapi-schema.
 """
 
-from flask import Flask
+from flask import Flask, request, jsonify
 from flask_restful import Api, Resource, reqparse
 
 from flask_x_openapi_schema import OpenAPIMetaResponse, OpenAPIMetaResponseItem
@@ -14,6 +14,7 @@ from benchmarks.common.models import (
     UserQueryParams,
     UserResponse,
     Error400Resp,
+    UserRole,
 )
 
 
@@ -26,20 +27,20 @@ def create_standard_flask_restful_app(app: Flask):
 
         def post(self, user_id):
             """Create a user using standard Flask-RESTful."""
-            # Create a request parser
+            # Create a request parser for body parameters
             parser = reqparse.RequestParser()
             parser.add_argument(
-                "username", type=str, required=True, help="Username is required"
+                "username", type=str, required=True, help="Username is required", location="json"
             )
             parser.add_argument(
-                "email", type=str, required=True, help="Email is required"
+                "email", type=str, required=True, help="Email is required", location="json"
             )
             parser.add_argument(
-                "full_name", type=str, required=True, help="Full name is required"
+                "full_name", type=str, required=True, help="Full name is required", location="json"
             )
-            parser.add_argument("age", type=int, required=True, help="Age is required")
-            parser.add_argument("is_active", type=bool, default=True)
-            parser.add_argument("tags", type=list, default=[])
+            parser.add_argument("age", type=int, required=True, help="Age is required", location="json")
+            parser.add_argument("is_active", type=bool, default=True, location="json")
+            parser.add_argument("tags", type=list, default=[], location="json")
 
             # Parse query parameters
             query_parser = reqparse.RequestParser()
@@ -49,12 +50,46 @@ def create_standard_flask_restful_app(app: Flask):
             query_parser.add_argument(
                 "sort_by", type=str, default="username", location="args"
             )
+            query_parser.add_argument(
+                "sort_order", type=str, default="asc", location="args"
+            )
             query_parser.add_argument("limit", type=int, default=10, location="args")
             query_parser.add_argument("offset", type=int, default=0, location="args")
+            query_parser.add_argument(
+                "filter_role", type=str, default=None, location="args"
+            )
+            query_parser.add_argument(
+                "search", type=str, default=None, location="args"
+            )
+            query_parser.add_argument(
+                "min_age", type=int, default=None, location="args"
+            )
+            query_parser.add_argument(
+                "max_age", type=int, default=None, location="args"
+            )
+            query_parser.add_argument(
+                "tags", type=str, default=None, location="args"
+            )
+            query_parser.add_argument(
+                "created_after", type=str, default=None, location="args"
+            )
+            query_parser.add_argument(
+                "created_before", type=str, default=None, location="args"
+            )
 
             # Parse arguments
-            args = parser.parse_args(strict=True)
-            _ = query_parser.parse_args()
+            args = parser.parse_args(strict=False, req=request)
+            query_args = query_parser.parse_args(strict=False, req=request)
+
+            # Validate filter_role if present
+            if query_args.get("filter_role"):
+                valid_roles = [role.value for role in UserRole]
+                print(f"Valid roles: {valid_roles}")
+                print(f"Current filter_role: {query_args['filter_role']}")
+                if query_args["filter_role"] not in valid_roles:
+                    return jsonify({
+                        "error": f"filter_role must be one of: {', '.join(valid_roles)}"
+                    }), 400
 
             # Create response
             response = {
@@ -72,7 +107,7 @@ def create_standard_flask_restful_app(app: Flask):
             return response, 201
 
     # Register the resource
-    api.add_resource(StandardUserResource, "/standard/api/users/<string:user_id>")
+    api.add_resource(StandardUserResource, "/standard/api/users/<user_id>")
 
     return app
 
@@ -105,28 +140,35 @@ def create_openapi_flask_restful_app(app: Flask):
             self, user_id, _x_body: UserRequest = None, _x_query: UserQueryParams = None
         ):
             """Create a user using flask-x-openapi-schema."""
-            try:
-                # Create response
-                response = UserResponse(
-                    id=user_id,
-                    username=_x_body.username,
-                    email=_x_body.email,
-                    full_name=_x_body.full_name,
-                    age=_x_body.age,
-                    is_active=_x_body.is_active,
-                    tags=_x_body.tags,
-                    created_at="2023-01-01T00:00:00Z",
-                    updated_at=None,
-                )
+            if _x_query:
+                # Validate filter_role if present (should be handled by Pydantic, but double-check)
+                if _x_query.filter_role:
+                    valid_roles = [role for role in UserRole]
+                    print(f"Valid roles: {[role.value for role in valid_roles]}")
+                    print(f"Current filter_role: {_x_query.filter_role}")
+                    if _x_query.filter_role not in valid_roles:
+                        return jsonify({
+                            "error": f"filter_role must be one of: {', '.join([role.value for role in UserRole])}"
+                        }), 400
 
-                return response.to_response(201)
-            except Exception as e:
-                # Log the error for debugging
-                print(f"Error in OpenAPIUserResource.post: {e}")
-                return {"error": str(e)}, 400
+            # Create response
+            response = UserResponse(
+                id=user_id,
+                username=_x_body.username,
+                email=_x_body.email,
+                full_name=_x_body.full_name,
+                age=_x_body.age,
+                is_active=_x_body.is_active,
+                tags=_x_body.tags,
+                created_at="2023-01-01T00:00:00Z",
+                updated_at=None,
+            )
+
+            return response.to_response(201)
+
 
     # Register the resource
-    api.add_resource(OpenAPIUserResource, "/openapi/api/users/<string:user_id>")
+    api.add_resource(OpenAPIUserResource, "/openapi/api/users/<user_id>")
 
     return app
 
@@ -145,4 +187,4 @@ def create_combined_app():
 app = create_combined_app()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5001)

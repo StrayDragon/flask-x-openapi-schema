@@ -1,3 +1,3 @@
 """
-Flask-RESTful specific benchmarks for flask-x-openapi-schema.
+Flask-RESTful benchmarks package.
 """

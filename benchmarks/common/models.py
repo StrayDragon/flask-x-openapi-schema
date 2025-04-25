@@ -30,8 +30,6 @@ class AddressModel(BaseModel):
     country: str = Field(..., description="Country")
     is_primary: bool = Field(True, description="Whether this is the primary address")
 
-    model_config = {"arbitrary_types_allowed": True}
-
 
 class ContactInfo(BaseModel):
     """Contact information model."""
@@ -39,8 +37,6 @@ class ContactInfo(BaseModel):
     phone: Optional[str] = Field(None, description="Phone number")
     alternative_email: Optional[EmailStr] = Field(None, description="Alternative email")
     emergency_contact: Optional[str] = Field(None, description="Emergency contact")
-
-    model_config = {"arbitrary_types_allowed": True}
 
 
 class Preferences(BaseModel):
@@ -53,8 +49,6 @@ class Preferences(BaseModel):
     language: str = Field("en", description="Preferred language")
     timezone: str = Field("UTC", description="Preferred timezone")
     email_frequency: str = Field("daily", description="Email notification frequency")
-
-    model_config = {"arbitrary_types_allowed": True}
 
 
 class UserRequest(BaseModel):
@@ -84,8 +78,6 @@ class UserRequest(BaseModel):
             raise ValueError("must be a valid email")
         return v
 
-    model_config = {"arbitrary_types_allowed": True}
-
 
 class UserQueryParams(BaseModel):
     """Query parameters for user endpoints."""
@@ -109,8 +101,6 @@ class UserQueryParams(BaseModel):
         None, description="Filter by creation date (ISO format)"
     )
 
-    model_config = {"arbitrary_types_allowed": True}
-
 
 class UserStats(BaseModel):
     """User statistics model."""
@@ -120,8 +110,6 @@ class UserStats(BaseModel):
     post_count: int = Field(0, description="Number of posts")
     comment_count: int = Field(0, description="Number of comments")
     reputation: int = Field(0, description="User reputation score")
-
-    model_config = {"arbitrary_types_allowed": True}
 
 
 class UserResponse(BaseRespModel):
@@ -148,8 +136,6 @@ class UserResponse(BaseRespModel):
     stats: UserStats = Field(default_factory=UserStats, description="User statistics")
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: Optional[str] = Field(None, description="Last update timestamp")
-
-    model_config = {"arbitrary_types_allowed": True}
 
 
 class Error400Resp(BaseModel):

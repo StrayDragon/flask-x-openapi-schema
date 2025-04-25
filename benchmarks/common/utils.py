@@ -8,7 +8,6 @@ import random
 import time
 from datetime import datetime
 from typing import Dict, Any
-from urllib.parse import urlencode
 
 from benchmarks.common.factories import UserRequestFactory, UserQueryParamsFactory
 
@@ -26,7 +25,7 @@ def get_random_user_data() -> Dict[str, Any]:
     user_request = UserRequestFactory.build()
 
     # Convert to dictionary for compatibility with existing code
-    return user_request.model_dump()
+    return user_request.model_dump(mode='json', exclude_none=True)
 
 
 def get_random_user_id() -> str:
@@ -34,26 +33,14 @@ def get_random_user_id() -> str:
     return f"user-{random.randint(1000, 9999)}"
 
 
-def get_query_params() -> str:
+def get_query_params() -> dict:
     """Get random query parameters for benchmarking.
 
     Uses polyfactory to generate valid query parameters that will pass validation.
     """
-    # Generate valid query parameters using the factory
     query_params = UserQueryParamsFactory.build()
 
-    # Convert to dictionary and filter out None values
-    params = {k: v for k, v in query_params.model_dump().items() if v is not None}
-
-    # Special handling for tags which should be comma-separated
-    if params.get("tags") is not None and isinstance(params["tags"], str):
-        # Ensure tags is a valid string format
-        if params["tags"].strip() == "":
-            params.pop("tags")
-
-    # Convert to query string
-    query_string = "?" + urlencode(params)
-    return query_string
+    return query_params.model_dump(mode="json", exclude_none=True)
 
 
 def get_performance_metrics() -> Dict[str, Any]:

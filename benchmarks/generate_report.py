@@ -25,32 +25,18 @@ def calculate_percentiles(data):
     """Calculate percentiles from the Locust CSV data."""
     if data.empty:
         return {}
-    # Locust already provides percentiles in the CSV
-    try:
-        return {
-            "p50": data["50%"].median(),
-            "p75": data["75%"].median(),
-            "p90": data["90%"].median(),
-            "p95": data["95%"].median(),
-            "p99": data["99%"].median(),
-        }
-    except KeyError:
-        # Fallback if percentile columns are not found
-        return {
-            "p50": data["Median Response Time"].median(),
-            "p75": data["75%"].median()
-            if "75%" in data.columns
-            else data["Median Response Time"].median() * 1.2,
-            "p90": data["90%"].median()
-            if "90%" in data.columns
-            else data["Median Response Time"].median() * 1.5,
-            "p95": data["95%"].median()
-            if "95%" in data.columns
-            else data["Median Response Time"].median() * 1.8,
-            "p99": data["99%"].median()
-            if "99%" in data.columns
-            else data["Median Response Time"].median() * 2.0,
-        }
+
+    # Extract percentiles directly from the data
+    percentiles = {}
+    for p in ["50%", "75%", "90%", "95%", "99%"]:
+        if p in data.columns:
+            percentiles[p.replace("%", "")] = data[p].median()
+
+    # Fallback for missing percentiles
+    if "50" not in percentiles and "Median Response Time" in data.columns:
+        percentiles["50"] = data["Median Response Time"].median()
+
+    return percentiles
 
 
 def generate_performance_charts(flask_results, flask_restful_results):
@@ -62,7 +48,7 @@ def generate_performance_charts(flask_results, flask_restful_results):
     fig, axs = plt.subplots(2, 2, figsize=(15, 10))
     fig.suptitle("Performance Comparison: Standard vs OpenAPI", fontsize=16)
 
-    # Response Time Comparison
+    # Process Flask results
     if flask_results is not None:
         standard_rows = flask_results[flask_results["Name"].str.contains("/standard/")]
         openapi_rows = flask_results[flask_results["Name"].str.contains("/openapi/")]
@@ -95,7 +81,7 @@ def generate_performance_charts(flask_results, flask_restful_results):
             axs[0, 1].set_title("Requests per Second (Flask)")
             axs[0, 1].set_ylabel("Requests/s")
 
-    # Response Time Comparison for Flask-RESTful
+    # Process Flask-RESTful results
     if flask_restful_results is not None:
         standard_rows = flask_restful_results[
             flask_restful_results["Name"].str.contains("/standard/")
@@ -136,6 +122,33 @@ def generate_performance_charts(flask_results, flask_restful_results):
     plt.savefig("benchmarks/results/performance_charts.png")
 
 
+def calculate_metrics(data, endpoint_type):
+    """Calculate metrics for a specific endpoint type."""
+    if data is None or data.empty:
+        return None
+
+    rows = data[data["Name"].str.contains(f"/{endpoint_type}/")]
+    if rows.empty:
+        return None
+
+    metrics = {
+        "requests": rows["Request Count"].sum(),
+        "failures": rows["Failure Count"].sum(),
+        "success_rate": 100 - (rows["Failure Count"].sum() / rows["Request Count"].sum() * 100),
+        "avg_response_time": rows["Average Response Time"].mean(),
+        "min_response_time": rows["Min Response Time"].min(),
+        "max_response_time": rows["Max Response Time"].max(),
+        "rps": rows["Requests/s"].sum(),
+    }
+
+    # Add percentiles
+    percentiles = calculate_percentiles(rows)
+    for p, value in percentiles.items():
+        metrics[f"p{p}"] = value
+
+    return metrics
+
+
 def generate_report():
     """Generate a benchmark report."""
     console = Console()
@@ -146,7 +159,13 @@ def generate_report():
 
     if flask_results is None and flask_restful_results is None:
         console.print("[bold red]No benchmark results found.")
+        # 创建一个空的报告文件，表示尝试过生成报告
+        with open("benchmarks/results/report.txt", "w") as f:
+            f.write("No benchmark results found.\n")
         return
+
+    # 确保结果目录存在
+    os.makedirs("benchmarks/results", exist_ok=True)
 
     # Generate charts
     try:
@@ -161,249 +180,82 @@ def generate_report():
     table.add_column("Framework", style="cyan")
     table.add_column("Endpoint", style="green")
     table.add_column("Requests", style="blue")
-    table.add_column("Failures", style="red")
+    table.add_column("Success Rate", style="green")
     table.add_column("Median (ms)", style="yellow")
-    table.add_column("90%ile (ms)", style="yellow")
     table.add_column("95%ile (ms)", style="yellow")
-    table.add_column("99%ile (ms)", style="yellow")
     table.add_column("Avg (ms)", style="yellow")
-    table.add_column("Min (ms)", style="yellow")
-    table.add_column("Max (ms)", style="yellow")
     table.add_column("RPS", style="magenta")
+    table.add_column("Overhead", style="red")
 
-    # Add Flask results
+    # Process Flask results
     if flask_results is not None:
-        # Calculate metrics for standard and OpenAPI endpoints
-        standard_rows = flask_results[flask_results["Name"].str.contains("/standard/")]
-        openapi_rows = flask_results[flask_results["Name"].str.contains("/openapi/")]
+        std_metrics = calculate_metrics(flask_results, "standard")
+        api_metrics = calculate_metrics(flask_results, "openapi")
 
-        if not standard_rows.empty:
-            # Calculate metrics for standard endpoint
-            framework = "Flask"
-            endpoint = "Standard"
-            requests = standard_rows["Request Count"].sum()
-            failures = standard_rows["Failure Count"].sum()
-
-            # Calculate percentiles
-            percentiles = calculate_percentiles(standard_rows)
-            median = percentiles.get(
-                "p50", standard_rows["Median Response Time"].median()
+        if std_metrics and api_metrics:
+            # Standard endpoint row
+            table.add_row(
+                "Flask",
+                "Standard",
+                str(int(std_metrics["requests"])),
+                f"{std_metrics['success_rate']:.2f}%",
+                f"{std_metrics.get('p50', 0):.2f}",
+                f"{std_metrics.get('p95', 0):.2f}",
+                f"{std_metrics['avg_response_time']:.2f}",
+                f"{std_metrics['rps']:.2f}",
+                "baseline",
             )
-            percentile_90 = percentiles.get(
-                "p90",
-                standard_rows["90%"].median() if "90%" in standard_rows.columns else 0,
-            )
-            percentile_95 = percentiles.get("p95", 0)
-            percentile_99 = percentiles.get("p99", 0)
 
-            avg = standard_rows["Average Response Time"].mean()
-            min_time = standard_rows["Min Response Time"].min()
-            max_time = standard_rows["Max Response Time"].max()
-            rps = standard_rows["Requests/s"].sum()
+            # OpenAPI endpoint row
+            overhead = ((api_metrics["avg_response_time"] - std_metrics["avg_response_time"]) /
+                        std_metrics["avg_response_time"] * 100)
 
             table.add_row(
-                framework,
-                endpoint,
-                str(int(requests)),
-                str(int(failures)),
-                f"{median:.2f}",
-                f"{percentile_90:.2f}",
-                f"{percentile_95:.2f}",
-                f"{percentile_99:.2f}",
-                f"{avg:.2f}",
-                f"{min_time:.2f}",
-                f"{max_time:.2f}",
-                f"{rps:.2f}",
+                "Flask",
+                "OpenAPI",
+                str(int(api_metrics["requests"])),
+                f"{api_metrics['success_rate']:.2f}%",
+                f"{api_metrics.get('p50', 0):.2f}",
+                f"{api_metrics.get('p95', 0):.2f}",
+                f"{api_metrics['avg_response_time']:.2f}",
+                f"{api_metrics['rps']:.2f}",
+                f"{overhead:+.2f}%",
             )
 
-        if not openapi_rows.empty:
-            # Calculate metrics for OpenAPI endpoint
-            framework = "Flask"
-            endpoint = "OpenAPI"
-            requests = openapi_rows["Request Count"].sum()
-            failures = openapi_rows["Failure Count"].sum()
-
-            # Calculate percentiles
-            percentiles = calculate_percentiles(openapi_rows)
-            median = percentiles.get(
-                "p50", openapi_rows["Median Response Time"].median()
-            )
-            percentile_90 = percentiles.get(
-                "p90",
-                openapi_rows["90%"].median() if "90%" in openapi_rows.columns else 0,
-            )
-            percentile_95 = percentiles.get("p95", 0)
-            percentile_99 = percentiles.get("p99", 0)
-
-            avg = openapi_rows["Average Response Time"].mean()
-            min_time = openapi_rows["Min Response Time"].min()
-            max_time = openapi_rows["Max Response Time"].max()
-            rps = openapi_rows["Requests/s"].sum()
-
-            table.add_row(
-                framework,
-                endpoint,
-                str(int(requests)),
-                str(int(failures)),
-                f"{median:.2f}",
-                f"{percentile_90:.2f}",
-                f"{percentile_95:.2f}",
-                f"{percentile_99:.2f}",
-                f"{avg:.2f}",
-                f"{min_time:.2f}",
-                f"{max_time:.2f}",
-                f"{rps:.2f}",
-            )
-
-            # Calculate performance difference
-            if not standard_rows.empty:
-                perf_diff = (
-                    (avg - standard_rows["Average Response Time"].mean())
-                    / standard_rows["Average Response Time"].mean()
-                    * 100
-                )
-                rps_diff = (
-                    (rps - standard_rows["Requests/s"].sum())
-                    / standard_rows["Requests/s"].sum()
-                    * 100
-                )
-
-                diff_text = f"[{'green' if perf_diff <= 0 else 'red'}]Response time: {perf_diff:.2f}% | "
-                diff_text += f"[{'green' if rps_diff >= 0 else 'red'}]RPS: {'+' if rps_diff > 0 else ''}{rps_diff:.2f}%"
-
-                table.add_row(
-                    "Flask",
-                    "Difference",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    diff_text,
-                    "",
-                    "",
-                    "",
-                )
-
-    # Add Flask-RESTful results
+    # Process Flask-RESTful results
     if flask_restful_results is not None:
-        # Calculate metrics for standard and OpenAPI endpoints
-        standard_rows = flask_restful_results[
-            flask_restful_results["Name"].str.contains("/standard/")
-        ]
-        openapi_rows = flask_restful_results[
-            flask_restful_results["Name"].str.contains("/openapi/")
-        ]
+        std_metrics = calculate_metrics(flask_restful_results, "standard")
+        api_metrics = calculate_metrics(flask_restful_results, "openapi")
 
-        if not standard_rows.empty:
-            # Calculate metrics for standard endpoint
-            framework = "Flask-RESTful"
-            endpoint = "Standard"
-            requests = standard_rows["Request Count"].sum()
-            failures = standard_rows["Failure Count"].sum()
-
-            # Calculate percentiles
-            percentiles = calculate_percentiles(standard_rows)
-            median = percentiles.get(
-                "p50", standard_rows["Median Response Time"].median()
+        if std_metrics and api_metrics:
+            # Standard endpoint row
+            table.add_row(
+                "Flask-RESTful",
+                "Standard",
+                str(int(std_metrics["requests"])),
+                f"{std_metrics['success_rate']:.2f}%",
+                f"{std_metrics.get('p50', 0):.2f}",
+                f"{std_metrics.get('p95', 0):.2f}",
+                f"{std_metrics['avg_response_time']:.2f}",
+                f"{std_metrics['rps']:.2f}",
+                "baseline",
             )
-            percentile_90 = percentiles.get(
-                "p90",
-                standard_rows["90%"].median() if "90%" in standard_rows.columns else 0,
-            )
-            percentile_95 = percentiles.get("p95", 0)
-            percentile_99 = percentiles.get("p99", 0)
 
-            avg = standard_rows["Average Response Time"].mean()
-            min_time = standard_rows["Min Response Time"].min()
-            max_time = standard_rows["Max Response Time"].max()
-            rps = standard_rows["Requests/s"].sum()
+            # OpenAPI endpoint row
+            overhead = ((api_metrics["avg_response_time"] - std_metrics["avg_response_time"]) /
+                        std_metrics["avg_response_time"] * 100)
 
             table.add_row(
-                framework,
-                endpoint,
-                str(int(requests)),
-                str(int(failures)),
-                f"{median:.2f}",
-                f"{percentile_90:.2f}",
-                f"{percentile_95:.2f}",
-                f"{percentile_99:.2f}",
-                f"{avg:.2f}",
-                f"{min_time:.2f}",
-                f"{max_time:.2f}",
-                f"{rps:.2f}",
+                "Flask-RESTful",
+                "OpenAPI",
+                str(int(api_metrics["requests"])),
+                f"{api_metrics['success_rate']:.2f}%",
+                f"{api_metrics.get('p50', 0):.2f}",
+                f"{api_metrics.get('p95', 0):.2f}",
+                f"{api_metrics['avg_response_time']:.2f}",
+                f"{api_metrics['rps']:.2f}",
+                f"{overhead:+.2f}%",
             )
-
-        if not openapi_rows.empty:
-            # Calculate metrics for OpenAPI endpoint
-            framework = "Flask-RESTful"
-            endpoint = "OpenAPI"
-            requests = openapi_rows["Request Count"].sum()
-            failures = openapi_rows["Failure Count"].sum()
-
-            # Calculate percentiles
-            percentiles = calculate_percentiles(openapi_rows)
-            median = percentiles.get(
-                "p50", openapi_rows["Median Response Time"].median()
-            )
-            percentile_90 = percentiles.get(
-                "p90",
-                openapi_rows["90%"].median() if "90%" in openapi_rows.columns else 0,
-            )
-            percentile_95 = percentiles.get("p95", 0)
-            percentile_99 = percentiles.get("p99", 0)
-
-            avg = openapi_rows["Average Response Time"].mean()
-            min_time = openapi_rows["Min Response Time"].min()
-            max_time = openapi_rows["Max Response Time"].max()
-            rps = openapi_rows["Requests/s"].sum()
-
-            table.add_row(
-                framework,
-                endpoint,
-                str(int(requests)),
-                str(int(failures)),
-                f"{median:.2f}",
-                f"{percentile_90:.2f}",
-                f"{percentile_95:.2f}",
-                f"{percentile_99:.2f}",
-                f"{avg:.2f}",
-                f"{min_time:.2f}",
-                f"{max_time:.2f}",
-                f"{rps:.2f}",
-            )
-
-            # Calculate performance difference
-            if not standard_rows.empty:
-                perf_diff = (
-                    (avg - standard_rows["Average Response Time"].mean())
-                    / standard_rows["Average Response Time"].mean()
-                    * 100
-                )
-                rps_diff = (
-                    (rps - standard_rows["Requests/s"].sum())
-                    / standard_rows["Requests/s"].sum()
-                    * 100
-                )
-
-                diff_text = f"[{'green' if perf_diff <= 0 else 'red'}]Response time: {perf_diff:.2f}% | "
-                diff_text += f"[{'green' if rps_diff >= 0 else 'red'}]RPS: {'+' if rps_diff > 0 else ''}{rps_diff:.2f}%"
-
-                table.add_row(
-                    "Flask-RESTful",
-                    "Difference",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                    diff_text,
-                    "",
-                    "",
-                    "",
-                )
 
     # Print the table
     console.print(table)
@@ -415,9 +267,7 @@ def generate_report():
 
     # Print chart info if available
     if os.path.exists("benchmarks/results/performance_charts.png"):
-        print(
-            "\nPerformance charts generated: benchmarks/results/performance_charts.png"
-        )
+        print("\nPerformance charts generated: benchmarks/results/performance_charts.png")
 
 
 if __name__ == "__main__":

@@ -1,3 +1,3 @@
 """
-Common benchmark utilities for flask-x-openapi-schema.
+Common utilities and models for benchmarks.
 """
