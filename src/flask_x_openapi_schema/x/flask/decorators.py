@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from ...core.config import ConventionalPrefixConfig
 from ...i18n.i18n_string import I18nStr
 from ...models.responses import OpenAPIMetaResponse
+from ...core.cache import make_cache_key
 
 
 class FlaskOpenAPIDecorator:
@@ -141,8 +142,28 @@ class FlaskOpenAPIDecorator:
 
         # Get data from request (JSON or form)
         body_data = {}
+
+        # Create cache key for this request
+
         if request.is_json:
             body_data = request.get_json(silent=True) or {}
+            logger.debug(f"Request body data (JSON): {body_data}")
+
+            # Create cache key based on model and body data
+            cache_key = make_cache_key(id(model), body_data)
+
+            # Try to create model instance directly from raw JSON
+            if body_data:
+                try:
+                    model_instance = model.model_validate(body_data)
+                    logger.debug(
+                        f"Created model instance directly from JSON for {param_name}"
+                    )
+                    kwargs[param_name] = model_instance
+                    MODEL_CACHE.set(cache_key, model_instance)
+                    return kwargs
+                except Exception as e:
+                    logger.warning(f"Failed to validate model from raw JSON: {e}")
         elif request.form:
             # Convert form data to dict
             body_data = {key: value for key, value in request.form.items()}
@@ -150,12 +171,13 @@ class FlaskOpenAPIDecorator:
             if request.files:
                 for key, file in request.files.items():
                     body_data[key] = file
-        logger.debug(f"Request body data: {body_data}")
+            logger.debug(f"Request body data (form): {body_data}")
 
-        # Create cache key for this request
-        from ...core.cache import make_cache_key
-
-        cache_key = make_cache_key(id(model), body_data)
+            # Create cache key based on model and body data
+            cache_key = make_cache_key(id(model), body_data)
+        else:
+            logger.debug("No JSON or form data found in request")
+            cache_key = make_cache_key(id(model), {})
 
         # Check if we have a cached model instance
         cached_instance = MODEL_CACHE.get(cache_key)

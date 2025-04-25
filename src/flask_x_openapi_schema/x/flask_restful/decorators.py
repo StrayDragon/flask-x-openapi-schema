@@ -3,12 +3,15 @@ Decorators for adding OpenAPI metadata to Flask-RESTful Resource endpoints.
 """
 
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
+from flask import request
 
 from pydantic import BaseModel
 
 from ...core.config import ConventionalPrefixConfig
 from ...i18n.i18n_string import I18nStr
 from ...models.responses import OpenAPIMetaResponse
+from ...core.decorator_base import preprocess_request_data
+import logging
 
 # These caches have been moved to core.cache module
 # and are now using ThreadSafeCache implementation
@@ -176,7 +179,7 @@ class FlaskRestfulOpenAPIDecorator:
         if not hasattr(model, "model_fields"):
             return False
 
-        for field_name, field_info in model.model_fields.items():
+        for _, field_info in model.model_fields.items():
             field_type = field_info.annotation
             if inspect.isclass(field_type) and issubclass(field_type, FileField):
                 return True
@@ -252,16 +255,79 @@ class FlaskRestfulOpenAPIDecorator:
         Returns:
             An instance of the model
         """
-        # Extract fields that exist in the model
-        body_data = {}
-        model_fields = model.model_fields
 
-        for field_name in model_fields:
-            if field_name in args:
-                body_data[field_name] = args[field_name]
+        logger = logging.getLogger(__name__)
 
-        # Create and return model instance
-        return model(**body_data)
+        # First, try to use the raw JSON data if available
+        if request.is_json:
+            try:
+                raw_json = request.get_json(silent=True)
+                if raw_json and isinstance(raw_json, dict):
+                    logger.debug("Using raw JSON data from request")
+
+                    # Try to create model instance directly from raw JSON
+                    try:
+                        return model.model_validate(raw_json)
+                    except Exception as e:
+                        logger.warning(f"Failed to validate model from raw JSON: {e}")
+
+                        # If validation fails, try to create using constructor
+                        try:
+                            # Only use fields that exist in the model
+                            model_fields = model.model_fields
+                            filtered_json = {
+                                k: v for k, v in raw_json.items() if k in model_fields
+                            }
+                            return model(**filtered_json)
+                        except Exception as e2:
+                            logger.warning(
+                                f"Failed to create model from raw JSON: {e2}"
+                            )
+                            # Continue with normal processing if this fails
+            except Exception as e:
+                logger.warning(f"Error accessing raw JSON data: {e}")
+
+        # Process arguments using the core preprocess_request_data function
+        # This ensures consistent handling across Flask and Flask-RESTful
+        processed_data = preprocess_request_data(args, model)
+
+        # Try to create model instance using model_validate first (better handling of complex types)
+        try:
+            logger.debug(
+                f"Attempting to validate model {model.__name__} with processed data"
+            )
+            model_instance = model.model_validate(processed_data)
+            logger.debug("Model validation successful")
+            return model_instance
+        except Exception as e:
+            logger.warning(
+                f"Validation error: {e}. Falling back to manual construction."
+            )
+
+            # Filter data to only include fields in the model
+            try:
+                model_fields = model.model_fields
+                filtered_data = {
+                    k: v for k, v in processed_data.items() if k in model_fields
+                }
+                logger.debug(f"Filtered data: {filtered_data}")
+
+                # Create instance using constructor
+                model_instance = model(**filtered_data)
+                logger.debug("Created model instance using constructor")
+                return model_instance
+            except Exception as e2:
+                logger.error(f"Failed to create model instance: {e2}")
+                logger.error(f"Processed data: {processed_data}")
+
+                # Try to create an empty instance with default values as last resort
+                try:
+                    model_instance = model()
+                    logger.warning("Created empty model instance as fallback")
+                    return model_instance
+                except Exception as e3:
+                    logger.error(f"Failed to create empty model instance: {e3}")
+                    raise e2  # Raise the original error
 
     def process_query_params(
         self, param_name: str, model: Type[BaseModel], kwargs: Dict[str, Any]

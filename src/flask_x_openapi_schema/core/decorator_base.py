@@ -59,6 +59,11 @@ def preprocess_request_data(
     Returns:
         Processed data that can be validated by Pydantic
     """
+    import json
+    import logging
+
+    logger = logging.getLogger(__name__)
+
     if not hasattr(model, "model_fields"):
         return data
 
@@ -72,8 +77,10 @@ def preprocess_request_data(
         field_value = data[field_name]
         field_type = field_info.annotation
 
-        # Handle list fields
+        # Get the origin type (for generics like List, Dict)
         origin = getattr(field_type, "__origin__", None)
+
+        # Handle list fields
         if origin is list or origin is List:
             # If the value is a string that looks like a JSON array, parse it
             if (
@@ -82,11 +89,11 @@ def preprocess_request_data(
                 and field_value.endswith("]")
             ):
                 try:
-                    import json
-
                     result[field_name] = json.loads(field_value)
+                    logger.debug(f"Parsed string to list for field {field_name}: {result[field_name]}")
                     continue
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse string as JSON list for field {field_name}: {e}")
                     pass
 
             # If it's already a list, use it as is
@@ -96,11 +103,58 @@ def preprocess_request_data(
                 # Try to convert to a list if possible
                 try:
                     result[field_name] = [field_value]
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"Failed to convert value to list for field {field_name}: {e}")
                     # If conversion fails, keep the original value
                     result[field_name] = field_value
+
+        # Handle dictionary fields
+        elif origin is dict or origin is Dict:
+            # If the value is a string that looks like a JSON object, parse it
+            if (
+                isinstance(field_value, str)
+                and field_value.startswith("{")
+                and field_value.endswith("}")
+            ):
+                try:
+                    result[field_name] = json.loads(field_value)
+                    logger.debug(f"Parsed string to dict for field {field_name}: {result[field_name]}")
+                    continue
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse string as JSON dict for field {field_name}: {e}")
+                    pass
+
+            # If it's already a dict, use it as is
+            if isinstance(field_value, dict):
+                result[field_name] = field_value
+            else:
+                # For non-dict values, keep the original (will likely fail validation)
+                logger.warning(f"Non-dict value for dict field {field_name}: {field_value}")
+                result[field_name] = field_value
+
+        # Handle nested model fields
+        elif (
+            isinstance(field_type, type)
+            and issubclass(field_type, BaseModel)
+            and isinstance(field_value, str)
+            and field_value.startswith("{")
+            and field_value.endswith("}")
+        ):
+            # If the value is a string that looks like a JSON object, parse it
+            try:
+                parsed_value = json.loads(field_value)
+                if isinstance(parsed_value, dict):
+                    result[field_name] = parsed_value
+                    logger.debug(f"Parsed string to dict for nested model field {field_name}")
+                    continue
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse string as JSON for nested model field {field_name}: {e}")
+                pass
+
+            # If parsing fails, keep the original value
+            result[field_name] = field_value
         else:
-            # For non-list fields, keep the original value
+            # For other fields, keep the original value
             result[field_name] = field_value
 
     # Add any fields from the original data that weren't processed
