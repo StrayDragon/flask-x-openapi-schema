@@ -2,6 +2,13 @@ format-and-lintfix:
 	ruff format
 	ruff check --fix
 
+setup-pre-commit:
+	uv pip install pre-commit
+	pre-commit install
+
+run-pre-commit:
+	pre-commit run --all-files
+
 sync-all-deps:
 	uv sync --all-extras --dev
 
@@ -18,36 +25,22 @@ test-core:
 	uv run pytest tests/core
 
 benchmark-report:
-	#!/usr/bin/env bash
-	# Generate benchmark report
 	uv run python benchmarks/generate_report.py
-	# Display the performance chart if available
-	if [ -f benchmarks/results/performance_charts.png ]; then
-		xdg-open benchmarks/results/performance_charts.png &> /dev/null || open benchmarks/results/performance_charts.png &> /dev/null || echo "Could not open performance chart automatically."
-	fi
 
 benchmark-flask:
-	#!/usr/bin/env bash
-	# Create results directory if it doesn't exist
 	mkdir -p benchmarks/results
-	# Run the Flask app in the background
 	uv run python -m benchmarks.flask.app &
 	SERVER_PID=$!
 	sleep 2
-	# Run Locust with more users and longer duration for better statistics
 	uv run locust -f benchmarks/flask/locustfile.py --headless -u 200 -r 20 -t 60s --csv=benchmarks/results/flask
 	kill $SERVER_PID || true
 	sleep 1
 
 benchmark-flask-restful:
-	#!/usr/bin/env bash
-	# Create results directory if it doesn't exist
 	mkdir -p benchmarks/results
-	# Run the Flask-RESTful app in the background
 	uv run python -m benchmarks.flask_restful.app &
 	SERVER_PID=$!
 	sleep 2
-	# Run Locust with more users and longer duration for better statistics
 	uv run locust -f benchmarks/flask_restful/locustfile.py --headless -u 200 -r 20 -t 60s --csv=benchmarks/results/flask_restful
 	kill $SERVER_PID || true
 	sleep 1
@@ -77,4 +70,3 @@ docs:
 docs-markdown:
 	mkdir -p docs/markdown
 	uv run pdoc -o docs/markdown -d markdown src/flask_x_openapi_schema
-
