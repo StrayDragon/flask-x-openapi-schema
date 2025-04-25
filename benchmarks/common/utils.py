@@ -25,7 +25,7 @@ def get_random_user_data() -> Dict[str, Any]:
     user_request = UserRequestFactory.build()
 
     # Convert to dictionary for compatibility with existing code
-    return user_request.model_dump(mode='json', exclude_none=True)
+    return user_request.model_dump(mode="json", exclude_none=True)
 
 
 def get_random_user_id() -> str:

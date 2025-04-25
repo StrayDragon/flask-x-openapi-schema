@@ -90,10 +90,14 @@ def preprocess_request_data(
             ):
                 try:
                     result[field_name] = json.loads(field_value)
-                    logger.debug(f"Parsed string to list for field {field_name}: {result[field_name]}")
+                    logger.debug(
+                        f"Parsed string to list for field {field_name}: {result[field_name]}"
+                    )
                     continue
                 except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse string as JSON list for field {field_name}: {e}")
+                    logger.warning(
+                        f"Failed to parse string as JSON list for field {field_name}: {e}"
+                    )
                     pass
 
             # If it's already a list, use it as is
@@ -104,7 +108,9 @@ def preprocess_request_data(
                 try:
                     result[field_name] = [field_value]
                 except Exception as e:
-                    logger.warning(f"Failed to convert value to list for field {field_name}: {e}")
+                    logger.warning(
+                        f"Failed to convert value to list for field {field_name}: {e}"
+                    )
                     # If conversion fails, keep the original value
                     result[field_name] = field_value
 
@@ -118,10 +124,14 @@ def preprocess_request_data(
             ):
                 try:
                     result[field_name] = json.loads(field_value)
-                    logger.debug(f"Parsed string to dict for field {field_name}: {result[field_name]}")
+                    logger.debug(
+                        f"Parsed string to dict for field {field_name}: {result[field_name]}"
+                    )
                     continue
                 except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse string as JSON dict for field {field_name}: {e}")
+                    logger.warning(
+                        f"Failed to parse string as JSON dict for field {field_name}: {e}"
+                    )
                     pass
 
             # If it's already a dict, use it as is
@@ -129,7 +139,9 @@ def preprocess_request_data(
                 result[field_name] = field_value
             else:
                 # For non-dict values, keep the original (will likely fail validation)
-                logger.warning(f"Non-dict value for dict field {field_name}: {field_value}")
+                logger.warning(
+                    f"Non-dict value for dict field {field_name}: {field_value}"
+                )
                 result[field_name] = field_value
 
         # Handle nested model fields
@@ -145,10 +157,14 @@ def preprocess_request_data(
                 parsed_value = json.loads(field_value)
                 if isinstance(parsed_value, dict):
                     result[field_name] = parsed_value
-                    logger.debug(f"Parsed string to dict for nested model field {field_name}")
+                    logger.debug(
+                        f"Parsed string to dict for nested model field {field_name}"
+                    )
                     continue
             except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse string as JSON for nested model field {field_name}: {e}")
+                logger.warning(
+                    f"Failed to parse string as JSON for nested model field {field_name}: {e}"
+                )
                 pass
 
             # If parsing fails, keep the original value

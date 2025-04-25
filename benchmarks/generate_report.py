@@ -134,7 +134,8 @@ def calculate_metrics(data, endpoint_type):
     metrics = {
         "requests": rows["Request Count"].sum(),
         "failures": rows["Failure Count"].sum(),
-        "success_rate": 100 - (rows["Failure Count"].sum() / rows["Request Count"].sum() * 100),
+        "success_rate": 100
+        - (rows["Failure Count"].sum() / rows["Request Count"].sum() * 100),
         "avg_response_time": rows["Average Response Time"].mean(),
         "min_response_time": rows["Min Response Time"].min(),
         "max_response_time": rows["Max Response Time"].max(),
@@ -207,8 +208,11 @@ def generate_report():
             )
 
             # OpenAPI endpoint row
-            overhead = ((api_metrics["avg_response_time"] - std_metrics["avg_response_time"]) /
-                        std_metrics["avg_response_time"] * 100)
+            overhead = (
+                (api_metrics["avg_response_time"] - std_metrics["avg_response_time"])
+                / std_metrics["avg_response_time"]
+                * 100
+            )
 
             table.add_row(
                 "Flask",
@@ -242,8 +246,11 @@ def generate_report():
             )
 
             # OpenAPI endpoint row
-            overhead = ((api_metrics["avg_response_time"] - std_metrics["avg_response_time"]) /
-                        std_metrics["avg_response_time"] * 100)
+            overhead = (
+                (api_metrics["avg_response_time"] - std_metrics["avg_response_time"])
+                / std_metrics["avg_response_time"]
+                * 100
+            )
 
             table.add_row(
                 "Flask-RESTful",
@@ -267,7 +274,9 @@ def generate_report():
 
     # Print chart info if available
     if os.path.exists("benchmarks/results/performance_charts.png"):
-        print("\nPerformance charts generated: benchmarks/results/performance_charts.png")
+        print(
+            "\nPerformance charts generated: benchmarks/results/performance_charts.png"
+        )
 
 
 if __name__ == "__main__":

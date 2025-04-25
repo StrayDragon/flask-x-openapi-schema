@@ -6,7 +6,6 @@ This module contains Flask applications for benchmarking with and without flask-
 
 import json
 import time
-from datetime import datetime
 
 from flask import Flask, request, jsonify, Response
 
@@ -17,8 +16,6 @@ from benchmarks.common.models import (
     UserRequest,
     UserQueryParams,
     UserResponse,
-    UserRole,
-    UserStats,
 )
 from benchmarks.common.utils import get_performance_metrics
 
@@ -42,7 +39,7 @@ def create_standard_flask_app():
         req = UserRequest.model_validate(data)
 
         # Create response
-        response = req.model_dump(mode='json')
+        response = req.model_dump(mode="json")
         end_time = time.time()
         processing_time = (end_time - start_time) * 1000
 
@@ -104,7 +101,7 @@ def create_openapi_flask_app():
         metrics["request_duration_ms"] = processing_time
 
         # Create response with metrics in headers
-        resp = Response(response.model_dump(mode='json'), 201)
+        resp = Response(response.model_dump(mode="json"), 201)
         resp.headers["X-Processing-Time"] = f"{processing_time:.2f}ms"
         resp.headers["X-DB-Queries"] = str(metrics["db_query_count"])
         resp.headers["X-Cache-Status"] = (

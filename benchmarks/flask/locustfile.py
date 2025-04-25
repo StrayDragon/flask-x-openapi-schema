@@ -16,6 +16,7 @@ from benchmarks.common.utils import (
     get_query_params,
 )
 
+
 class StandardFlaskUser(HttpUser):
     """User that tests the standard Flask implementation."""
 

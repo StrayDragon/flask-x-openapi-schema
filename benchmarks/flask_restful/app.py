@@ -30,15 +30,29 @@ def create_standard_flask_restful_app(app: Flask):
             # Create a request parser for body parameters
             parser = reqparse.RequestParser()
             parser.add_argument(
-                "username", type=str, required=True, help="Username is required", location="json"
+                "username",
+                type=str,
+                required=True,
+                help="Username is required",
+                location="json",
             )
             parser.add_argument(
-                "email", type=str, required=True, help="Email is required", location="json"
+                "email",
+                type=str,
+                required=True,
+                help="Email is required",
+                location="json",
             )
             parser.add_argument(
-                "full_name", type=str, required=True, help="Full name is required", location="json"
+                "full_name",
+                type=str,
+                required=True,
+                help="Full name is required",
+                location="json",
             )
-            parser.add_argument("age", type=int, required=True, help="Age is required", location="json")
+            parser.add_argument(
+                "age", type=int, required=True, help="Age is required", location="json"
+            )
             parser.add_argument("is_active", type=bool, default=True, location="json")
             parser.add_argument("tags", type=list, default=[], location="json")
 
@@ -58,18 +72,14 @@ def create_standard_flask_restful_app(app: Flask):
             query_parser.add_argument(
                 "filter_role", type=str, default=None, location="args"
             )
-            query_parser.add_argument(
-                "search", type=str, default=None, location="args"
-            )
+            query_parser.add_argument("search", type=str, default=None, location="args")
             query_parser.add_argument(
                 "min_age", type=int, default=None, location="args"
             )
             query_parser.add_argument(
                 "max_age", type=int, default=None, location="args"
             )
-            query_parser.add_argument(
-                "tags", type=str, default=None, location="args"
-            )
+            query_parser.add_argument("tags", type=str, default=None, location="args")
             query_parser.add_argument(
                 "created_after", type=str, default=None, location="args"
             )
@@ -87,9 +97,11 @@ def create_standard_flask_restful_app(app: Flask):
                 print(f"Valid roles: {valid_roles}")
                 print(f"Current filter_role: {query_args['filter_role']}")
                 if query_args["filter_role"] not in valid_roles:
-                    return jsonify({
-                        "error": f"filter_role must be one of: {', '.join(valid_roles)}"
-                    }), 400
+                    return jsonify(
+                        {
+                            "error": f"filter_role must be one of: {', '.join(valid_roles)}"
+                        }
+                    ), 400
 
             # Create response
             response = {
@@ -147,9 +159,11 @@ def create_openapi_flask_restful_app(app: Flask):
                     print(f"Valid roles: {[role.value for role in valid_roles]}")
                     print(f"Current filter_role: {_x_query.filter_role}")
                     if _x_query.filter_role not in valid_roles:
-                        return jsonify({
-                            "error": f"filter_role must be one of: {', '.join([role.value for role in UserRole])}"
-                        }), 400
+                        return jsonify(
+                            {
+                                "error": f"filter_role must be one of: {', '.join([role.value for role in UserRole])}"
+                            }
+                        ), 400
 
             # Create response
             response = UserResponse(
@@ -165,7 +179,6 @@ def create_openapi_flask_restful_app(app: Flask):
             )
 
             return response.to_response(201)
-
 
     # Register the resource
     api.add_resource(OpenAPIUserResource, "/openapi/api/users/<user_id>")

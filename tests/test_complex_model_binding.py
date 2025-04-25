@@ -10,12 +10,13 @@ import pytest
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
-from flask import Flask, request
+from flask import Flask
 from flask_x_openapi_schema.x.flask import openapi_metadata
 
 
 class Address(BaseModel):
     """Address model for testing."""
+
     street: str = Field(..., description="Street address")
     city: str = Field(..., description="City")
     state: str = Field(..., description="State or province")
@@ -26,6 +27,7 @@ class Address(BaseModel):
 
 class ContactInfo(BaseModel):
     """Contact information model for testing."""
+
     phone: Optional[str] = Field(None, description="Phone number")
     alternative_email: Optional[str] = Field(None, description="Alternative email")
     emergency_contact: Optional[str] = Field(None, description="Emergency contact")
@@ -33,12 +35,17 @@ class ContactInfo(BaseModel):
 
 class ComplexUserRequest(BaseModel):
     """Complex user request model with nested structures."""
+
     username: str = Field(..., description="The username")
     email: str = Field(..., description="The email address")
     tags: List[str] = Field(default_factory=list, description="Tags for the user")
     addresses: List[Address] = Field(default_factory=list, description="User addresses")
-    contact_info: Optional[ContactInfo] = Field(None, description="Additional contact information")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    contact_info: Optional[ContactInfo] = Field(
+        None, description="Additional contact information"
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata"
+    )
 
 
 @pytest.fixture
@@ -46,7 +53,7 @@ def app():
     """Create a Flask application for testing."""
     app = Flask(__name__)
 
-    @app.route('/test_complex_binding', methods=['POST'])
+    @app.route("/test_complex_binding", methods=["POST"])
     @openapi_metadata(
         summary="Test complex binding",
         description="Test binding of complex nested models",
@@ -55,6 +62,7 @@ def app():
         """Test complex model binding."""
         import logging
         import json
+
         logger = logging.getLogger(__name__)
 
         logger.warning(f"test_complex_binding called with _x_body: {_x_body}")
@@ -71,7 +79,7 @@ def app():
                     logger.warning(f"Parsed JSON data: {data}")
                     _x_body = ComplexUserRequest.model_validate(data)
                     logger.warning(f"Created model: {_x_body}")
-                elif request.content_type == 'application/x-www-form-urlencoded':
+                elif request.content_type == "application/x-www-form-urlencoded":
                     # Handle form data with JSON strings
                     data = request.form.to_dict()
                     logger.warning(f"Form data: {data}")
@@ -79,11 +87,23 @@ def app():
                     # Process JSON strings in form data
                     processed_data = {}
                     for key, value in data.items():
-                        if key in ['tags', 'addresses', 'contact_info', 'metadata'] and isinstance(value, str):
+                        if key in [
+                            "tags",
+                            "addresses",
+                            "contact_info",
+                            "metadata",
+                        ] and isinstance(value, str):
                             try:
-                                if value.startswith('[') and value.endswith(']') or value.startswith('{') and value.endswith('}'):
+                                if (
+                                    value.startswith("[")
+                                    and value.endswith("]")
+                                    or value.startswith("{")
+                                    and value.endswith("}")
+                                ):
                                     processed_data[key] = json.loads(value)
-                                    logger.warning(f"Parsed {key} as JSON: {processed_data[key]}")
+                                    logger.warning(
+                                        f"Parsed {key} as JSON: {processed_data[key]}"
+                                    )
                                 else:
                                     processed_data[key] = value
                             except json.JSONDecodeError:
@@ -97,7 +117,9 @@ def app():
                     logger.warning(f"Created model from form data: {_x_body}")
                 else:
                     logger.warning(f"Unknown content type: {request.content_type}")
-                    return {"error": f"Unsupported content type: {request.content_type}"}, 400
+                    return {
+                        "error": f"Unsupported content type: {request.content_type}"
+                    }, 400
             except Exception as e:
                 logger.warning(f"Failed to parse request data: {e}")
                 return {"error": f"Failed to parse request data: {e}"}, 400
@@ -129,7 +151,7 @@ def test_complex_model_binding_with_json(app, client):
                 "state": "CA",
                 "postal_code": "12345",
                 "country": "USA",
-                "is_primary": True
+                "is_primary": True,
             },
             {
                 "street": "456 Oak Ave",
@@ -137,33 +159,28 @@ def test_complex_model_binding_with_json(app, client):
                 "state": "NY",
                 "postal_code": "67890",
                 "country": "USA",
-                "is_primary": False
-            }
+                "is_primary": False,
+            },
         ],
         "contact_info": {
             "phone": "555-1234",
             "alternative_email": "alt@example.com",
-            "emergency_contact": "John Doe"
+            "emergency_contact": "John Doe",
         },
-        "metadata": {
-            "key1": "value1",
-            "key2": 123,
-            "key3": True
-        }
+        "metadata": {"key1": "value1", "key2": 123, "key3": True},
     }
 
     # Send request with JSON data
     import json
     import logging
+
     logger = logging.getLogger(__name__)
     logger.warning(f"Sending JSON data: {json.dumps(test_data)}")
 
     # Force the content type to be application/json
-    headers = {'Content-Type': 'application/json'}
+    headers = {"Content-Type": "application/json"}
     response = client.post(
-        '/test_complex_binding',
-        data=json.dumps(test_data),
-        headers=headers
+        "/test_complex_binding", data=json.dumps(test_data), headers=headers
     )
 
     # Check response
@@ -186,20 +203,21 @@ def test_complex_model_binding_with_string_lists_and_dicts(app, client):
     test_data = {
         "username": "testuser",
         "email": "test@example.com",
-        "tags": "[\"tag1\", \"tag2\", \"tag3\"]",  # String representation of a list
-        "addresses": "[{\"street\": \"123 Main St\", \"city\": \"Anytown\", \"state\": \"CA\", \"postal_code\": \"12345\", \"country\": \"USA\", \"is_primary\": true}]",  # String representation of a list of objects
-        "metadata": "{\"key1\": \"value1\", \"key2\": 123}"  # String representation of a dict
+        "tags": '["tag1", "tag2", "tag3"]',  # String representation of a list
+        "addresses": '[{"street": "123 Main St", "city": "Anytown", "state": "CA", "postal_code": "12345", "country": "USA", "is_primary": true}]',  # String representation of a list of objects
+        "metadata": '{"key1": "value1", "key2": 123}',  # String representation of a dict
     }
 
     # Send request with form data (which will be strings)
     import logging
+
     logger = logging.getLogger(__name__)
     logger.warning(f"Sending form data: {test_data}")
 
     response = client.post(
-        '/test_complex_binding',
+        "/test_complex_binding",
         data=test_data,
-        content_type='application/x-www-form-urlencoded'
+        content_type="application/x-www-form-urlencoded",
     )
 
     # Check response
