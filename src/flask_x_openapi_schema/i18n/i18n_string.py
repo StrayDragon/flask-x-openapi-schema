@@ -12,47 +12,77 @@ _current_language = contextvars.ContextVar[str]("current_language", default="en-
 
 
 def get_current_language() -> str:
-    """
-    Get the current language for the current thread.
+    """Get the current language for the current thread.
 
-    Returns:
-        The current language code (e.g., "en-US", "zh-Hans")
+    This function returns the language code that is currently set for the current thread.
+    The language code is used for internationalization of strings in the OpenAPI schema.
+
+    :return: The current language code (e.g., "en-US", "zh-Hans")
+    :rtype: str
+
+    Example:
+        >>> from flask_x_openapi_schema import get_current_language
+        >>> get_current_language()
+        'en-US'
     """
     return _current_language.get()
 
 
 def set_current_language(language: str) -> None:
-    """
-    Set the current language for the current thread.
+    """Set the current language for the current thread.
 
-    Args:
-        language: The language code to set (e.g., "en-US", "zh-Hans")
+    This function sets the language code for the current thread. This affects how
+    internationalized strings are displayed in the OpenAPI schema and in responses.
+
+    :param language: The language code to set (e.g., "en-US", "zh-Hans")
+    :type language: str
+    :return: None
+
+    Example:
+        >>> from flask_x_openapi_schema import set_current_language
+        >>> set_current_language("zh-Hans")  # Switch to Simplified Chinese
     """
     _current_language.set(language)
 
 
 class I18nStr:
-    """
-    A string class that supports internationalization.
+    """A string class that supports internationalization.
 
     This class allows you to define strings in multiple languages and automatically
     returns the appropriate string based on the current language setting.
 
+    :param strings: Either a dictionary mapping language codes to strings, or a single string
+    :type strings: Union[dict[str, str], str]
+    :param default_language: The default language to use if the requested language is not available
+    :type default_language: str
+
     Example:
-        ```python
-        # Create an I18nString with multiple language versions
-        greeting = I18nString({
-            "en-US": "Hello",
-            "zh-Hans": "你好",
-            "ja-JP": "こんにちは"
-        })
-
-        # Get the string in the current language
-        print(str(greeting))  # Outputs the greeting in the current language
-
-        # Get the string in a specific language
-        print(greeting.get("zh-Hans"))  # Outputs "你好"
-        ```
+        >>> from flask_x_openapi_schema import I18nStr
+        >>>
+        >>> # Create an I18nStr with multiple language versions
+        >>> greeting = I18nStr({
+        ...     "en-US": "Hello",
+        ...     "zh-Hans": "你好",
+        ...     "ja-JP": "こんにちは"
+        ... })
+        >>>
+        >>> # Get the string in the current language
+        >>> str(greeting)  # Outputs the greeting in the current language
+        'Hello'
+        >>>
+        >>> # Get the string in a specific language
+        >>> greeting.get("zh-Hans")
+        '你好'
+        >>>
+        >>> # Use in OpenAPI metadata
+        >>> @openapi_metadata(
+        ...     summary=I18nStr({
+        ...         "en-US": "Get an item",
+        ...         "zh-Hans": "获取一个项目"
+        ...     })
+        ... )
+        >>> def get(self, item_id):
+        ...     pass
     """
 
     @classmethod

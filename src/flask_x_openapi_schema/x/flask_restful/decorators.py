@@ -438,23 +438,77 @@ def openapi_metadata(
     language: Optional[str] = None,
     prefix_config: Optional[ConventionalPrefixConfig] = None,
 ) -> Union[Callable[[F], F], F]:
-    """
-    Decorator to add OpenAPI metadata to a Flask-RESTful Resource endpoint.
+    """Decorator to add OpenAPI metadata to a Flask-RESTful Resource endpoint.
 
-    Args:
-        summary: A short summary of what the operation does
-        description: A verbose explanation of the operation behavior
-        tags: A list of tags for API documentation control
-        operation_id: Unique string used to identify the operation
-        responses: The responses the API can return (**Optional**, auto detect by user response if pydanitc model input)
-        security: A declaration of which security mechanisms can be used for this operation
-        deprecated: Declares this operation to be deprecated
-        external_docs: Additional external documentation
-        language: Language code to use for I18nString values (default: current language)
-        prefix_config: Configuration object for parameter prefixes
+    This decorator adds OpenAPI metadata to a Flask-RESTful Resource endpoint and handles
+    parameter binding for request data. It automatically binds request body, query parameters,
+    path parameters, and file uploads to function parameters based on their type annotations
+    and parameter name prefixes.
 
-    Returns:
-        The decorated function with OpenAPI metadata attached
+    :param summary: A short summary of what the operation does
+    :type summary: Optional[Union[str, I18nStr]]
+    :param description: A verbose explanation of the operation behavior
+    :type description: Optional[Union[str, I18nStr]]
+    :param tags: A list of tags for API documentation control
+    :type tags: Optional[List[str]]
+    :param operation_id: Unique string used to identify the operation
+    :type operation_id: Optional[str]
+    :param deprecated: Declares this operation to be deprecated
+    :type deprecated: bool
+    :param responses: The responses the API can return
+    :type responses: Optional[OpenAPIMetaResponse]
+    :param security: A declaration of which security mechanisms can be used for this operation
+    :type security: Optional[List[Dict[str, List[str]]]]
+    :param external_docs: Additional external documentation
+    :type external_docs: Optional[Dict[str, str]]
+    :param language: Language code to use for I18nString values (default: current language)
+    :type language: Optional[str]
+    :param prefix_config: Configuration object for parameter prefixes
+    :type prefix_config: Optional[ConventionalPrefixConfig]
+    :return: The decorated function with OpenAPI metadata attached
+    :rtype: Union[Callable[[F], F], F]
+
+    Example:
+        >>> from flask_restful import Resource
+        >>> from flask_x_openapi_schema.x.flask_restful import openapi_metadata
+        >>> from flask_x_openapi_schema import OpenAPIMetaResponse, OpenAPIMetaResponseItem
+        >>> from pydantic import BaseModel, Field
+        >>>
+        >>> class ItemRequest(BaseModel):
+        ...     name: str = Field(..., description="Item name")
+        ...     price: float = Field(..., description="Item price")
+        >>>
+        >>> class ItemResponse(BaseModel):
+        ...     id: str = Field(..., description="Item ID")
+        ...     name: str = Field(..., description="Item name")
+        ...     price: float = Field(..., description="Item price")
+        >>>
+        >>> class ItemResource(Resource):
+        ...     @openapi_metadata(
+        ...         summary="Create a new item",
+        ...         description="Create a new item with the provided information",
+        ...         tags=["items"],
+        ...         operation_id="createItem",
+        ...         responses=OpenAPIMetaResponse(
+        ...             responses={
+        ...                 "201": OpenAPIMetaResponseItem(
+        ...                     model=ItemResponse,
+        ...                     description="Item created successfully"
+        ...                 ),
+        ...                 "400": OpenAPIMetaResponseItem(
+        ...                     description="Invalid request data"
+        ...                 )
+        ...             }
+        ...         )
+        ...     )
+        ...     def post(self, _x_body: ItemRequest):
+        ...         # _x_body is automatically populated from the request JSON
+        ...         item = {
+        ...             "id": "123",
+        ...             "name": _x_body.name,
+        ...             "price": _x_body.price
+        ...         }
+        ...         return item, 201
     """
     return FlaskRestfulOpenAPIDecorator(
         summary=summary,

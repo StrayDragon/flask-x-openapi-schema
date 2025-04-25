@@ -12,20 +12,52 @@ from ...core.schema_generator import OpenAPISchemaGenerator
 
 
 class OpenAPIMethodViewMixin:
-    """
-    A mixin class for Flask.MethodView to collect OpenAPI metadata.
+    """A mixin class for Flask.MethodView to collect OpenAPI metadata.
+
+    This mixin class adds OpenAPI schema generation capabilities to Flask's MethodView.
+    It provides a method to register the view to a blueprint while collecting metadata
+    for OpenAPI schema generation.
+
+    Example:
+        >>> from flask import Blueprint
+        >>> from flask.views import MethodView
+        >>> from flask_x_openapi_schema.x.flask import OpenAPIMethodViewMixin, openapi_metadata
+        >>> from pydantic import BaseModel, Field
+        >>>
+        >>> class ItemResponse(BaseModel):
+        ...     id: str = Field(..., description="Item ID")
+        ...     name: str = Field(..., description="Item name")
+        >>>
+        >>> class ItemView(OpenAPIMethodViewMixin, MethodView):
+        ...     @openapi_metadata(summary="Get an item")
+        ...     def get(self, item_id: str):
+        ...         return {"id": item_id, "name": "Example Item"}
+        >>>
+        >>> # Create a blueprint and register the view
+        >>> bp = Blueprint("items", __name__)
+        >>> ItemView.register_to_blueprint(bp, "/items/<item_id>")
     """
 
     @classmethod
     def register_to_blueprint(cls, blueprint, url, endpoint=None, **kwargs):
-        """
-        Register the MethodView to a blueprint and collect OpenAPI metadata.
+        """Register the MethodView to a blueprint and collect OpenAPI metadata.
 
-        Args:
-            blueprint: The Flask blueprint to register to
-            url: The URL rule to register
-            endpoint: The endpoint name (defaults to the class name)
-            **kwargs: Additional arguments to pass to add_url_rule
+        This method registers the view to a blueprint and stores metadata for
+        OpenAPI schema generation.
+
+        :param blueprint: The Flask blueprint to register to
+        :type blueprint: flask.Blueprint
+        :param url: The URL rule to register
+        :type url: str
+        :param endpoint: The endpoint name (defaults to the class name)
+        :type endpoint: Optional[str]
+        :param kwargs: Additional arguments to pass to add_url_rule
+        :return: The view function
+        :rtype: callable
+
+        Example:
+            >>> bp = Blueprint("items", __name__)
+            >>> ItemView.register_to_blueprint(bp, "/items/<item_id>")
         """
         view_func = cls.as_view(endpoint or cls.__name__.lower())
         blueprint.add_url_rule(url, view_func=view_func, **kwargs)

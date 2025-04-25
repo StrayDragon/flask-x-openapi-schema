@@ -20,17 +20,52 @@ from ..flask.views import MethodViewOpenAPISchemaGenerator
 
 
 class OpenAPIIntegrationMixin(Api):
-    """
-    A mixin class for the flask-restful Api to collect OpenAPI metadata.
+    """A mixin class for the flask-restful Api to collect OpenAPI metadata.
+
+    This mixin extends Flask-RESTful's Api class to add OpenAPI schema generation capabilities.
+    It tracks resources added to the API and provides methods to generate OpenAPI schemas.
+
+    :param args: Arguments to pass to the parent class
+    :param kwargs: Keyword arguments to pass to the parent class
+
+    Example:
+        >>> from flask import Flask
+        >>> from flask_restful import Resource
+        >>> from flask_x_openapi_schema.x.flask_restful import OpenAPIIntegrationMixin, openapi_metadata
+        >>> from pydantic import BaseModel, Field
+        >>>
+        >>> app = Flask(__name__)
+        >>>
+        >>> # Create an OpenAPI-enabled API
+        >>> class OpenAPIApi(OpenAPIIntegrationMixin):
+        ...     pass
+        >>>
+        >>> api = OpenAPIApi(app)
+        >>>
+        >>> class ItemResource(Resource):
+        ...     @openapi_metadata(summary="Get an item")
+        ...     def get(self, item_id):
+        ...         return {"id": item_id, "name": "Example Item"}
+        >>>
+        >>> # Register the resource
+        >>> api.add_resource(ItemResource, "/items/<item_id>")
+        >>>
+        >>> # Generate OpenAPI schema
+        >>> @app.route("/openapi.yaml")
+        >>> def get_openapi_spec():
+        ...     schema = api.generate_openapi_schema(
+        ...         title="My API",
+        ...         version="1.0.0",
+        ...         description="API for managing items"
+        ...     )
+        ...     return schema
     """
 
     def __init__(self, *args, **kwargs):
-        """
-        Initialize the mixin.
+        """Initialize the mixin.
 
-        Args:
-            *args: Arguments to pass to the parent class
-            **kwargs: Keyword arguments to pass to the parent class
+        :param args: Arguments to pass to the parent class
+        :param kwargs: Keyword arguments to pass to the parent class
         """
         # 确保调用父类的 __init__ 方法
         super().__init__(*args, **kwargs)
@@ -117,18 +152,55 @@ class OpenAPIIntegrationMixin(Api):
         output_format: Literal["json", "yaml"] = "yaml",
         language: Optional[str] = None,
     ) -> Any:
-        """
-        Generate an OpenAPI schema for the API.
+        """Generate an OpenAPI schema for the API.
 
-        Args:
-            title: The title of the API (can be an I18nString)
-            version: The version of the API
-            description: The description of the API (can be an I18nString)
-            output_format: The output format (json or yaml)
-            language: The language to use for internationalized strings (default: current language)
+        This method generates an OpenAPI schema for all resources registered with the API.
+        It supports internationalization through I18nStr objects and can output the schema
+        in either JSON or YAML format.
 
-        Returns:
-            The OpenAPI schema as a dictionary (if json) or string (if yaml)
+        :param title: The title of the API (can be an I18nString)
+        :type title: Union[str, I18nStr]
+        :param version: The version of the API
+        :type version: str
+        :param description: The description of the API (can be an I18nString)
+        :type description: Union[str, I18nStr]
+        :param output_format: The output format (json or yaml)
+        :type output_format: Literal["json", "yaml"]
+        :param language: The language to use for internationalized strings (default: current language)
+        :type language: Optional[str]
+        :return: The OpenAPI schema as a dictionary (if json) or string (if yaml)
+        :rtype: Union[Dict[str, Any], str]
+
+        Example:
+            >>> # Generate schema in YAML format
+            >>> yaml_schema = api.generate_openapi_schema(
+            ...     title="My API",
+            ...     version="1.0.0",
+            ...     description="API for managing items"
+            ... )
+            >>>
+            >>> # Generate schema in JSON format
+            >>> json_schema = api.generate_openapi_schema(
+            ...     title="My API",
+            ...     version="1.0.0",
+            ...     description="API for managing items",
+            ...     output_format="json"
+            ... )
+            >>>
+            >>> # Generate schema with internationalized strings
+            >>> from flask_x_openapi_schema import I18nStr
+            >>> i18n_schema = api.generate_openapi_schema(
+            ...     title=I18nStr({
+            ...         "en-US": "My API",
+            ...         "zh-Hans": "我的API"
+            ...     }),
+            ...     version="1.0.0",
+            ...     description=I18nStr({
+            ...         "en-US": "API for managing items",
+            ...         "zh-Hans": "用于管理项目的API"
+            ...     }),
+            ...     language="zh-Hans"  # Use Chinese for the schema
+            ... )
         """
         # Use the specified language or get the current language
         current_lang = language or get_current_language()
@@ -156,8 +228,47 @@ class OpenAPIIntegrationMixin(Api):
 
 
 class OpenAPIBlueprintMixin:
-    """
-    A mixin class for Flask Blueprint to collect OpenAPI metadata from MethodView classes.
+    """A mixin class for Flask Blueprint to collect OpenAPI metadata from MethodView classes.
+
+    This mixin extends Flask's Blueprint class to add OpenAPI schema generation capabilities
+    for MethodView classes. It tracks MethodView classes registered to the blueprint and
+    provides methods to generate OpenAPI schemas.
+
+    Example:
+        >>> from flask import Blueprint, Flask
+        >>> from flask.views import MethodView
+        >>> from flask_x_openapi_schema.x.flask_restful import OpenAPIBlueprintMixin
+        >>> from flask_x_openapi_schema.x.flask import openapi_metadata, OpenAPIMethodViewMixin
+        >>>
+        >>> app = Flask(__name__)
+        >>>
+        >>> # Create an OpenAPI-enabled Blueprint
+        >>> class OpenAPIBlueprint(OpenAPIBlueprintMixin, Blueprint):
+        ...     pass
+        >>>
+        >>> bp = OpenAPIBlueprint("api", __name__, url_prefix="/api")
+        >>>
+        >>> # Create a MethodView with OpenAPI metadata
+        >>> class ItemView(OpenAPIMethodViewMixin, MethodView):
+        ...     @openapi_metadata(summary="Get an item")
+        ...     def get(self, item_id):
+        ...         return {"id": item_id, "name": "Example Item"}
+        >>>
+        >>> # Register the view to the blueprint
+        >>> ItemView.register_to_blueprint(bp, "/items/<item_id>")
+        >>>
+        >>> # Register the blueprint to the app
+        >>> app.register_blueprint(bp)
+        >>>
+        >>> # Generate OpenAPI schema
+        >>> @app.route("/openapi.yaml")
+        >>> def get_openapi_spec():
+        ...     schema = bp.generate_openapi_schema(
+        ...         title="My API",
+        ...         version="1.0.0",
+        ...         description="API for managing items"
+        ...     )
+        ...     return schema
     """
 
     def configure_openapi(

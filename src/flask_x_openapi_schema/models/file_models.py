@@ -96,7 +96,22 @@ class TextField(FileField):
 
 
 class FileUploadModel(BaseModel):
-    """Base model for file uploads."""
+    """Base model for file uploads.
+
+    This model provides a structured way to handle file uploads with validation.
+    It automatically validates that the uploaded file is a valid FileStorage instance.
+
+    :param file: The uploaded file
+    :type file: FileStorage
+
+    Example:
+        >>> from flask_x_openapi_schema import FileUploadModel
+        >>>
+        >>> @openapi_metadata(summary="Upload a file")
+        >>> def post(self, _x_file: FileUploadModel):
+        ...     # File is automatically injected and validated
+        ...     return {"filename": _x_file.file.filename}
+    """
 
     file: FileStorage = Field(..., description="The uploaded file")
 
@@ -107,14 +122,40 @@ class FileUploadModel(BaseModel):
 
     @field_validator("file")
     def validate_file(cls, v: Any) -> FileStorage:
-        """Validate that the file is a FileStorage instance."""
+        """Validate that the file is a FileStorage instance.
+
+        :param v: The value to validate
+        :type v: Any
+        :return: The validated FileStorage instance
+        :rtype: FileStorage
+        :raises ValueError: If the value is not a FileStorage instance
+        """
         if not isinstance(v, FileStorage):
             raise ValueError("Not a valid file upload")
         return v
 
 
 class ImageUploadModel(FileUploadModel):
-    """Model for image file uploads with validation."""
+    """Model for image file uploads with validation.
+
+    This model extends FileUploadModel to provide specific validation for image files.
+    It validates file extensions and optionally checks file size.
+
+    :param file: The uploaded image file
+    :type file: FileStorage
+    :param allowed_extensions: List of allowed file extensions (default: ["jpg", "jpeg", "png", "gif", "webp", "svg"])
+    :type allowed_extensions: List[str]
+    :param max_size: Maximum file size in bytes (default: None)
+    :type max_size: Optional[int]
+
+    Example:
+        >>> from flask_x_openapi_schema import ImageUploadModel
+        >>>
+        >>> @openapi_metadata(summary="Upload an image")
+        >>> def post(self, _x_file: ImageUploadModel):
+        ...     # Image file is automatically injected and validated
+        ...     return {"filename": _x_file.file.filename}
+    """
 
     file: FileStorage = Field(..., description="The uploaded image file")
     allowed_extensions: List[str] = Field(
@@ -208,7 +249,22 @@ class DocumentUploadModel(FileUploadModel):
 
 
 class MultipleFileUploadModel(BaseModel):
-    """Model for multiple file uploads."""
+    """Model for multiple file uploads.
+
+    This model allows uploading multiple files at once and validates that all files
+    are valid FileStorage instances.
+
+    :param files: List of uploaded files
+    :type files: List[FileStorage]
+
+    Example:
+        >>> from flask_x_openapi_schema import MultipleFileUploadModel
+        >>>
+        >>> @openapi_metadata(summary="Upload multiple files")
+        >>> def post(self, _x_file: MultipleFileUploadModel):
+        ...     # Files are automatically injected and validated
+        ...     return {"filenames": [f.filename for f in _x_file.files]}
+    """
 
     files: List[FileStorage] = Field(..., description="The uploaded files")
 
@@ -217,7 +273,14 @@ class MultipleFileUploadModel(BaseModel):
 
     @field_validator("files")
     def validate_files(cls, v: List[Any]) -> List[FileStorage]:
-        """Validate that all files are FileStorage instances."""
+        """Validate that all files are FileStorage instances.
+
+        :param v: List of values to validate
+        :type v: List[Any]
+        :return: The validated list of FileStorage instances
+        :rtype: List[FileStorage]
+        :raises ValueError: If the list is empty or contains non-FileStorage objects
+        """
         if not v:
             raise ValueError("No files provided")
 

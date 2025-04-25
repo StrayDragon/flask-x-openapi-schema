@@ -28,12 +28,25 @@ class ConventionalPrefixConfig:
     This class holds configuration settings for parameter prefixes used in
     binding request data to function parameters.
 
-    Attributes:
-        request_body_prefix: Prefix for request body parameters
-        request_query_prefix: Prefix for query parameters
-        request_path_prefix: Prefix for path parameters
-        request_file_prefix: Prefix for file parameters
-        extra_options: Additional configuration options
+    :param request_body_prefix: Prefix for request body parameters (default: "_x_body")
+    :type request_body_prefix: str
+    :param request_query_prefix: Prefix for query parameters (default: "_x_query")
+    :type request_query_prefix: str
+    :param request_path_prefix: Prefix for path parameters (default: "_x_path")
+    :type request_path_prefix: str
+    :param request_file_prefix: Prefix for file parameters (default: "_x_file")
+    :type request_file_prefix: str
+    :param extra_options: Additional configuration options
+    :type extra_options: Dict[str, Any]
+
+    Example:
+        >>> from flask_x_openapi_schema import ConventionalPrefixConfig
+        >>> config = ConventionalPrefixConfig(
+        ...     request_body_prefix="req_body",
+        ...     request_query_prefix="req_query",
+        ...     request_path_prefix="req_path",
+        ...     request_file_prefix="req_file"
+        ... )
     """
 
     request_body_prefix: str = DEFAULT_BODY_PREFIX
@@ -148,8 +161,21 @@ GLOBAL_CONFIG_HOLDER = ThreadSafeConfig()
 def configure_prefixes(config: ConventionalPrefixConfig) -> None:
     """Configure global parameter prefixes.
 
-    Args:
-        config: Configuration object with parameter prefixes
+    Sets the global configuration for parameter prefixes used in binding request data
+    to function parameters. This affects all decorators that don't specify their own
+    prefix configuration.
+
+    :param config: Configuration object with parameter prefixes
+    :type config: ConventionalPrefixConfig
+    :return: None
+
+    Example:
+        >>> from flask_x_openapi_schema import ConventionalPrefixConfig, configure_prefixes
+        >>> custom_config = ConventionalPrefixConfig(
+        ...     request_body_prefix="req_body",
+        ...     request_query_prefix="req_query"
+        ... )
+        >>> configure_prefixes(custom_config)
     """
     # Update the configuration in a thread-safe manner
     GLOBAL_CONFIG_HOLDER.set(config)
@@ -166,7 +192,20 @@ def configure_openapi(config: OpenAPIConfig) -> None:
 
 
 def reset_prefixes() -> None:
-    """Reset parameter prefixes to default values."""
+    """Reset parameter prefixes to default values.
+
+    Resets the global parameter prefix configuration to the default values:
+    - request_body_prefix: "_x_body"
+    - request_query_prefix: "_x_query"
+    - request_path_prefix: "_x_path"
+    - request_file_prefix: "_x_file"
+
+    :return: None
+
+    Example:
+        >>> from flask_x_openapi_schema import reset_prefixes
+        >>> reset_prefixes()  # Resets to default prefixes
+    """
     # Reset the configuration in a thread-safe manner
     GLOBAL_CONFIG_HOLDER.reset()
 
