@@ -12,6 +12,7 @@ benchmark-report:
 	uv run python benchmarks/generate_report.py
 
 benchmark-flask:
+	#!/bin/bash
 	mkdir -p benchmarks/results
 	uv run python -m benchmarks.flask.app &
 	SERVER_PID=$!
@@ -21,6 +22,7 @@ benchmark-flask:
 	sleep 1
 
 benchmark-flask-restful:
+	#!/bin/bash
 	mkdir -p benchmarks/results
 	uv run python -m benchmarks.flask_restful.app &
 	SERVER_PID=$!
