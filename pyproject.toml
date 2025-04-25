@@ -44,6 +44,7 @@ dev = [
     "pandas>=2.0.3",
     "pdoc>=14.1.0",
     "polyfactory>=2.21.0",
+    "pre-commit>=3.6.0",
     "pydantic[email]>=2.10.6",
     "pytest>=8.3.5",
     "pytest-benchmark>=4.0.0",
@@ -74,7 +75,7 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-x --cov=src/flask_x_openapi_schema --cov-report=term-missing --cov-report=html --cov-report=xml -v"
+addopts = "-x -v --doctest-modules --cov=src/flask_x_openapi_schema --cov-report=term-missing --cov-report=html --cov-report=xml"
 xfail_strict = true
 filterwarnings = [
     # "ignore::pytest.PytestCollectionWarning",

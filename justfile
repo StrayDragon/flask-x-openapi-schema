@@ -2,27 +2,11 @@ format-and-lintfix:
 	ruff format
 	ruff check --fix
 
-setup-pre-commit:
-	uv pip install pre-commit
-	pre-commit install
-
-run-pre-commit:
-	pre-commit run --all-files
-
 sync-all-deps:
 	uv sync --all-extras --dev
 
 test:
 	uv run pytest
-
-test-flask:
-	uv run pytest tests/flask
-
-test-flask-restful:
-	uv run pytest tests/flask_restful
-
-test-core:
-	uv run pytest tests/core
 
 benchmark-report:
 	uv run python benchmarks/generate_report.py
@@ -49,10 +33,10 @@ benchmark: benchmark-flask benchmark-flask-restful benchmark-report
 	@echo Done
 
 
-run-example-flask:
+example-flask:
 	uv run python -m examples.flask.app
 
-run-example-flask-restful:
+example-flask-restful:
 	uv run python -m examples.flask_restful.app
 
 docs:
