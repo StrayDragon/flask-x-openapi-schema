@@ -46,7 +46,7 @@ example-flask:
 example-flask-restful:
 	uv run python -m examples.flask_restful.app
 
-docs:
+pdoc-serve:
 	mkdir -p docs/api
 	uv run pdoc -o docs/api src/flask_x_openapi_schema \
 		--show-source \
@@ -58,6 +58,18 @@ docs:
 	# 尝试打开文档（如果支持）
 	xdg-open docs/api/flask_x_openapi_schema.html &> /dev/null || open docs/api/flask_x_openapi_schema.html &> /dev/null || echo "无法自动打开文档,请手动打开 docs/api/flask_x_openapi_schema.html"
 
-docs-markdown:
+pdoc-build-markdown:
 	mkdir -p docs/markdown
 	uv run pdoc -o docs/markdown -d markdown src/flask_x_openapi_schema
+
+mkdocs-build:
+	uv run mkdocs build
+
+mkdocs-serve:
+	uv run mkdocs serve
+
+mkdocs-deploy:
+	uv run mkdocs gh-deploy --force
+
+docs-build-all: pdoc-build-markdown mkdocs-build
+	@echo "API 文档和 MkDocs 文档已生成"

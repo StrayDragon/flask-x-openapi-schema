@@ -1,0 +1,131 @@
+site_name: Flask-X-OpenAPI-Schema
+site_description: A powerful utility for automatically generating OpenAPI schemas from Flask-RESTful resources, Flask.MethodView classes, and Pydantic models.
+site_author: straydragon
+site_url: https://straydragon.github.io/flask-x-openapi-schema/
+
+repo_name: StrayDragon/flask-x-openapi-schema
+repo_url: https://github.com/StrayDragon/flask-x-openapi-schema
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+
+  features:
+    - content.code.annotate
+    - content.code.copy
+    # - content.tabs.link
+    - content.tooltips
+    # - header.autohide
+    # - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    # - navigation.instant
+    # - navigation.prune
+    - navigation.sections
+    - navigation.tabs
+    # - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+    # - toc.integrate
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - tables
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - mermaid2:
+      javascript: https://cdn.jsdelivr.net/npm/mermaid@11.6.0/dist/mermaid.min.js
+  - llmstxt:
+      markdown_description: "A powerful utility for automatically generating OpenAPI schemas from Flask-RESTful resources, Flask.MethodView classes, and Pydantic models to simplify API documentation with minimal effort."
+      sections:
+        "Getting Started":
+          - getting_started.md
+        "Architecture":
+          - architecture.md
+        "Usage Guide":
+          - usage_guide.md
+          - core_components.md
+          - parameter_binding.md
+          - schema_generation.md
+          - response_handling.md
+        "Features":
+          - file_uploads.md
+          - internationalization.md
+        "API Reference":
+          - api/core.md
+          - api/flask.md
+          - api/flask_restful.md
+          - api/models.md
+          - api/i18n.md
+
+nav:
+  - Home: index.md
+  - Getting Started: getting_started.md
+  - Usage Guide: usage_guide.md
+  - Architecture: architecture.md
+  - Core Components:
+    - Overview: core_components.md
+    - Parameter Binding: parameter_binding.md
+    - Schema Generation: schema_generation.md
+    - Response Handling: response_handling.md
+  - Features:
+    - File Uploads: file_uploads.md
+    - Internationalization: internationalization.md
+  - API Reference:
+    - Core: api/core.md
+    - Flask: api/flask.md
+    - Flask-RESTful: api/flask_restful.md
+    - Models: api/models.md
+    - I18n: api/i18n.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/StrayDragon/flask-x-openapi-schema
+      name: Flask-X-OpenAPI-Schema on GitHub
+
+copyright: Copyright &copy; 2023 - 2024 straydragon
