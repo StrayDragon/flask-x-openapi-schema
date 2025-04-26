@@ -1,10 +1,9 @@
-"""
-Response models for OpenAPI schema generation.
+"""Response models for OpenAPI schema generation.
 
 This module provides models for defining OpenAPI responses in a structured way.
 """
 
-from typing import Any, Dict, Optional, Type, Union
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -35,40 +34,32 @@ class OpenAPIMetaResponseItem(BaseModel):
         >>> class UserResponse(BaseModel):
         ...     id: str
         ...     name: str
-        ...
         >>> response_item = OpenAPIMetaResponseItem(
-        ...     model=UserResponse,
-        ...     description="User details",
-        ...     content_type="application/json"
+        ...     model=UserResponse, description="User details", content_type="application/json"
         ... )
+
     """
 
-    model: Optional[Type[BaseModel]] = Field(
-        None, description="Pydantic model for the response"
-    )
+    model: type[BaseModel] | None = Field(None, description="Pydantic model for the response")
     description: str = Field("Successful response", description="Response description")
     content_type: str = Field("application/json", description="Response content type")
-    headers: Optional[Dict[str, Any]] = Field(None, description="Response headers")
-    examples: Optional[Dict[str, Any]] = Field(None, description="Response examples")
-    msg: Optional[str] = Field(
-        None, description="Simple message for responses without a model"
-    )
+    headers: dict[str, Any] | None = Field(None, description="Response headers")
+    examples: dict[str, Any] | None = Field(None, description="Response examples")
+    msg: str | None = Field(None, description="Simple message for responses without a model")
 
-    def to_openapi_dict(self) -> Dict[str, Any]:
-        """
-        Convert the response item to an OpenAPI response object.
+    def to_openapi_dict(self) -> dict[str, Any]:
+        """Convert the response item to an OpenAPI response object.
 
         Returns:
             An OpenAPI response object
+
         """
         response = {"description": self.description}
 
         # Add content if model is provided
         if self.model:
             response["content"] = {
-                self.content_type: {
-                    "schema": {"$ref": f"#/components/schemas/{self.model.__name__}"}
-                }
+                self.content_type: {"schema": {"$ref": f"#/components/schemas/{self.model.__name__}"}},
             }
 
             # Add examples if provided
@@ -98,35 +89,31 @@ class OpenAPIMetaResponse(BaseModel):
         >>> class UserResponse(BaseModel):
         ...     id: str
         ...     name: str
-        ...
         >>> class ErrorResponse(BaseModel):
         ...     error: str
         ...     code: int
-        ...
         >>> responses = OpenAPIMetaResponse(
         ...     responses={
         ...         "200": OpenAPIMetaResponseItem(
-        ...             model=UserResponse,
-        ...             description="User details retrieved successfully"
+        ...             model=UserResponse, description="User details retrieved successfully"
         ...         ),
-        ...         "404": OpenAPIMetaResponseItem(
-        ...             model=ErrorResponse,
-        ...             description="User not found"
-        ...         )
+        ...         "404": OpenAPIMetaResponseItem(model=ErrorResponse, description="User not found"),
         ...     }
         ... )
+
     """
 
-    responses: Dict[str, OpenAPIMetaResponseItem] = Field(
-        ..., description="Map of status codes to response definitions"
+    responses: dict[str, OpenAPIMetaResponseItem] = Field(
+        ...,
+        description="Map of status codes to response definitions",
     )
 
-    def to_openapi_dict(self) -> Dict[str, Any]:
-        """
-        Convert the response container to an OpenAPI responses object.
+    def to_openapi_dict(self) -> dict[str, Any]:
+        """Convert the response container to an OpenAPI responses object.
 
         Returns:
             An OpenAPI responses object
+
         """
         result = {}
         for status_code, response_item in self.responses.items():
@@ -135,14 +122,14 @@ class OpenAPIMetaResponse(BaseModel):
 
 
 def create_response(
-    model: Optional[Type[BaseModel]] = None,
+    model: type[BaseModel] | None = None,
     description: str = "Successful response",
-    status_code: Union[int, str] = 200,
+    status_code: int | str = 200,
     content_type: str = "application/json",
-    headers: Optional[Dict[str, Any]] = None,
-    examples: Optional[Dict[str, Any]] = None,
-    msg: Optional[str] = None,
-) -> Dict[str, OpenAPIMetaResponseItem]:
+    headers: dict[str, Any] | None = None,
+    examples: dict[str, Any] | None = None,
+    msg: str | None = None,
+) -> dict[str, OpenAPIMetaResponseItem]:
     """Create a response definition for use with OpenAPIMetaResponse.
 
     This is a helper function to create a response definition for a specific status code.
@@ -172,25 +159,15 @@ def create_response(
         >>> class UserResponse(BaseModel):
         ...     id: str
         ...     name: str
-        ...
         >>> # Create a response for status code 200
-        >>> user_response = create_response(
-        ...     model=UserResponse,
-        ...     description="User details",
-        ...     status_code=200
-        ... )
+        >>> user_response = create_response(model=UserResponse, description="User details", status_code=200)
         >>>
         >>> # Create a response for status code 404
-        >>> not_found_response = create_response(
-        ...     msg="User not found",
-        ...     description="User not found",
-        ...     status_code=404
-        ... )
+        >>> not_found_response = create_response(msg="User not found", description="User not found", status_code=404)
         >>>
         >>> # Combine responses
-        >>> responses = OpenAPIMetaResponse(
-        ...     responses={**user_response, **not_found_response}
-        ... )
+        >>> responses = OpenAPIMetaResponse(responses={**user_response, **not_found_response})
+
     """
     return {
         str(status_code): OpenAPIMetaResponseItem(
@@ -200,20 +177,19 @@ def create_response(
             headers=headers,
             examples=examples,
             msg=msg,
-        )
+        ),
     }
 
 
 def success_response(
-    model: Type[BaseModel],
+    model: type[BaseModel],
     description: str = "Successful response",
-    status_code: Union[int, str] = 200,
+    status_code: int | str = 200,
     content_type: str = "application/json",
-    headers: Optional[Dict[str, Any]] = None,
-    examples: Optional[Dict[str, Any]] = None,
-) -> Dict[str, OpenAPIMetaResponseItem]:
-    """
-    Create a success response definition for use with OpenAPIMetaResponse.
+    headers: dict[str, Any] | None = None,
+    examples: dict[str, Any] | None = None,
+) -> dict[str, OpenAPIMetaResponseItem]:
+    """Create a success response definition for use with OpenAPIMetaResponse.
 
     Args:
         model: Pydantic model for the response
@@ -225,6 +201,7 @@ def success_response(
 
     Returns:
         A dictionary with the status code as key and response item as value
+
     """
     return create_response(
         model=model,
@@ -238,15 +215,14 @@ def success_response(
 
 def error_response(
     description: str,
-    status_code: Union[int, str] = 400,
-    model: Optional[Type[BaseModel]] = None,
+    status_code: int | str = 400,
+    model: type[BaseModel] | None = None,
     content_type: str = "application/json",
-    headers: Optional[Dict[str, Any]] = None,
-    examples: Optional[Dict[str, Any]] = None,
-    msg: Optional[str] = None,
-) -> Dict[str, OpenAPIMetaResponseItem]:
-    """
-    Create an error response definition for use with OpenAPIMetaResponse.
+    headers: dict[str, Any] | None = None,
+    examples: dict[str, Any] | None = None,
+    msg: str | None = None,
+) -> dict[str, OpenAPIMetaResponseItem]:
+    """Create an error response definition for use with OpenAPIMetaResponse.
 
     Args:
         description: Response description
@@ -259,6 +235,7 @@ def error_response(
 
     Returns:
         A dictionary with the status code as key and response item as value
+
     """
     return create_response(
         model=model,

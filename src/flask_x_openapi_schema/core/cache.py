@@ -1,5 +1,4 @@
-"""
-Caching mechanisms for OpenAPI schema generation.
+"""Caching mechanisms for OpenAPI schema generation.
 
 This module provides thread-safe caching utilities to improve performance
 when generating OpenAPI schemas. It implements various caching strategies
@@ -9,7 +8,7 @@ to reduce computation overhead during schema generation.
 import threading
 import weakref
 from functools import lru_cache
-from typing import Any, Dict, Optional, Tuple, Type, TypeVar, Generic, Union
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 
@@ -26,47 +25,55 @@ FUNCTION_METADATA_CACHE = weakref.WeakKeyDictionary()
 MODEL_INSTANCE_CACHE = {}
 
 # Cache for parameter detection results (using dict with size limit)
-PARAM_DETECTION_CACHE: Dict[Tuple, Any] = {}
+PARAM_DETECTION_CACHE: dict[tuple, Any] = {}
+
+# Maximum size for PARAM_DETECTION_CACHE items
+MAX_PARAM_DETECTION_CACHE_SIZE = 1000
 
 # Cache for OpenAPI parameters extracted from models (using dict with size limit)
-OPENAPI_PARAMS_CACHE: Dict[Tuple, Any] = {}
+OPENAPI_PARAMS_CACHE: dict[tuple, Any] = {}
+
+# Maximum size for OPENAPI_PARAMS_CACHE items
+MAX_OPENAPI_PARAMS_CACHE_SIZE = 1000
 
 # Cache for OpenAPI metadata generation (using dict with size limit)
-METADATA_CACHE: Dict[Tuple, Any] = {}
+METADATA_CACHE: dict[tuple, Any] = {}
+
+# Maximum size for METADATA_CACHE items
+MAX_METADATA_CACHE_SIZE = 1000
 
 # Cache for RequestParser instances (using dict with size limit)
-REQPARSE_CACHE: Dict[str, Any] = {}
+REQPARSE_CACHE: dict[str, Any] = {}
 
 
 class ThreadSafeCache(Generic[T]):
-    """
-    Thread-safe generic cache with size limiting.
+    """Thread-safe generic cache with size limiting.
 
     This cache implementation provides thread safety using RLock and
     implements a simple LRU-like mechanism to prevent unbounded growth.
     """
 
-    def __init__(self, max_size: int = MAX_CACHE_SIZE):
-        """
-        Initialize the cache with a maximum size.
+    def __init__(self, max_size: int = MAX_CACHE_SIZE) -> None:
+        """Initialize the cache with a maximum size.
 
         Args:
             max_size: Maximum number of items to store in the cache
+
         """
-        self._cache: Dict[Union[str, Tuple], T] = {}
+        self._cache: dict[str | tuple, T] = {}
         self._lock = threading.RLock()
         self._max_size = max_size
         self._access_order: list = []  # Simple LRU tracking
 
-    def get(self, key: Union[str, Tuple]) -> Optional[T]:
-        """
-        Get a value from the cache.
+    def get(self, key: str | tuple) -> T | None:
+        """Get a value from the cache.
 
         Args:
             key: Cache key
 
         Returns:
             Cached value or None if not found
+
         """
         with self._lock:
             if key in self._cache:
@@ -77,17 +84,17 @@ class ThreadSafeCache(Generic[T]):
                 return self._cache[key]
             return None
 
-    def set(self, key: Union[str, Tuple], value: T) -> None:
-        """
-        Set a value in the cache.
+    def set(self, key: str | tuple, value: T) -> None:
+        """Set a value in the cache.
 
         Args:
             key: Cache key
             value: Value to cache
+
         """
         with self._lock:
             # Check if we need to evict items
-            if len(self._cache) >= self._max_size and key not in self._cache:
+            if len(self._cache) >= self._max_size and key not in self._cache:  # noqa: SIM102
                 # Remove oldest item (simple LRU)
                 if self._access_order:
                     oldest = self._access_order.pop(0)
@@ -101,15 +108,15 @@ class ThreadSafeCache(Generic[T]):
                 self._access_order.remove(key)
             self._access_order.append(key)
 
-    def contains(self, key: Union[str, Tuple]) -> bool:
-        """
-        Check if a key exists in the cache.
+    def contains(self, key: str | tuple) -> bool:
+        """Check if a key exists in the cache.
 
         Args:
             key: Cache key
 
         Returns:
             True if key exists, False otherwise
+
         """
         with self._lock:
             return key in self._cache
@@ -122,15 +129,15 @@ class ThreadSafeCache(Generic[T]):
 
 
 # Create singleton instances
-MODEL_SCHEMA_CACHE = ThreadSafeCache[Dict[str, Any]]()
+MODEL_SCHEMA_CACHE = ThreadSafeCache[dict[str, Any]]()
 MODEL_CACHE = ThreadSafeCache[Any]()
 
 
 def get_parameter_prefixes(
-    config: Optional[Any] = None,
-) -> Tuple[str, str, str, str]:
-    """
-    Get parameter prefixes from config or global defaults.
+    config: Any | None = None,
+) -> tuple[str, str, str, str]:
+    """Get parameter prefixes from config or global defaults.
+
     This function retrieves parameter prefixes from the provided config or global defaults.
 
     Args:
@@ -138,14 +145,12 @@ def get_parameter_prefixes(
 
     Returns:
         Tuple of (body_prefix, query_prefix, path_prefix, file_prefix)
+
     """
     from .config import GLOBAL_CONFIG_HOLDER
 
     # If config is None, use global config
-    if config is None:
-        prefix_config = GLOBAL_CONFIG_HOLDER.get()
-    else:
-        prefix_config = config
+    prefix_config = GLOBAL_CONFIG_HOLDER.get() if config is None else config
 
     # Extract the prefixes directly
     return (
@@ -158,11 +163,11 @@ def get_parameter_prefixes(
 
 @lru_cache(maxsize=256)
 def extract_param_types(
-    request_body_model: Optional[Type[BaseModel]],
-    query_model: Optional[Type[BaseModel]],
-) -> Dict[str, Any]:
-    """
-    Extract parameter types from Pydantic models for type annotations.
+    request_body_model: type[BaseModel] | None,
+    query_model: type[BaseModel] | None,
+) -> dict[str, Any]:
+    """Extract parameter types from Pydantic models for type annotations.
+
     This function is cached to avoid recomputing for the same models.
 
     Args:
@@ -171,11 +176,12 @@ def extract_param_types(
 
     Returns:
         Dictionary of parameter types
+
     """
     param_types = {}
 
     # Helper function to extract and cache model field types
-    def extract_model_types(model: Type[BaseModel]) -> Dict[str, Any]:
+    def extract_model_types(model: type[BaseModel]) -> dict[str, Any]:
         # Create a cache key based on the model's id
         model_key = id(model)
 
@@ -185,10 +191,7 @@ def extract_param_types(
             return cached_types
 
         # Get field types from the Pydantic model
-        model_types = {
-            field_name: field.annotation
-            for field_name, field in model.model_fields.items()
-        }
+        model_types = {field_name: field.annotation for field_name, field in model.model_fields.items()}
 
         # Cache the result
         MODEL_CACHE.set(model_key, model_types)
@@ -211,8 +214,8 @@ def clear_all_caches() -> None:
     This function clears all caches used by the library, including both
     regular dictionary caches and ThreadSafeCache instances.
     """
-    import logging
     import gc
+    import logging
 
     logger = logging.getLogger(__name__)
     logger.debug("Clearing all caches")
@@ -239,11 +242,12 @@ def clear_all_caches() -> None:
     logger.debug(f"Cache stats after clearing: {get_cache_stats()}")
 
 
-def get_cache_stats() -> Dict[str, int]:
+def get_cache_stats() -> dict[str, int]:
     """Get statistics about cache usage.
 
     Returns:
         Dictionary with cache sizes
+
     """
     # Get sizes of all caches
     stats = {
@@ -256,16 +260,16 @@ def get_cache_stats() -> Dict[str, int]:
 
     # Add ThreadSafeCache sizes
     # These need to be accessed through their internal _cache attribute
-    with MODEL_SCHEMA_CACHE._lock:
-        stats["model_schema"] = len(MODEL_SCHEMA_CACHE._cache)
+    with MODEL_SCHEMA_CACHE._lock:  # noqa: SLF001
+        stats["model_schema"] = len(MODEL_SCHEMA_CACHE._cache)  # noqa: SLF001
 
-    with MODEL_CACHE._lock:
-        stats["model_cache"] = len(MODEL_CACHE._cache)
+    with MODEL_CACHE._lock:  # noqa: SLF001
+        stats["model_cache"] = len(MODEL_CACHE._cache)  # noqa: SLF001
 
     return stats
 
 
-def make_cache_key(*args: Any, **kwargs: Any) -> Tuple:
+def make_cache_key(*args: Any, **kwargs: Any) -> tuple:
     """Create a consistent cache key from arguments.
 
     This helper function creates a hashable cache key from a mix of
@@ -277,35 +281,32 @@ def make_cache_key(*args: Any, **kwargs: Any) -> Tuple:
 
     Returns:
         A hashable tuple to use as a cache key
+
     """
     import logging
 
     logger = logging.getLogger(__name__)
     logger.debug(f"Creating cache key for args={args}, kwargs={kwargs}")
 
-    def make_hashable(obj):
+    def make_hashable(obj):  # noqa: ANN001, ANN202
         """Convert an object to a hashable representation."""
         if isinstance(obj, dict):
             # Convert dict to sorted tuple of items with hashable values
             return tuple(sorted((k, make_hashable(v)) for k, v in obj.items()))
-        elif isinstance(obj, (list, tuple)):
+        if isinstance(obj, (list, tuple)):
             # Convert list/tuple to tuple with hashable values
             return tuple(make_hashable(x) for x in obj)
-        elif isinstance(obj, (str, int, float, bool, type(None))):
+        if isinstance(obj, (str, int, float, bool, type(None))):
             # These types are already hashable
             return obj
-        elif hasattr(obj, "__dict__"):
+        if hasattr(obj, "__dict__"):
             # Use object's id for objects
             return f"obj:{id(obj)}"
-        else:
-            # For any other type, use string representation and id
-            return f"{type(obj).__name__}:{id(obj)}"
-
-    key_parts = []
+        # For any other type, use string representation and id
+        return f"{type(obj).__name__}:{id(obj)}"
 
     # Process positional args
-    for arg in args:
-        key_parts.append(make_hashable(arg))
+    key_parts = [make_hashable(arg) for arg in args]
 
     # Process keyword args (sorted by key)
     if kwargs:

@@ -1,16 +1,13 @@
-"""
-Shared fixtures for Flask-specific tests.
-"""
+"""Shared fixtures for Flask-specific tests."""
 
 import pytest
-from flask import Flask, Blueprint
+from flask import Blueprint, Flask
 
 
 @pytest.fixture
 def flask_app():
     """Create a Flask app for testing."""
-    app = Flask(__name__)
-    return app
+    return Flask(__name__)
 
 
 @pytest.fixture
@@ -22,5 +19,4 @@ def flask_client(flask_app):
 @pytest.fixture
 def flask_blueprint():
     """Create a Flask blueprint for testing."""
-    bp = Blueprint("api", __name__, url_prefix="/api")
-    return bp
+    return Blueprint("api", __name__, url_prefix="/api")

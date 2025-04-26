@@ -10,7 +10,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -22,7 +21,7 @@ classifiers = [
 
 license = { text = "MIT" }
 
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 
 dependencies = [
     "flask>=2.0.0",
@@ -94,3 +93,60 @@ exclude_lines = [
     "pass",
     "raise ImportError",
 ]
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py310" # use minimum version
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = []
+
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+"**/{src}/*" = [
+    "D401",
+    "ANN002",
+    "ANN003",
+    "ANN401",
+    "PLR0912",
+    "PLR0913",
+    "G004",
+    "BLE001",
+    "C901",
+    "FBT001",
+    "FBT002",
+    "TC001",
+]
+"**/{tests,docs,examples,benchmarks}/*" = [
+    "S101",
+    "ANN",
+    "ARG001",
+    "B018",
+    "N806",
+    "PLR2004",
+    "G004",
+    "E501",
+    "BLE001",
+    "C901",
+    "PT011",
+    "FBT003",
+    "T201",
+    "D",
+    "SLF001",
+    "RUF001",
+    "PTH",
+    "DTZ005",
+    "S311",
+    "TC001",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+docstring-code-format = true
+docstring-code-line-length = "dynamic"

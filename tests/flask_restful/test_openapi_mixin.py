@@ -1,20 +1,19 @@
-"""
-Test for the OpenAPIIntegrationMixin class.
+"""Test for the OpenAPIIntegrationMixin class.
 
 This module tests the OpenAPIIntegrationMixin class without using the openapi_metadata decorator.
 """
 
-import pytest
-from typing import List, Optional
+from __future__ import annotations
 
+import pytest
 from flask import Flask
-from flask_x_openapi_schema._opt_deps._flask_restful import Api, Resource
 from pydantic import BaseModel, Field
 
 from flask_x_openapi_schema import (
     BaseRespModel,
     OpenAPIIntegrationMixin,
 )
+from flask_x_openapi_schema._opt_deps._flask_restful import Api, Resource
 
 
 # Define Pydantic models for request and response
@@ -22,9 +21,9 @@ class ItemRequest(BaseModel):
     """Request model for creating an item."""
 
     name: str = Field(..., description="The name of the item")
-    description: Optional[str] = Field(None, description="The description of the item")
+    description: str | None = Field(None, description="The description of the item")
     price: float = Field(..., description="The price of the item")
-    tags: List[str] = Field(default_factory=list, description="Tags for the item")
+    tags: list[str] = Field(default_factory=list, description="Tags for the item")
 
 
 class ItemResponse(BaseRespModel):
@@ -32,9 +31,9 @@ class ItemResponse(BaseRespModel):
 
     id: str = Field(..., description="The ID of the item")
     name: str = Field(..., description="The name of the item")
-    description: Optional[str] = Field(None, description="The description of the item")
+    description: str | None = Field(None, description="The description of the item")
     price: float = Field(..., description="The price of the item")
-    tags: List[str] = Field(default_factory=list, description="Tags for the item")
+    tags: list[str] = Field(default_factory=list, description="Tags for the item")
 
 
 # Define a Flask-RESTful resource without OpenAPI metadata
@@ -67,9 +66,7 @@ def app_with_api():
     api = OpenAPIApi(flask_app)
 
     # Register the resources
-    api.add_resource(
-        ItemResource, "/api/items/<string:item_id>", endpoint="item_resource"
-    )
+    api.add_resource(ItemResource, "/api/items/<string:item_id>", endpoint="item_resource")
 
     return flask_app, api
 
@@ -114,6 +111,4 @@ def test_generate_openapi_schema(app_with_api):
     # Check basic structure
     assert schema_json["info"]["title"] == "Test API"
     assert schema_json["info"]["version"] == "1.0.0"
-    assert (
-        schema_json["info"]["description"] == "API for testing OpenAPIIntegrationMixin"
-    )
+    assert schema_json["info"]["description"] == "API for testing OpenAPIIntegrationMixin"

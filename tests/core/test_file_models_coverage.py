@@ -1,15 +1,14 @@
-"""
-Tests for the file_models module to improve coverage.
-"""
+"""Tests for the file_models module to improve coverage."""
 
 import io
+
 import pytest
 from werkzeug.datastructures import FileStorage
 
 from flask_x_openapi_schema.models.file_models import (
+    DocumentUploadModel,
     FileUploadModel,
     ImageUploadModel,
-    DocumentUploadModel,
     MultipleFileUploadModel,
 )
 

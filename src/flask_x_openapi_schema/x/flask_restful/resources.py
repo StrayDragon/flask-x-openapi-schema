@@ -1,22 +1,14 @@
-"""
-Extension for the Flask-RESTful Api class to collect OpenAPI metadata.
-"""
+"""Extension for the Flask-RESTful Api class to collect OpenAPI metadata."""
 
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal
 
 import yaml
 
-from flask_x_openapi_schema._opt_deps._flask_restful import Api
-
-
-from ...core.config import (
-    ConventionalPrefixConfig,
-    configure_prefixes,
-    GLOBAL_CONFIG_HOLDER,
-)
-from ...core.schema_generator import OpenAPISchemaGenerator
-from ...i18n.i18n_string import I18nStr, get_current_language
-from ..flask.views import MethodViewOpenAPISchemaGenerator
+from flask_x_openapi_schema._opt_deps._flask_restful import Api, Resource
+from flask_x_openapi_schema.core.config import GLOBAL_CONFIG_HOLDER, ConventionalPrefixConfig, configure_prefixes
+from flask_x_openapi_schema.core.schema_generator import OpenAPISchemaGenerator
+from flask_x_openapi_schema.i18n.i18n_string import I18nStr, get_current_language
+from flask_x_openapi_schema.x.flask.views import MethodViewOpenAPISchemaGenerator
 
 
 class OpenAPIIntegrationMixin(Api):
@@ -54,14 +46,13 @@ class OpenAPIIntegrationMixin(Api):
         >>> @app.route("/openapi.yaml")
         >>> def get_openapi_spec():
         ...     schema = api.generate_openapi_schema(
-        ...         title="My API",
-        ...         version="1.0.0",
-        ...         description="API for managing items"
+        ...         title="My API", version="1.0.0", description="API for managing items"
         ...     )
         ...     return schema
+
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         """Initialize the mixin.
 
         :param args: Arguments to pass to the parent class
@@ -74,9 +65,8 @@ class OpenAPIIntegrationMixin(Api):
         if not hasattr(self, "resources"):
             self.resources = []
 
-    def add_resource(self, resource, *urls, **kwargs):
-        """
-        Add a resource to the API and register it for OpenAPI schema generation.
+    def add_resource(self, resource: Resource, *urls, **kwargs) -> Any:
+        """Add a resource to the API and register it for OpenAPI schema generation.
 
         Args:
             resource: The resource class
@@ -85,6 +75,7 @@ class OpenAPIIntegrationMixin(Api):
 
         Returns:
             The result of the parent method
+
         """
         # 调用父类的 add_resource 方法
         result = super().add_resource(resource, *urls, **kwargs)
@@ -110,15 +101,13 @@ class OpenAPIIntegrationMixin(Api):
 
         return result
 
-    def configure_openapi(
-        self, *, prefix_config: ConventionalPrefixConfig = None, **kwargs
-    ):
-        """
-        Configure OpenAPI settings for this API instance.
+    def configure_openapi(self, *, prefix_config: ConventionalPrefixConfig = None, **kwargs) -> None:
+        """Configure OpenAPI settings for this API instance.
 
         Args:
             prefix_config: Configuration object with parameter prefixes
             **kwargs: For backward compatibility - will be used to create a config object if prefix_config is None
+
         """
         if prefix_config is not None:
             configure_prefixes(prefix_config)
@@ -146,11 +135,11 @@ class OpenAPIIntegrationMixin(Api):
 
     def generate_openapi_schema(
         self,
-        title: Union[str, I18nStr],
+        title: str | I18nStr,
         version: str,
-        description: Union[str, I18nStr] = "",
+        description: str | I18nStr = "",
         output_format: Literal["json", "yaml"] = "yaml",
-        language: Optional[str] = None,
+        language: str | None = None,
     ) -> Any:
         """Generate an OpenAPI schema for the API.
 
@@ -174,40 +163,28 @@ class OpenAPIIntegrationMixin(Api):
         Example:
             >>> # Generate schema in YAML format
             >>> yaml_schema = api.generate_openapi_schema(
-            ...     title="My API",
-            ...     version="1.0.0",
-            ...     description="API for managing items"
+            ...     title="My API", version="1.0.0", description="API for managing items"
             ... )
             >>>
             >>> # Generate schema in JSON format
             >>> json_schema = api.generate_openapi_schema(
-            ...     title="My API",
-            ...     version="1.0.0",
-            ...     description="API for managing items",
-            ...     output_format="json"
+            ...     title="My API", version="1.0.0", description="API for managing items", output_format="json"
             ... )
             >>>
             >>> # Generate schema with internationalized strings
             >>> from flask_x_openapi_schema import I18nStr
             >>> i18n_schema = api.generate_openapi_schema(
-            ...     title=I18nStr({
-            ...         "en-US": "My API",
-            ...         "zh-Hans": "我的API"
-            ...     }),
+            ...     title=I18nStr({"en-US": "My API", "zh-Hans": "我的API"}),
             ...     version="1.0.0",
-            ...     description=I18nStr({
-            ...         "en-US": "API for managing items",
-            ...         "zh-Hans": "用于管理项目的API"
-            ...     }),
-            ...     language="zh-Hans"  # Use Chinese for the schema
+            ...     description=I18nStr({"en-US": "API for managing items", "zh-Hans": "用于管理项目的API"}),
+            ...     language="zh-Hans",  # Use Chinese for the schema
             ... )
+
         """
         # Use the specified language or get the current language
         current_lang = language or get_current_language()
 
-        generator = OpenAPISchemaGenerator(
-            title, version, description, language=current_lang
-        )
+        generator = OpenAPISchemaGenerator(title, version, description, language=current_lang)
 
         # Get URL prefix from blueprint if available
         url_prefix = None
@@ -215,16 +192,13 @@ class OpenAPIIntegrationMixin(Api):
             url_prefix = self.blueprint.url_prefix
 
         for resource, urls, _ in self.resources:
-            generator._process_resource(resource, urls, url_prefix)
+            generator._process_resource(resource, urls, url_prefix)  # noqa: SLF001
 
         schema = generator.generate_schema()
 
         if output_format == "yaml":
-            return yaml.dump(
-                schema, sort_keys=False, default_flow_style=False, allow_unicode=True
-            )
-        else:
-            return schema
+            return yaml.dump(schema, sort_keys=False, default_flow_style=False, allow_unicode=True)
+        return schema
 
 
 class OpenAPIBlueprintMixin:
@@ -264,22 +238,19 @@ class OpenAPIBlueprintMixin:
         >>> @app.route("/openapi.yaml")
         >>> def get_openapi_spec():
         ...     schema = bp.generate_openapi_schema(
-        ...         title="My API",
-        ...         version="1.0.0",
-        ...         description="API for managing items"
+        ...         title="My API", version="1.0.0", description="API for managing items"
         ...     )
         ...     return schema
+
     """
 
-    def configure_openapi(
-        self, *, prefix_config: ConventionalPrefixConfig = None, **kwargs
-    ):
-        """
-        Configure OpenAPI settings for this Blueprint instance.
+    def configure_openapi(self, *, prefix_config: ConventionalPrefixConfig = None, **kwargs) -> None:
+        """Configure OpenAPI settings for this Blueprint instance.
 
         Args:
             prefix_config: Configuration object with parameter prefixes
             **kwargs: For backward compatibility - will be used to create a config object if prefix_config is None
+
         """
         if prefix_config is not None:
             configure_prefixes(prefix_config)
@@ -305,21 +276,20 @@ class OpenAPIBlueprintMixin:
             )
             configure_prefixes(new_config)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:  # noqa: D107
         super().__init__(*args, **kwargs)
         # Initialize a list to store MethodView resources
         self._methodview_openapi_resources = []
 
     def generate_openapi_schema(
         self,
-        title: Union[str, I18nStr],
+        title: str | I18nStr,
         version: str,
-        description: Union[str, I18nStr] = "",
+        description: str | I18nStr = "",
         output_format: Literal["json", "yaml"] = "yaml",
-        language: Optional[str] = None,
+        language: str | None = None,
     ) -> Any:
-        """
-        Generate an OpenAPI schema for the API.
+        """Generate an OpenAPI schema for the API.
 
         Args:
             title: The title of the API (can be an I18nString)
@@ -330,13 +300,12 @@ class OpenAPIBlueprintMixin:
 
         Returns:
             The OpenAPI schema as a dictionary (if json) or string (if yaml)
+
         """
         # Use the specified language or get the current language
         current_lang = language or get_current_language()
 
-        generator = MethodViewOpenAPISchemaGenerator(
-            title, version, description, language=current_lang
-        )
+        generator = MethodViewOpenAPISchemaGenerator(title, version, description, language=current_lang)
 
         # Process MethodView resources
         generator.process_methodview_resources(self)
@@ -344,8 +313,5 @@ class OpenAPIBlueprintMixin:
         schema = generator.generate_schema()
 
         if output_format == "yaml":
-            return yaml.dump(
-                schema, sort_keys=False, default_flow_style=False, allow_unicode=True
-            )
-        else:
-            return schema
+            return yaml.dump(schema, sort_keys=False, default_flow_style=False, allow_unicode=True)
+        return schema

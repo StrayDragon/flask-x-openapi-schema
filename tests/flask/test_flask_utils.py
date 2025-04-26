@@ -1,11 +1,9 @@
-"""
-Tests for Flask utility functions.
-"""
+"""Tests for Flask utility functions."""
 
-import yaml
 from unittest.mock import MagicMock, patch
 
 import pytest
+import yaml
 from flask import Blueprint, Flask
 from pydantic import BaseModel, Field
 
@@ -82,7 +80,7 @@ def test_generate_openapi_schema_yaml_with_mock(blueprint):
         assert "description: Test API Description" in schema
 
         # Check that the generator was called with the correct parameters
-        mock_generator.process_methodview_resources.assert_called_once_with(blueprint)
+        mock_generator.process_methodview_resources.assert_called_once_with(blueprint=blueprint)
         mock_generator.generate_schema.assert_called_once()
 
 
@@ -188,7 +186,7 @@ def test_generate_openapi_schema_json_with_mock(blueprint):
         assert schema["info"]["description"] == "Test API Description"
 
         # Check that the generator was called with the correct parameters
-        mock_generator.process_methodview_resources.assert_called_once_with(blueprint)
+        mock_generator.process_methodview_resources.assert_called_once_with(blueprint=blueprint)
         mock_generator.generate_schema.assert_called_once()
 
 
@@ -271,7 +269,7 @@ def test_generate_openapi_schema_with_i18n_and_mock(blueprint):
         assert schema["info"]["description"] == "测试 API 描述"
 
         # Check that the generator was called with the correct parameters
-        mock_generator.process_methodview_resources.assert_called_once_with(blueprint)
+        mock_generator.process_methodview_resources.assert_called_once_with(blueprint=blueprint)
         mock_generator.generate_schema.assert_called_once()
 
 
@@ -311,30 +309,26 @@ def test_generate_openapi_schema_with_default_language(blueprint):
         assert schema["info"]["description"] == "Description de l'API de test"
 
         # Check that the generator was called with the correct parameters
-        mock_generator.process_methodview_resources.assert_called_once_with(blueprint)
+        mock_generator.process_methodview_resources.assert_called_once_with(blueprint=blueprint)
         mock_generator.generate_schema.assert_called_once()
 
 
 @pytest.fixture
 def app():
     """Create a Flask app for testing."""
-    app = Flask(__name__)
-    return app
+    return Flask(__name__)
 
 
 @pytest.fixture
 def blueprint():
     """Create a Flask blueprint for testing."""
-    bp = Blueprint("test_api", __name__)
-    return bp
+    return Blueprint("test_api", __name__)
 
 
 def test_register_model_schema():
     """Test registering a model schema with a generator."""
     # Create a schema generator
-    generator = MethodViewOpenAPISchemaGenerator(
-        title="Test API", version="1.0.0", description="Test API Description"
-    )
+    generator = MethodViewOpenAPISchemaGenerator(title="Test API", version="1.0.0", description="Test API Description")
 
     # Register a model
     register_model_schema(generator, SampleModel)
@@ -344,18 +338,8 @@ def test_register_model_schema():
 
     # Check that the model was registered
     assert "SampleModel" in schema["components"]["schemas"]
-    assert (
-        schema["components"]["schemas"]["SampleModel"]["properties"]["name"][
-            "description"
-        ]
-        == "The name"
-    )
-    assert (
-        schema["components"]["schemas"]["SampleModel"]["properties"]["age"][
-            "description"
-        ]
-        == "The age"
-    )
+    assert schema["components"]["schemas"]["SampleModel"]["properties"]["name"]["description"] == "The name"
+    assert schema["components"]["schemas"]["SampleModel"]["properties"]["age"]["description"] == "The age"
 
 
 def test_register_model_schema_with_mock():

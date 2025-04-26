@@ -1,13 +1,13 @@
-"""
-Generate a benchmark report for flask-x-openapi-schema.
+"""Generate a benchmark report for flask-x-openapi-schema.
 
 This script reads the benchmark results and generates a report comparing the performance
 of Flask and Flask-RESTful with and without flask-x-openapi-schema.
 """
 
 import os
-import pandas as pd
+
 import matplotlib.pyplot as plt
+import pandas as pd
 from rich.console import Console
 from rich.table import Table
 
@@ -83,12 +83,8 @@ def generate_performance_charts(flask_results, flask_restful_results):
 
     # Process Flask-RESTful results
     if flask_restful_results is not None:
-        standard_rows = flask_restful_results[
-            flask_restful_results["Name"].str.contains("/standard/")
-        ]
-        openapi_rows = flask_restful_results[
-            flask_restful_results["Name"].str.contains("/openapi/")
-        ]
+        standard_rows = flask_restful_results[flask_restful_results["Name"].str.contains("/standard/")]
+        openapi_rows = flask_restful_results[flask_restful_results["Name"].str.contains("/openapi/")]
 
         if not standard_rows.empty and not openapi_rows.empty:
             # Response Time Distribution
@@ -134,8 +130,7 @@ def calculate_metrics(data, endpoint_type):
     metrics = {
         "requests": rows["Request Count"].sum(),
         "failures": rows["Failure Count"].sum(),
-        "success_rate": 100
-        - (rows["Failure Count"].sum() / rows["Request Count"].sum() * 100),
+        "success_rate": 100 - (rows["Failure Count"].sum() / rows["Request Count"].sum() * 100),
         "avg_response_time": rows["Average Response Time"].mean(),
         "min_response_time": rows["Min Response Time"].min(),
         "max_response_time": rows["Max Response Time"].max(),
@@ -160,7 +155,7 @@ def generate_report():
 
     if flask_results is None and flask_restful_results is None:
         console.print("[bold red]No benchmark results found.")
-        # 创建一个空的报告文件，表示尝试过生成报告
+        # 创建一个空的报告文件,表示尝试过生成报告
         with open("benchmarks/results/report.txt", "w") as f:
             f.write("No benchmark results found.\n")
         return
@@ -274,9 +269,7 @@ def generate_report():
 
     # Print chart info if available
     if os.path.exists("benchmarks/results/performance_charts.png"):
-        print(
-            "\nPerformance charts generated: benchmarks/results/performance_charts.png"
-        )
+        print("\nPerformance charts generated: benchmarks/results/performance_charts.png")
 
 
 if __name__ == "__main__":

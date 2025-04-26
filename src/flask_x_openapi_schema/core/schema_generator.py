@@ -1,5 +1,4 @@
-"""
-OpenAPI Schema Generator for API documentation.
+"""OpenAPI Schema Generator for API documentation.
 
 This module provides the main class for generating OpenAPI schemas from Flask-RESTful resources.
 It handles scanning resources, extracting metadata, and generating a complete OpenAPI schema.
@@ -8,21 +7,27 @@ It handles scanning resources, extracting metadata, and generating a complete Op
 import re
 import threading
 from functools import lru_cache
-from typing import Any, Dict, List, Optional, Set, Type, get_type_hints
+from typing import Any, get_type_hints
 
 from flask import Blueprint
-from flask_x_openapi_schema._opt_deps._flask_restful import Resource
 from pydantic import BaseModel
 
-from ..i18n.i18n_model import I18nBaseModel
-from ..i18n.i18n_string import I18nStr, get_current_language
+from flask_x_openapi_schema._opt_deps._flask_restful import Resource
+from flask_x_openapi_schema.i18n.i18n_model import I18nBaseModel
+from flask_x_openapi_schema.i18n.i18n_string import I18nStr, get_current_language
+
 from .config import get_openapi_config
-from .utils import pydantic_to_openapi_schema, process_i18n_dict, process_i18n_value
+from .utils import process_i18n_dict, process_i18n_value, pydantic_to_openapi_schema
+
+
+@lru_cache(maxsize=128)
+def _get_operation_id(resource_name: str, method_name: str) -> str:
+    """Generate a cached operation ID for a resource method."""
+    return f"{resource_name}_{method_name}"
 
 
 class OpenAPISchemaGenerator:
-    """
-    Generator for OpenAPI schemas from Flask-RESTful resources.
+    """Generator for OpenAPI schemas from Flask-RESTful resources.
 
     This class scans Flask-RESTful resources and generates OpenAPI schemas based on
     the resource methods, docstrings, and type annotations.
@@ -30,19 +35,19 @@ class OpenAPISchemaGenerator:
 
     def __init__(
         self,
-        title: Optional[str] = None,
-        version: Optional[str] = None,
-        description: Optional[str] = None,
-        language: Optional[str] = None,
-    ):
-        """
-        Initialize the OpenAPI schema generator.
+        title: str | None = None,
+        version: str | None = None,
+        description: str | None = None,
+        language: str | None = None,
+    ) -> None:
+        """Initialize the OpenAPI schema generator.
 
         Args:
             title: The title of the API (default: from config)
             version: The version of the API (default: from config)
             description: The description of the API (default: from config)
             language: The language to use for internationalized strings (default: current language)
+
         """
         # Get defaults from config if not provided
         config = get_openapi_config()
@@ -54,24 +59,20 @@ class OpenAPISchemaGenerator:
 
         self.version = version if version is not None else config.version
 
-        self.description = (
-            description if description is not None else config.description
-        )
+        self.description = description if description is not None else config.description
         if isinstance(self.description, I18nStr):
             self.description = self.description.get(language)
 
         self.language = language or get_current_language()
 
         # Initialize data structures
-        self.paths: Dict[str, Dict[str, Any]] = {}
-        self.components: Dict[str, Dict[str, Any]] = {
+        self.paths: dict[str, dict[str, Any]] = {}
+        self.components: dict[str, dict[str, Any]] = {
             "schemas": {},
-            "securitySchemes": config.security_schemes.copy()
-            if config.security_schemes
-            else {},
+            "securitySchemes": config.security_schemes.copy() if config.security_schemes else {},
         }
-        self.tags: List[Dict[str, str]] = []
-        self._registered_models: Set[Type[BaseModel]] = set()
+        self.tags: list[dict[str, str]] = []
+        self._registered_models: set[type[BaseModel]] = set()
 
         # Thread safety locks
         self._lock = threading.RLock()  # Main lock for coordinating access
@@ -81,33 +82,33 @@ class OpenAPISchemaGenerator:
         self._models_lock = threading.RLock()
 
     def add_security_scheme(self, name: str, scheme: dict[str, Any]) -> None:
-        """
-        Add a security scheme to the OpenAPI schema.
+        """Add a security scheme to the OpenAPI schema.
 
         Args:
             name: The name of the security scheme
             scheme: The security scheme definition
+
         """
         with self._components_lock:
             self.components["securitySchemes"][name] = scheme
 
     def add_tag(self, name: str, description: str = "") -> None:
-        """
-        Add a tag to the OpenAPI schema.
+        """Add a tag to the OpenAPI schema.
 
         Args:
             name: The name of the tag
             description: The description of the tag
+
         """
         with self._tags_lock:
             self.tags.append({"name": name, "description": description})
 
     def scan_blueprint(self, blueprint: Blueprint) -> None:
-        """
-        Scan a Flask blueprint for API resources and add them to the schema.
+        """Scan a Flask blueprint for API resources and add them to the schema.
 
         Args:
             blueprint: The Flask blueprint to scan
+
         """
         # Get all resources registered to the blueprint
         if not hasattr(blueprint, "resources"):
@@ -116,16 +117,14 @@ class OpenAPISchemaGenerator:
         for resource, urls, _ in blueprint.resources:
             self._process_resource(resource, urls, blueprint.url_prefix)
 
-    def _process_resource(
-        self, resource: type[Resource], urls: tuple[str], prefix: Optional[str] = None
-    ) -> None:
-        """
-        Process a Flask-RESTful resource and add its endpoints to the schema.
+    def _process_resource(self, resource: type[Resource], urls: tuple[str], prefix: str | None = None) -> None:
+        """Process a Flask-RESTful resource and add its endpoints to the schema.
 
         Args:
             resource: The Flask-RESTful resource class
             urls: The URLs registered for the resource
             prefix: The URL prefix for the resource
+
         """
         for url in urls:
             full_url = f"{prefix or ''}{url}"
@@ -156,11 +155,7 @@ class OpenAPISchemaGenerator:
                             operation["parameters"] = []
 
                         # Add path parameters without duplicates
-                        existing_param_names = {
-                            p["name"]
-                            for p in operation["parameters"]
-                            if p["in"] == "path"
-                        }
+                        existing_param_names = {p["name"] for p in operation["parameters"] if p["in"] == "path"}
                         for param in path_params:
                             if param["name"] not in existing_param_names:
                                 operation["parameters"].append(param)
@@ -179,14 +174,14 @@ class OpenAPISchemaGenerator:
                     self.paths[openapi_path][method_name] = operation
 
     def _convert_flask_path_to_openapi_path(self, flask_path: str) -> str:
-        """
-        Convert a Flask URL path to an OpenAPI path.
+        """Convert a Flask URL path to an OpenAPI path.
 
         Args:
             flask_path: The Flask URL path
 
         Returns:
             The OpenAPI path
+
         """
         from .cache import get_parameter_prefixes
 
@@ -196,7 +191,7 @@ class OpenAPISchemaGenerator:
 
         # Replace Flask's <converter:param> with OpenAPI's {param}
         # and remove any prefix from the parameter name
-        def replace_param(match):
+        def replace_param(match: re.Match) -> str:
             param_name = match.group(1)
 
             # Remove prefix if present (e.g., _x_path_)
@@ -208,14 +203,14 @@ class OpenAPISchemaGenerator:
         return re.sub(r"<(?:[^:>]+:)?([^>]+)>", replace_param, flask_path)
 
     def _extract_path_parameters(self, flask_path: str) -> list[dict[str, Any]]:
-        """
-        Extract path parameters from a Flask URL path.
+        """Extract path parameters from a Flask URL path.
 
         Args:
             flask_path: The Flask URL path
 
         Returns:
             A list of OpenAPI parameter objects
+
         """
         from .cache import get_parameter_prefixes
 
@@ -243,14 +238,14 @@ class OpenAPISchemaGenerator:
         return parameters
 
     def _get_schema_for_converter(self, converter: str) -> dict[str, Any]:
-        """
-        Get an OpenAPI schema for a Flask URL converter.
+        """Get an OpenAPI schema for a Flask URL converter.
 
         Args:
             converter: The Flask URL converter
 
         Returns:
             An OpenAPI schema object
+
         """
         # Map Flask URL converters to OpenAPI types
         converter_map = {
@@ -263,16 +258,8 @@ class OpenAPISchemaGenerator:
         }
         return converter_map.get(converter, {"type": "string"})
 
-    @lru_cache(maxsize=128)
-    def _get_operation_id(self, resource_name: str, method_name: str) -> str:
-        """Generate a cached operation ID for a resource method."""
-        return f"{resource_name}_{method_name}"
-
-    def _build_operation_from_method(
-        self, method: Any, resource_cls: type[Resource]
-    ) -> dict[str, Any]:
-        """
-        Build an OpenAPI operation object from a Flask-RESTful resource method.
+    def _build_operation_from_method(self, method: Any, resource_cls: type[Resource]) -> dict[str, Any]:
+        """Build an OpenAPI operation object from a Flask-RESTful resource method.
 
         Args:
             method: The resource method
@@ -280,6 +267,7 @@ class OpenAPISchemaGenerator:
 
         Returns:
             An OpenAPI operation object
+
         """
         operation: dict[str, Any] = {}
 
@@ -302,15 +290,11 @@ class OpenAPISchemaGenerator:
             lines = docstring.split("\n")
             operation["summary"] = lines[0].strip()
             if len(lines) > 1:
-                operation["description"] = "\n".join(
-                    line.strip() for line in lines[1:]
-                ).strip()
+                operation["description"] = "\n".join(line.strip() for line in lines[1:]).strip()
 
         # Get operation ID
         if "operationId" not in operation:
-            operation["operationId"] = self._get_operation_id(
-                resource_cls.__name__, method.__name__
-            )
+            operation["operationId"] = _get_operation_id(resource_cls.__name__, method.__name__)
 
         # Extract request and response schemas from type annotations
         self._add_request_schema(method, operation)
@@ -319,12 +303,12 @@ class OpenAPISchemaGenerator:
         return operation
 
     def _add_request_schema(self, method: Any, operation: dict[str, Any]) -> None:
-        """
-        Add request schema to an OpenAPI operation based on method type annotations.
+        """Add request schema to an OpenAPI operation based on method type annotations.
 
         Args:
             method: The resource method
             operation: The OpenAPI operation object to update
+
         """
         type_hints = get_type_hints(method)
 
@@ -344,65 +328,46 @@ class OpenAPISchemaGenerator:
                 # Check model config for multipart/form-data flag
                 if hasattr(param_type, "model_config"):
                     config = getattr(param_type, "model_config", {})
-                    if isinstance(config, dict) and config.get(
-                        "json_schema_extra", {}
-                    ).get("multipart/form-data", False):
+                    if isinstance(config, dict) and config.get("json_schema_extra", {}).get(
+                        "multipart/form-data",
+                        False,
+                    ):
                         is_file_upload = True
-                elif hasattr(param_type, "Config") and hasattr(
-                    param_type.Config, "json_schema_extra"
-                ):
+                elif hasattr(param_type, "Config") and hasattr(param_type.Config, "json_schema_extra"):
                     config_extra = getattr(param_type.Config, "json_schema_extra", {})
                     is_file_upload = config_extra.get("multipart/form-data", False)
 
                 # Check if model has any binary fields
                 if hasattr(param_type, "model_fields"):
-                    for field_name, field_info in param_type.model_fields.items():
+                    for field_info in param_type.model_fields.values():
                         field_schema = getattr(field_info, "json_schema_extra", None)
-                        if (
-                            field_schema is not None
-                            and field_schema.get("format") == "binary"
-                        ):
+                        if field_schema is not None and field_schema.get("format") == "binary":
                             has_binary_fields = True
                             break
 
                 # Determine content type based on model properties
-                content_type = (
-                    "multipart/form-data"
-                    if (is_file_upload or has_binary_fields)
-                    else "application/json"
-                )
+                content_type = "multipart/form-data" if (is_file_upload or has_binary_fields) else "application/json"
 
                 # Add request body with appropriate content type
                 operation["requestBody"] = {
-                    "content": {
-                        content_type: {
-                            "schema": {
-                                "$ref": f"#/components/schemas/{param_type.__name__}"
-                            }
-                        }
-                    },
+                    "content": {content_type: {"schema": {"$ref": f"#/components/schemas/{param_type.__name__}"}}},
                     "required": True,
                 }
 
                 # If this is a file upload model, remove any file parameters from parameters
                 # as they will be included in the requestBody
-                if is_file_upload or has_binary_fields:
-                    if "parameters" in operation:
-                        # Keep only path and query parameters
-                        operation["parameters"] = [
-                            p
-                            for p in operation["parameters"]
-                            if p["in"] in ["path", "query"]
-                        ]
+                if (is_file_upload or has_binary_fields) and "parameters" in operation:
+                    # Keep only path and query parameters
+                    operation["parameters"] = [p for p in operation["parameters"] if p["in"] in ["path", "query"]]
                 break
 
     def _add_response_schema(self, method: Any, operation: dict[str, Any]) -> None:
-        """
-        Add response schema to an OpenAPI operation based on method return type annotation.
+        """Add response schema to an OpenAPI operation based on method return type annotation.
 
         Args:
             method: The resource method
             operation: The OpenAPI operation object to update
+
         """
         type_hints = get_type_hints(method)
 
@@ -418,13 +383,9 @@ class OpenAPISchemaGenerator:
                     "200": {
                         "description": "Successful response",
                         "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": f"#/components/schemas/{return_type.__name__}"
-                                }
-                            }
+                            "application/json": {"schema": {"$ref": f"#/components/schemas/{return_type.__name__}"}},
                         },
-                    }
+                    },
                 }
             else:
                 # Default response
@@ -434,11 +395,11 @@ class OpenAPISchemaGenerator:
             operation["responses"] = {"200": {"description": "Successful response"}}
 
     def _register_model(self, model: type) -> None:
-        """
-        Register a Pydantic model or enum in the components schemas.
+        """Register a Pydantic model or enum in the components schemas.
 
         Args:
             model: The model to register (Pydantic model or enum)
+
         """
         with self._models_lock:
             # Skip if already registered
@@ -478,18 +439,18 @@ class OpenAPISchemaGenerator:
         self._register_nested_models(model)
 
     def _register_nested_models(self, model: type[BaseModel]) -> None:
-        """
-        Register nested Pydantic models found in fields of the given model.
+        """Register nested Pydantic models found in fields of the given model.
 
         Args:
             model: The Pydantic model to scan for nested models
+
         """
         # Get model fields
         if not hasattr(model, "model_fields"):
             return
 
         # Check each field for nested models
-        for field_name, field_info in model.model_fields.items():
+        for field_info in model.model_fields.values():
             field_type = field_info.annotation
 
             # Handle direct BaseModel references
@@ -529,36 +490,36 @@ class OpenAPISchemaGenerator:
                     if field_type.__name__ not in self.components["schemas"]:
                         self.components["schemas"][field_type.__name__] = enum_schema
 
-    def _process_i18n_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Process a dictionary that might contain I18nString values.
+    def _process_i18n_dict(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Process a dictionary that might contain I18nString values.
 
         Args:
             data: The dictionary to process
 
         Returns:
             A new dictionary with I18nString values converted to strings
+
         """
         return process_i18n_dict(data, self.language)
 
     def _process_i18n_value(self, value: Any) -> Any:
-        """
-        Process a value that might be an I18nString or contain I18nString values.
+        """Process a value that might be an I18nString or contain I18nString values.
 
         Args:
             value: The value to process
 
         Returns:
             The processed value
+
         """
         return process_i18n_value(value, self.language)
 
-    def generate_schema(self) -> Dict[str, Any]:
-        """
-        Generate the complete OpenAPI schema.
+    def generate_schema(self) -> dict[str, Any]:
+        """Generate the complete OpenAPI schema.
 
         Returns:
             The OpenAPI schema as a dictionary
+
         """
         # Use a lock to ensure consistent state during schema generation
         with self._lock:

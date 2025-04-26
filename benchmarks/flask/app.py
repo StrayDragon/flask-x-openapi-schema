@@ -1,5 +1,4 @@
-"""
-Flask benchmark applications.
+"""Flask benchmark applications.
 
 This module contains Flask applications for benchmarking with and without flask-x-openapi-schema.
 """
@@ -7,17 +6,17 @@ This module contains Flask applications for benchmarking with and without flask-
 import json
 import time
 
-from flask import Flask, request, jsonify, Response
+from flask import Flask, Response, jsonify, request
 
-from flask_x_openapi_schema import OpenAPIMetaResponse, OpenAPIMetaResponseItem
-from flask_x_openapi_schema.x.flask import openapi_metadata
 from benchmarks.common.models import (
     Error400Resp,
-    UserRequest,
     UserQueryParams,
+    UserRequest,
     UserResponse,
 )
 from benchmarks.common.utils import get_performance_metrics
+from flask_x_openapi_schema import OpenAPIMetaResponse, OpenAPIMetaResponseItem
+from flask_x_openapi_schema.x.flask import openapi_metadata
 
 
 def create_standard_flask_app():
@@ -51,9 +50,7 @@ def create_standard_flask_app():
         resp = Response(json.dumps(response), status=201, mimetype="application/json")
         resp.headers["X-Processing-Time"] = f"{processing_time:.2f}ms"
         resp.headers["X-DB-Queries"] = str(metrics["db_query_count"])
-        resp.headers["X-Cache-Status"] = (
-            f"hits={metrics['cache_hits']},misses={metrics['cache_misses']}"
-        )
+        resp.headers["X-Cache-Status"] = f"hits={metrics['cache_hits']},misses={metrics['cache_misses']}"
 
         return resp
 
@@ -79,12 +76,10 @@ def create_openapi_flask_app():
                     model=Error400Resp,
                     description="Bad request",
                 ),
-            }
+            },
         ),
     )
-    def openapi_create_user(
-        user_id: str, _x_body: UserRequest = None, _x_query: UserQueryParams = None
-    ):
+    def openapi_create_user(user_id: str, _x_body: UserRequest = None, _x_query: UserQueryParams = None):
         """Create a user using flask-x-openapi-schema."""
         # Start timing for performance metrics
         start_time = time.time()
@@ -104,9 +99,7 @@ def create_openapi_flask_app():
         resp = Response(response.model_dump(mode="json"), 201)
         resp.headers["X-Processing-Time"] = f"{processing_time:.2f}ms"
         resp.headers["X-DB-Queries"] = str(metrics["db_query_count"])
-        resp.headers["X-Cache-Status"] = (
-            f"hits={metrics['cache_hits']},misses={metrics['cache_misses']}"
-        )
+        resp.headers["X-Cache-Status"] = f"hits={metrics['cache_hits']},misses={metrics['cache_misses']}"
         return resp
 
     return app
@@ -145,4 +138,4 @@ def create_combined_app():
 app = create_combined_app()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5000)  # noqa: S104

@@ -1,19 +1,12 @@
-"""
-Base classes and utilities for OpenAPI metadata decorators.
-"""
+"""Base classes and utilities for OpenAPI metadata decorators."""
 
+import contextlib
 import inspect
 from collections.abc import Callable
 from functools import wraps
 from typing import (
     Any,
-    Dict,
-    List,
-    Optional,
-    Tuple,
-    Type,
     TypeVar,
-    Union,
     cast,
     get_type_hints,
 )
@@ -27,30 +20,31 @@ try:
 except ImportError:
     from typing_extensions import ParamSpec  # Python < 3.10
 
-from ..i18n.i18n_string import I18nStr, get_current_language
-from ..models.base import BaseRespModel
-from ..models.responses import OpenAPIMetaResponse
+from flask_x_openapi_schema.i18n.i18n_string import I18nStr, get_current_language
+from flask_x_openapi_schema.models.base import BaseRespModel
+from flask_x_openapi_schema.models.responses import OpenAPIMetaResponse
+
 from .cache import (
     FUNCTION_METADATA_CACHE,
+    MAX_METADATA_CACHE_SIZE,
+    MAX_OPENAPI_PARAMS_CACHE_SIZE,
+    MAX_PARAM_DETECTION_CACHE_SIZE,
     METADATA_CACHE,
     OPENAPI_PARAMS_CACHE,
     PARAM_DETECTION_CACHE,
     extract_param_types,
     get_parameter_prefixes,
 )
+from .config import GLOBAL_CONFIG_HOLDER, ConventionalPrefixConfig
 from .utils import _fix_references
-from .config import ConventionalPrefixConfig, GLOBAL_CONFIG_HOLDER
 
 # Type variables for function parameters and return type
 P = ParamSpec("P")
 R = TypeVar("R")
 
 
-def preprocess_request_data(
-    data: Dict[str, Any], model: Type[BaseModel]
-) -> Dict[str, Any]:
-    """
-    Pre-process request data to handle list fields and other complex types correctly.
+def preprocess_request_data(data: dict[str, Any], model: type[BaseModel]) -> dict[str, Any]:  # noqa: PLR0915
+    """Pre-process request data to handle list fields and other complex types correctly.
 
     Args:
         data: The request data to process
@@ -58,6 +52,7 @@ def preprocess_request_data(
 
     Returns:
         Processed data that can be validated by Pydantic
+
     """
     import json
     import logging
@@ -81,24 +76,15 @@ def preprocess_request_data(
         origin = getattr(field_type, "__origin__", None)
 
         # Handle list fields
-        if origin is list or origin is List:
+        if origin is list or origin is list:
             # If the value is a string that looks like a JSON array, parse it
-            if (
-                isinstance(field_value, str)
-                and field_value.startswith("[")
-                and field_value.endswith("]")
-            ):
+            if isinstance(field_value, str) and field_value.startswith("[") and field_value.endswith("]"):
                 try:
                     result[field_name] = json.loads(field_value)
-                    logger.debug(
-                        f"Parsed string to list for field {field_name}: {result[field_name]}"
-                    )
+                    logger.debug(f"Parsed string to list for field {field_name}: {result[field_name]}")
                     continue
                 except json.JSONDecodeError as e:
-                    logger.warning(
-                        f"Failed to parse string as JSON list for field {field_name}: {e}"
-                    )
-                    pass
+                    logger.warning(f"Failed to parse string as JSON list for field {field_name}: {e}")
 
             # If it's already a list, use it as is
             if isinstance(field_value, list):
@@ -108,40 +94,27 @@ def preprocess_request_data(
                 try:
                     result[field_name] = [field_value]
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to convert value to list for field {field_name}: {e}"
-                    )
+                    logger.warning(f"Failed to convert value to list for field {field_name}: {e}")
                     # If conversion fails, keep the original value
                     result[field_name] = field_value
 
         # Handle dictionary fields
-        elif origin is dict or origin is Dict:
+        elif origin is dict or origin is dict:
             # If the value is a string that looks like a JSON object, parse it
-            if (
-                isinstance(field_value, str)
-                and field_value.startswith("{")
-                and field_value.endswith("}")
-            ):
+            if isinstance(field_value, str) and field_value.startswith("{") and field_value.endswith("}"):
                 try:
                     result[field_name] = json.loads(field_value)
-                    logger.debug(
-                        f"Parsed string to dict for field {field_name}: {result[field_name]}"
-                    )
+                    logger.debug(f"Parsed string to dict for field {field_name}: {result[field_name]}")
                     continue
                 except json.JSONDecodeError as e:
-                    logger.warning(
-                        f"Failed to parse string as JSON dict for field {field_name}: {e}"
-                    )
-                    pass
+                    logger.warning(f"Failed to parse string as JSON dict for field {field_name}: {e}")
 
             # If it's already a dict, use it as is
             if isinstance(field_value, dict):
                 result[field_name] = field_value
             else:
                 # For non-dict values, keep the original (will likely fail validation)
-                logger.warning(
-                    f"Non-dict value for dict field {field_name}: {field_value}"
-                )
+                logger.warning(f"Non-dict value for dict field {field_name}: {field_value}")
                 result[field_name] = field_value
 
         # Handle nested model fields
@@ -157,15 +130,10 @@ def preprocess_request_data(
                 parsed_value = json.loads(field_value)
                 if isinstance(parsed_value, dict):
                     result[field_name] = parsed_value
-                    logger.debug(
-                        f"Parsed string to dict for nested model field {field_name}"
-                    )
+                    logger.debug(f"Parsed string to dict for nested model field {field_name}")
                     continue
             except json.JSONDecodeError as e:
-                logger.warning(
-                    f"Failed to parse string as JSON for nested model field {field_name}: {e}"
-                )
-                pass
+                logger.warning(f"Failed to parse string as JSON for nested model field {field_name}: {e}")
 
             # If parsing fails, keep the original value
             result[field_name] = field_value
@@ -183,11 +151,11 @@ def preprocess_request_data(
 
 def _extract_parameters_from_prefixes(
     signature: inspect.Signature,
-    type_hints: Dict[str, Any],
-    config: Optional[ConventionalPrefixConfig] = None,
-) -> Tuple[Optional[Type[BaseModel]], Optional[Type[BaseModel]], List[str]]:
-    """
-    Extract parameters based on prefix types from function signature.
+    type_hints: dict[str, Any],
+    config: ConventionalPrefixConfig | None = None,
+) -> tuple[type[BaseModel] | None, type[BaseModel] | None, list[str]]:
+    """Extract parameters based on prefix types from function signature.
+
     This function does not auto-detect parameters, but simply extracts them based on their prefixes.
     Results are cached based on the function signature and type hints.
 
@@ -198,6 +166,7 @@ def _extract_parameters_from_prefixes(
 
     Returns:
         Tuple of (request_body, query_model, path_params)
+
     """
     # Create a cache key based on signature, type hints, and config prefixes
     # We use the signature's string representation and a frozenset of type hints items
@@ -213,9 +182,7 @@ def _extract_parameters_from_prefixes(
     import logging
 
     logger = logging.getLogger(__name__)
-    logger.debug(
-        f"Extracting parameters with prefixes={prefixes}, signature={signature}, type_hints={type_hints}"
-    )
+    logger.debug(f"Extracting parameters with prefixes={prefixes}, signature={signature}, type_hints={type_hints}")
 
     # Check if we've already cached this extraction
     if cache_key in PARAM_DETECTION_CACHE:
@@ -245,22 +212,14 @@ def _extract_parameters_from_prefixes(
         # Check for request_body parameter
         if param_name.startswith(body_prefix):
             param_type = type_hints.get(param_name)
-            if (
-                param_type
-                and isinstance(param_type, type)
-                and issubclass(param_type, BaseModel)
-            ):
+            if param_type and isinstance(param_type, type) and issubclass(param_type, BaseModel):
                 request_body = param_type
                 continue
 
         # Check for request_query parameter
         if param_name.startswith(query_prefix):
             param_type = type_hints.get(param_name)
-            if (
-                param_type
-                and isinstance(param_type, type)
-                and issubclass(param_type, BaseModel)
-            ):
+            if param_type and isinstance(param_type, type) and issubclass(param_type, BaseModel):
                 query_model = param_type
                 continue
 
@@ -273,7 +232,7 @@ def _extract_parameters_from_prefixes(
             path_params.append(param_suffix)
 
     # Cache the result (limit cache size to prevent memory issues)
-    if len(PARAM_DETECTION_CACHE) > 1000:  # Limit cache size
+    if len(PARAM_DETECTION_CACHE) > MAX_PARAM_DETECTION_CACHE_SIZE:  # Limit cache size
         PARAM_DETECTION_CACHE.clear()
 
     result = (request_body, query_model, path_params)
@@ -281,17 +240,14 @@ def _extract_parameters_from_prefixes(
 
     # Debug information
     logger.debug(
-        f"Extracted parameters: request_body={request_body}, query_model={query_model}, path_params={path_params}"
+        f"Extracted parameters: request_body={request_body}, query_model={query_model}, path_params={path_params}",
     )
 
     return result
 
 
-def _process_i18n_value(
-    value: Optional[Union[str, I18nStr]], language: Optional[str]
-) -> Optional[str]:
-    """
-    Process an I18nString value to get the string for the current language.
+def _process_i18n_value(value: str | I18nStr | None, language: str | None) -> str | None:
+    """Process an I18nString value to get the string for the current language.
 
     Args:
         value: The value to process (string or I18nString)
@@ -299,6 +255,7 @@ def _process_i18n_value(
 
     Returns:
         The processed string value
+
     """
     if value is None:
         return None
@@ -310,33 +267,33 @@ def _process_i18n_value(
     return value
 
 
-def _generate_openapi_metadata(
-    summary: Optional[Union[str, I18nStr]],
-    description: Optional[Union[str, I18nStr]],
-    tags: Optional[List[str]],
-    operation_id: Optional[str],
+def _generate_openapi_metadata(  # noqa: D417
+    summary: str | I18nStr | None,
+    description: str | I18nStr | None,
+    tags: list[str] | None,
+    operation_id: str | None,
     deprecated: bool,
-    security: Optional[List[Dict[str, List[str]]]],
-    external_docs: Optional[Dict[str, str]],
-    actual_request_body: Optional[Union[Type[BaseModel], Dict[str, Any]]],
-    responses: Optional[OpenAPIMetaResponse],
-    language: Optional[str],
-) -> Dict[str, Any]:
-    """
-    Generate OpenAPI metadata dictionary.
+    security: list[dict[str, list[str]]] | None,
+    external_docs: dict[str, str] | None,
+    actual_request_body: type[BaseModel] | dict[str, Any] | None,
+    responses: OpenAPIMetaResponse | None,
+    language: str | None,
+) -> dict[str, Any]:
+    """Generate OpenAPI metadata dictionary.
 
     Args:
         Various parameters for OpenAPI metadata
 
     Returns:
         OpenAPI metadata dictionary
+
     """
     # Debug information
     import logging
 
     logger = logging.getLogger(__name__)
     logger.debug(f"Generating OpenAPI metadata with request_body={actual_request_body}")
-    metadata: Dict[str, Any] = {}
+    metadata: dict[str, Any] = {}
 
     # Use the specified language or get the current language
     current_lang = language or get_current_language()
@@ -362,13 +319,9 @@ def _generate_openapi_metadata(
     # Handle request body
     if actual_request_body:
         logger.debug(f"Processing request body: {actual_request_body}")
-        if isinstance(actual_request_body, type) and issubclass(
-            actual_request_body, BaseModel
-        ):
+        if isinstance(actual_request_body, type) and issubclass(actual_request_body, BaseModel):
             # It's a Pydantic model
-            logger.debug(
-                f"Request body is a Pydantic model: {actual_request_body.__name__}"
-            )
+            logger.debug(f"Request body is a Pydantic model: {actual_request_body.__name__}")
             # Check if the model has a Config with multipart/form-data flag
             is_multipart = False
             has_file_fields = False
@@ -376,45 +329,26 @@ def _generate_openapi_metadata(
             # Check model config for multipart/form-data flag
             if hasattr(actual_request_body, "model_config"):
                 config = getattr(actual_request_body, "model_config", {})
-                if isinstance(config, dict) and config.get("json_schema_extra", {}).get(
-                    "multipart/form-data", False
-                ):
+                if isinstance(config, dict) and config.get("json_schema_extra", {}).get("multipart/form-data", False):
                     is_multipart = True
-            elif hasattr(actual_request_body, "Config") and hasattr(
-                actual_request_body.Config, "json_schema_extra"
-            ):
-                config_extra = getattr(
-                    actual_request_body.Config, "json_schema_extra", {}
-                )
+            elif hasattr(actual_request_body, "Config") and hasattr(actual_request_body.Config, "json_schema_extra"):
+                config_extra = getattr(actual_request_body.Config, "json_schema_extra", {})
                 is_multipart = config_extra.get("multipart/form-data", False)
 
             # Check if model has any file fields
             if hasattr(actual_request_body, "model_fields"):
-                for field_name, field_info in actual_request_body.model_fields.items():
+                for field_info in actual_request_body.model_fields.values():
                     field_schema = getattr(field_info, "json_schema_extra", None)
-                    if (
-                        field_schema is not None
-                        and field_schema.get("format") == "binary"
-                    ):
+                    if field_schema is not None and field_schema.get("format") == "binary":
                         has_file_fields = True
                         break
 
             # If model has file fields or is explicitly marked as multipart/form-data, use multipart/form-data
-            content_type = (
-                "multipart/form-data"
-                if (is_multipart or has_file_fields)
-                else "application/json"
-            )
+            content_type = "multipart/form-data" if (is_multipart or has_file_fields) else "application/json"
             logger.debug(f"Using content type: {content_type}")
 
             metadata["requestBody"] = {
-                "content": {
-                    content_type: {
-                        "schema": {
-                            "$ref": f"#/components/schemas/{actual_request_body.__name__}"
-                        }
-                    }
-                },
+                "content": {content_type: {"schema": {"$ref": f"#/components/schemas/{actual_request_body.__name__}"}}},
                 "required": True,
             }
             logger.debug(f"Added requestBody to metadata: {metadata['requestBody']}")
@@ -431,43 +365,37 @@ def _generate_openapi_metadata(
 
 
 def _handle_response(result: Any) -> Any:
-    """
-    Handle response conversion for BaseRespModel instances.
+    """Handle response conversion for BaseRespModel instances.
 
     Args:
         result: Function result
 
     Returns:
         Processed result
+
     """
     if isinstance(result, BaseRespModel):
         # Convert the model to a response
         return result.to_response()
-    elif (
-        isinstance(result, tuple)
-        and len(result) >= 1
-        and isinstance(result[0], BaseRespModel)
-    ):
+    if isinstance(result, tuple) and len(result) >= 1 and isinstance(result[0], BaseRespModel):
         # Handle tuple returns with status code
         model = result[0]
-        if len(result) >= 2 and isinstance(result[1], int):
+        if len(result) >= 2 and isinstance(result[1], int):  # noqa: PLR2004
             # Return with status code
             return model.to_response(result[1])
-        else:
-            # Return without status code
-            return model.to_response()
+        # Return without status code
+        return model.to_response()
 
     # Return the original result if it's not a BaseRespModel
     return result
 
 
 def _detect_file_parameters(
-    param_names: List[str],
-    func_annotations: Dict[str, Any],
-    config: Optional[ConventionalPrefixConfig] = None,
-) -> List[Dict[str, Any]]:
-    """
-    Detect file parameters from function signature.
+    param_names: list[str],
+    func_annotations: dict[str, Any],
+    config: ConventionalPrefixConfig | None = None,
+) -> list[dict[str, Any]]:
+    """Detect file parameters from function signature.
 
     Args:
         param_names: List of parameter names
@@ -476,6 +404,7 @@ def _detect_file_parameters(
 
     Returns:
         List of file parameters for OpenAPI schema
+
     """
     file_params = []
 
@@ -493,23 +422,13 @@ def _detect_file_parameters(
 
         # Extract the file parameter name
         param_suffix = param_name[file_prefix_len:]
-        if "_" in param_suffix:
-            file_param_name = param_suffix.split("_", 1)[1]
-        else:
-            file_param_name = "file"
+        file_param_name = param_suffix.split("_", 1)[1] if "_" in param_suffix else "file"
 
         # Check if the parameter is a Pydantic model with a file field
         file_description = f"File upload for {file_param_name}"
 
-        if (
-            param_type
-            and isinstance(param_type, type)
-            and issubclass(param_type, BaseModel)
-        ):
-            if (
-                hasattr(param_type, "model_fields")
-                and "file" in param_type.model_fields
-            ):
+        if param_type and isinstance(param_type, type) and issubclass(param_type, BaseModel):  # noqa: SIM102
+            if hasattr(param_type, "model_fields") and "file" in param_type.model_fields:
                 field_info = param_type.model_fields["file"]
                 if field_info.description:
                     file_description = field_info.description
@@ -522,7 +441,7 @@ def _detect_file_parameters(
                 "required": True,
                 "type": "file",
                 "description": file_description,
-            }
+            },
         )
 
     return file_params
@@ -536,18 +455,18 @@ class OpenAPIDecoratorBase:
 
     def __init__(
         self,
-        summary: Optional[Union[str, I18nStr]] = None,
-        description: Optional[Union[str, I18nStr]] = None,
-        tags: Optional[List[str]] = None,
-        operation_id: Optional[str] = None,
-        responses: Optional[OpenAPIMetaResponse] = None,
+        summary: str | I18nStr | None = None,
+        description: str | I18nStr | None = None,
+        tags: list[str] | None = None,
+        operation_id: str | None = None,
+        responses: OpenAPIMetaResponse | None = None,
         deprecated: bool = False,
-        security: Optional[List[Dict[str, List[str]]]] = None,
-        external_docs: Optional[Dict[str, str]] = None,
-        language: Optional[str] = None,
-        prefix_config: Optional[ConventionalPrefixConfig] = None,
+        security: list[dict[str, list[str]]] | None = None,
+        external_docs: dict[str, str] | None = None,
+        language: str | None = None,
+        prefix_config: ConventionalPrefixConfig | None = None,
         framework: str = "flask",
-    ):
+    ) -> None:
         """Initialize the decorator with OpenAPI metadata parameters."""
         self.summary = summary
         self.description = description
@@ -567,13 +486,13 @@ class OpenAPIDecoratorBase:
         # We'll initialize the framework-specific decorator when needed
         # to avoid circular imports
 
-    def __call__(self, func: Callable[P, R]) -> Callable[P, R]:
+    def __call__(self, func: Callable[P, R]) -> Callable[P, R]:  # noqa: PLR0915
         """Apply the decorator to the function."""
         # Initialize the framework-specific decorator if needed
         if self.framework_decorator is None:
             if self.framework == "flask":
                 # Import here to avoid circular imports
-                from ..x.flask.decorators import FlaskOpenAPIDecorator
+                from flask_x_openapi_schema.x.flask.decorators import FlaskOpenAPIDecorator
 
                 self.framework_decorator = FlaskOpenAPIDecorator(
                     summary=self.summary,
@@ -589,7 +508,7 @@ class OpenAPIDecoratorBase:
                 )
             elif self.framework == "flask_restful":
                 # Import here to avoid circular imports
-                from ..x.flask_restful.decorators import FlaskRestfulOpenAPIDecorator
+                from flask_x_openapi_schema.x.flask_restful.decorators import FlaskRestfulOpenAPIDecorator
 
                 self.framework_decorator = FlaskRestfulOpenAPIDecorator(
                     summary=self.summary,
@@ -604,7 +523,8 @@ class OpenAPIDecoratorBase:
                     prefix_config=self.prefix_config,
                 )
             else:
-                raise ValueError(f"Unsupported framework: {self.framework}")
+                msg = f"Unsupported framework: {self.framework}"
+                raise ValueError(msg)
 
         # Check if we've already decorated this function
         if func in FUNCTION_METADATA_CACHE:
@@ -619,14 +539,14 @@ class OpenAPIDecoratorBase:
 
             # Create a wrapper function that reuses the cached metadata
             @wraps(func)
-            def cached_wrapper(*args, **kwargs):
+            def cached_wrapper(*args, **kwargs):  # noqa: ANN202
                 return self._process_request(func, cached_data, *args, **kwargs)
 
             # Copy cached metadata and annotations
-            cached_wrapper._openapi_metadata = cached_data["metadata"]  # type: ignore
+            cached_wrapper._openapi_metadata = cached_data["metadata"]  # noqa: SLF001
             cached_wrapper.__annotations__ = cached_data["annotations"]
 
-            return cast(Callable[P, R], cached_wrapper)
+            return cast("Callable[P, R]", cached_wrapper)
 
         # Get the function signature to find parameters with special prefixes
         signature = inspect.signature(func)
@@ -641,8 +561,10 @@ class OpenAPIDecoratorBase:
         extracted_path_params = []
 
         # Use helper function to extract parameters based on prefixes (cached)
-        extracted_request_body, extracted_query_model, extracted_path_params = (
-            _extract_parameters_from_prefixes(signature, type_hints, self.prefix_config)
+        extracted_request_body, extracted_query_model, extracted_path_params = _extract_parameters_from_prefixes(
+            signature,
+            type_hints,
+            self.prefix_config,
         )
 
         # Use extracted parameters
@@ -660,9 +582,7 @@ class OpenAPIDecoratorBase:
             self.deprecated,
             str(self.security) if self.security else None,
             str(self.external_docs) if self.external_docs else None,
-            id(actual_request_body)
-            if isinstance(actual_request_body, type)
-            else str(actual_request_body),
+            id(actual_request_body) if isinstance(actual_request_body, type) else str(actual_request_body),
             str(self.responses) if self.responses else None,
             id(actual_query_model) if actual_query_model else None,
             str(actual_path_params) if actual_path_params else None,
@@ -674,7 +594,7 @@ class OpenAPIDecoratorBase:
 
         logger = logging.getLogger(__name__)
         logger.debug(
-            f"Generating metadata with request_body={actual_request_body}, query_model={actual_query_model}, path_params={actual_path_params}"
+            f"Generating metadata with request_body={actual_request_body}, query_model={actual_query_model}, path_params={actual_path_params}",  # noqa: E501
         )
 
         # Check if we've already generated metadata for these parameters
@@ -696,7 +616,7 @@ class OpenAPIDecoratorBase:
             )
 
             # Cache the result (limit cache size to prevent memory issues)
-            if len(METADATA_CACHE) > 1000:
+            if len(METADATA_CACHE) > MAX_METADATA_CACHE_SIZE:
                 METADATA_CACHE.clear()
             METADATA_CACHE[cache_key] = metadata
 
@@ -725,7 +645,7 @@ class OpenAPIDecoratorBase:
                                 "in": "path",
                                 "required": True,
                                 "schema": {"type": "string"},
-                            }
+                            },
                         )
 
                 # Add query parameters
@@ -751,7 +671,7 @@ class OpenAPIDecoratorBase:
                         model_parameters.append(param)
 
                 # Cache the parameters (limit cache size to prevent memory issues)
-                if len(OPENAPI_PARAMS_CACHE) > 1000:  # Limit cache size
+                if len(OPENAPI_PARAMS_CACHE) > MAX_OPENAPI_PARAMS_CACHE_SIZE:  # Limit cache size
                     OPENAPI_PARAMS_CACHE.clear()
                 OPENAPI_PARAMS_CACHE[cache_key] = model_parameters
 
@@ -766,9 +686,7 @@ class OpenAPIDecoratorBase:
         file_params = []
         # Get function annotations
         func_annotations = get_type_hints(func)
-        file_params = _detect_file_parameters(
-            param_names, func_annotations, self.prefix_config
-        )
+        file_params = _detect_file_parameters(param_names, func_annotations, self.prefix_config)
 
         # If we have file parameters, set the consumes property to multipart/form-data
         if file_params:
@@ -779,13 +697,12 @@ class OpenAPIDecoratorBase:
             metadata["parameters"] = openapi_parameters
 
         # Attach metadata to the function
-        func._openapi_metadata = metadata  # type: ignore
+        func._openapi_metadata = metadata  # noqa: SLF001
 
         # Extract parameter types for type annotations (cached)
         param_types = extract_param_types(
             request_body_model=actual_request_body
-            if isinstance(actual_request_body, type)
-            and issubclass(actual_request_body, BaseModel)
+            if isinstance(actual_request_body, type) and issubclass(actual_request_body, BaseModel)
             else None,
             query_model=actual_query_model,
         )
@@ -810,20 +727,18 @@ class OpenAPIDecoratorBase:
 
         # Create a wrapper function that handles parameter binding
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs):  # noqa: ANN202
             return self._process_request(func, cached_data, *args, **kwargs)
 
         # Copy OpenAPI metadata to the wrapper
-        wrapper._openapi_metadata = metadata  # type: ignore
+        wrapper._openapi_metadata = metadata  # noqa: SLF001
 
         # Add type hints to the wrapper function
         wrapper.__annotations__ = merged_hints
 
-        return cast(Callable[P, R], wrapper)
+        return cast("Callable[P, R]", wrapper)
 
-    def _process_request(
-        self, func: Callable[P, R], cached_data: Dict[str, Any], *args, **kwargs
-    ) -> Any:
+    def _process_request(self, func: Callable[P, R], cached_data: dict[str, Any], *args, **kwargs) -> Any:  # noqa: PLR0915
         """Process a request using cached metadata."""
         # Extract cached data
         signature = cached_data["signature"]
@@ -837,11 +752,8 @@ class OpenAPIDecoratorBase:
 
         # Check if we're in a request context
         has_request_context = False
-        try:
+        with contextlib.suppress(RuntimeError):  # Not in a request context, skip request-dependent processing
             has_request_context = bool(request)
-        except RuntimeError:
-            # Not in a request context, skip request-dependent processing
-            pass
 
         if has_request_context:
             # Process special parameters that depend on request context
@@ -849,9 +761,7 @@ class OpenAPIDecoratorBase:
             skip_params = {"self", "cls"}
 
             # Get parameter prefixes (cached)
-            body_prefix, query_prefix, path_prefix, file_prefix = (
-                get_parameter_prefixes(self.prefix_config)
-            )
+            body_prefix, query_prefix, path_prefix, file_prefix = get_parameter_prefixes(self.prefix_config)
 
             # Precompute prefix lengths for path and file parameters
             path_prefix_len = len(path_prefix) + 1  # +1 for the underscore
@@ -869,9 +779,7 @@ class OpenAPIDecoratorBase:
 
                     if param_name.startswith(body_prefix):
                         # Process request body
-                        kwargs = self.framework_decorator.process_request_body(
-                            param_name, actual_request_body, kwargs
-                        )
+                        kwargs = self.framework_decorator.process_request_body(param_name, actual_request_body, kwargs)
                         break  # Only process the first request body parameter
 
             # Process query parameters
@@ -882,9 +790,7 @@ class OpenAPIDecoratorBase:
 
                     if param_name.startswith(query_prefix):
                         # Process query parameters
-                        kwargs = self.framework_decorator.process_query_params(
-                            param_name, actual_query_model, kwargs
-                        )
+                        kwargs = self.framework_decorator.process_query_params(param_name, actual_query_model, kwargs)
                         break  # Only process the first query parameter
 
             # Process path parameters
@@ -937,6 +843,23 @@ class OpenAPIDecoratorBase:
                             model_data = {}
                             # Add form data to model_data
                             for field_name, field_value in request.form.items():
+                                model_data[field_name] = field_value  # noqa: PERF403
+                            # Add file to model_data
+                            model_data["file"] = file_obj
+                            # Create model instance
+                            kwargs[param_name] = param_type(**model_data)
+                        else:
+                            # Just pass the file directly
+                            kwargs[param_name] = file_obj
+                    # If the specific file name is not found, try fallbacks
+                    # First try 'file' as a common default
+                    elif "file" in request.files:
+                        file_obj = request.files["file"]
+                        if is_pydantic_model:
+                            # Create a Pydantic model instance with the file and other form data
+                            model_data = {}
+                            # Add form data to model_data
+                            for field_name, field_value in request.form.items():
                                 model_data[field_name] = field_value
                             # Add file to model_data
                             model_data["file"] = file_obj
@@ -945,45 +868,25 @@ class OpenAPIDecoratorBase:
                         else:
                             # Just pass the file directly
                             kwargs[param_name] = file_obj
-                    else:
-                        # If the specific file name is not found, try fallbacks
-                        # First try 'file' as a common default
-                        if "file" in request.files:
-                            file_obj = request.files["file"]
-                            if is_pydantic_model:
-                                # Create a Pydantic model instance with the file and other form data
-                                model_data = {}
-                                # Add form data to model_data
-                                for field_name, field_value in request.form.items():
-                                    model_data[field_name] = field_value
-                                # Add file to model_data
-                                model_data["file"] = file_obj
-                                # Create model instance
-                                kwargs[param_name] = param_type(**model_data)
-                            else:
-                                # Just pass the file directly
-                                kwargs[param_name] = file_obj
-                        # If there's only one file, use that as a last resort
-                        elif len(request.files) == 1:
-                            file_obj = next(iter(request.files.values()))
-                            if is_pydantic_model:
-                                # Create a Pydantic model instance with the file and other form data
-                                model_data = {}
-                                # Add form data to model_data
-                                for field_name, field_value in request.form.items():
-                                    model_data[field_name] = field_value
-                                # Add file to model_data
-                                model_data["file"] = file_obj
-                                # Create model instance
-                                kwargs[param_name] = param_type(**model_data)
-                            else:
-                                # Just pass the file directly
-                                kwargs[param_name] = file_obj
+                    # If there's only one file, use that as a last resort
+                    elif len(request.files) == 1:
+                        file_obj = next(iter(request.files.values()))
+                        if is_pydantic_model:
+                            # Create a Pydantic model instance with the file and other form data
+                            model_data = {}
+                            # Add form data to model_data
+                            for field_name, field_value in request.form.items():
+                                model_data[field_name] = field_value
+                            # Add file to model_data
+                            model_data["file"] = file_obj
+                            # Create model instance
+                            kwargs[param_name] = param_type(**model_data)
+                        else:
+                            # Just pass the file directly
+                            kwargs[param_name] = file_obj
 
             # Process any additional framework-specific parameters
-            kwargs = self.framework_decorator.process_additional_params(
-                kwargs, param_names
-            )
+            kwargs = self.framework_decorator.process_additional_params(kwargs, param_names)
 
         # Filter out any kwargs that are not in the function signature
         # Get the function signature parameters once

@@ -1,13 +1,11 @@
-"""
-Tests for optional dependencies handling.
-"""
+"""Tests for optional dependencies handling."""
 
 import pytest
 
 from flask_x_openapi_schema._opt_deps import (
     MissingDependencyError,
-    import_optional_dependency,
     create_placeholder_class,
+    import_optional_dependency,
 )
 from flask_x_openapi_schema._opt_deps._flask_restful import (
     HAS_FLASK_RESTFUL,
@@ -24,9 +22,7 @@ def test_import_optional_dependency():
     assert os is not None
 
     # Test importing a non-existing module with raise_error=False
-    non_existent = import_optional_dependency(
-        "non_existent_module", "testing", raise_error=False
-    )
+    non_existent = import_optional_dependency("non_existent_module", "testing", raise_error=False)
     assert non_existent is None
 
     # Test importing a non-existing module with raise_error=True

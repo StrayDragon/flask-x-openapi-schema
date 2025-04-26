@@ -1,17 +1,16 @@
-"""
-Decorators for adding OpenAPI metadata to Flask-RESTful Resource endpoints.
-"""
+"""Decorators for adding OpenAPI metadata to Flask-RESTful Resource endpoints."""
 
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
+import logging
+from collections.abc import Callable
+from typing import Any, TypeVar
+
 from flask import request
-
 from pydantic import BaseModel
 
-from ...core.config import ConventionalPrefixConfig
-from ...i18n.i18n_string import I18nStr
-from ...models.responses import OpenAPIMetaResponse
-from ...core.decorator_base import preprocess_request_data
-import logging
+from flask_x_openapi_schema.core.config import ConventionalPrefixConfig
+from flask_x_openapi_schema.core.decorator_base import preprocess_request_data
+from flask_x_openapi_schema.i18n.i18n_string import I18nStr
+from flask_x_openapi_schema.models.responses import OpenAPIMetaResponse
 
 # These caches have been moved to core.cache module
 # and are now using ThreadSafeCache implementation
@@ -22,17 +21,17 @@ class FlaskRestfulOpenAPIDecorator:
 
     def __init__(
         self,
-        summary: Optional[Union[str, I18nStr]] = None,
-        description: Optional[Union[str, I18nStr]] = None,
-        tags: Optional[List[str]] = None,
-        operation_id: Optional[str] = None,
-        responses: Optional[OpenAPIMetaResponse] = None,
+        summary: str | I18nStr | None = None,
+        description: str | I18nStr | None = None,
+        tags: list[str] | None = None,
+        operation_id: str | None = None,
+        responses: OpenAPIMetaResponse | None = None,
         deprecated: bool = False,
-        security: Optional[List[Dict[str, List[str]]]] = None,
-        external_docs: Optional[Dict[str, str]] = None,
-        language: Optional[str] = None,
-        prefix_config: Optional[ConventionalPrefixConfig] = None,
-    ):
+        security: list[dict[str, list[str]]] | None = None,
+        external_docs: dict[str, str] | None = None,
+        language: str | None = None,
+        prefix_config: ConventionalPrefixConfig | None = None,
+    ) -> None:
         """Initialize the decorator with OpenAPI metadata parameters."""
         # Store parameters for later use
         self.summary = summary
@@ -51,12 +50,12 @@ class FlaskRestfulOpenAPIDecorator:
         self.base_decorator = None
         self.parsed_args = None
 
-    def __call__(self, func):
+    def __call__(self, func):  # noqa: ANN001, ANN204
         """Apply the decorator to the function."""
         # Initialize the base decorator if needed
         if self.base_decorator is None:
             # Import here to avoid circular imports
-            from ...core.decorator_base import OpenAPIDecoratorBase
+            from flask_x_openapi_schema.core.decorator_base import OpenAPIDecoratorBase
 
             self.base_decorator = OpenAPIDecoratorBase(
                 summary=self.summary,
@@ -74,23 +73,27 @@ class FlaskRestfulOpenAPIDecorator:
         return self.base_decorator(func)
 
     def extract_parameters_from_models(
-        self, query_model: Optional[Type[BaseModel]], path_params: Optional[List[str]]
-    ) -> List[Dict[str, Any]]:
+        self,
+        query_model: type[BaseModel] | None,
+        path_params: list[str] | None,
+    ) -> list[dict[str, Any]]:
         """Extract OpenAPI parameters from models."""
         # Create parameters for OpenAPI schema
         parameters = []
 
         # Add path parameters
         if path_params:
-            for param in path_params:
-                parameters.append(
+            parameters.extend(
+                [
                     {
                         "name": param,
                         "in": "path",
                         "required": True,
                         "schema": {"type": "string"},
                     }
-                )
+                    for param in path_params
+                ],
+            )
 
         # Add query parameters
         if query_model:
@@ -114,9 +117,7 @@ class FlaskRestfulOpenAPIDecorator:
 
         return parameters
 
-    def process_request_body(
-        self, param_name: str, model: Type[BaseModel], kwargs: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def process_request_body(self, param_name: str, model: type[BaseModel], kwargs: dict[str, Any]) -> dict[str, Any]:
         """Process request body parameters for Flask-RESTful.
 
         Args:
@@ -126,9 +127,11 @@ class FlaskRestfulOpenAPIDecorator:
 
         Returns:
             Updated kwargs dictionary with the model instance
+
         """
         from flask import request
-        from ...core.cache import MODEL_CACHE, make_cache_key
+
+        from flask_x_openapi_schema.core.cache import MODEL_CACHE, make_cache_key
 
         # Check if this is a file upload model
         has_file_fields = self._check_for_file_fields(model)
@@ -164,7 +167,7 @@ class FlaskRestfulOpenAPIDecorator:
 
         return kwargs
 
-    def _check_for_file_fields(self, model: Type[BaseModel]) -> bool:
+    def _check_for_file_fields(self, model: type[BaseModel]) -> bool:
         """Check if a model contains file upload fields.
 
         Args:
@@ -172,21 +175,23 @@ class FlaskRestfulOpenAPIDecorator:
 
         Returns:
             True if the model has file fields, False otherwise
+
         """
         import inspect
-        from ...models.file_models import FileField
+
+        from flask_x_openapi_schema.models.file_models import FileField
 
         if not hasattr(model, "model_fields"):
             return False
 
-        for _, field_info in model.model_fields.items():
+        for field_info in model.model_fields.values():
             field_type = field_info.annotation
             if inspect.isclass(field_type) and issubclass(field_type, FileField):
                 return True
 
         return False
 
-    def _process_file_upload_model(self, model: Type[BaseModel]) -> BaseModel:
+    def _process_file_upload_model(self, model: type[BaseModel]) -> BaseModel:
         """Process a file upload model with form data and files.
 
         Args:
@@ -194,17 +199,16 @@ class FlaskRestfulOpenAPIDecorator:
 
         Returns:
             An instance of the model with file data
+
         """
-        from flask import request
         import inspect
-        from ...models.file_models import FileField
+
+        from flask import request
+
+        from flask_x_openapi_schema.models.file_models import FileField
 
         # Create model data from form and files
-        model_data = {}
-
-        # Add form data
-        for field_name, field_value in request.form.items():
-            model_data[field_name] = field_value
+        model_data = dict(request.form.items())
 
         # Add file data
         for field_name, field_info in model.model_fields.items():
@@ -219,7 +223,7 @@ class FlaskRestfulOpenAPIDecorator:
         # Create and return model instance
         return model(**model_data)
 
-    def _get_or_create_parser(self, model: Type[BaseModel]):
+    def _get_or_create_parser(self, model: type[BaseModel]) -> Any:
         """Get an existing parser or create a new one for the model.
 
         Args:
@@ -227,9 +231,10 @@ class FlaskRestfulOpenAPIDecorator:
 
         Returns:
             A RequestParser instance for the model
+
         """
-        from ..flask_restful.utils import create_reqparse_from_pydantic
-        from ...core.cache import REQPARSE_CACHE
+        from flask_x_openapi_schema.core.cache import REQPARSE_CACHE
+        from flask_x_openapi_schema.x.flask_restful.utils import create_reqparse_from_pydantic
 
         # Use model's id as cache key
         model_id = id(model)
@@ -245,7 +250,7 @@ class FlaskRestfulOpenAPIDecorator:
         REQPARSE_CACHE[model_id] = parser
         return parser
 
-    def _create_model_from_args(self, model: Type[BaseModel], args: dict) -> BaseModel:
+    def _create_model_from_args(self, model: type[BaseModel], args: dict) -> BaseModel:
         """Create a model instance from parsed arguments.
 
         Args:
@@ -254,8 +259,8 @@ class FlaskRestfulOpenAPIDecorator:
 
         Returns:
             An instance of the model
-        """
 
+        """
         logger = logging.getLogger(__name__)
 
         # First, try to use the raw JSON data if available
@@ -275,14 +280,10 @@ class FlaskRestfulOpenAPIDecorator:
                         try:
                             # Only use fields that exist in the model
                             model_fields = model.model_fields
-                            filtered_json = {
-                                k: v for k, v in raw_json.items() if k in model_fields
-                            }
+                            filtered_json = {k: v for k, v in raw_json.items() if k in model_fields}
                             return model(**filtered_json)
                         except Exception as e2:
-                            logger.warning(
-                                f"Failed to create model from raw JSON: {e2}"
-                            )
+                            logger.warning(f"Failed to create model from raw JSON: {e2}")
                             # Continue with normal processing if this fails
             except Exception as e:
                 logger.warning(f"Error accessing raw JSON data: {e}")
@@ -293,45 +294,39 @@ class FlaskRestfulOpenAPIDecorator:
 
         # Try to create model instance using model_validate first (better handling of complex types)
         try:
-            logger.debug(
-                f"Attempting to validate model {model.__name__} with processed data"
-            )
+            logger.debug(f"Attempting to validate model {model.__name__} with processed data")
             model_instance = model.model_validate(processed_data)
             logger.debug("Model validation successful")
-            return model_instance
         except Exception as e:
-            logger.warning(
-                f"Validation error: {e}. Falling back to manual construction."
-            )
+            logger.warning("Validation error. Falling back to manual construction.", extra={"error": e})
 
             # Filter data to only include fields in the model
             try:
                 model_fields = model.model_fields
-                filtered_data = {
-                    k: v for k, v in processed_data.items() if k in model_fields
-                }
-                logger.debug(f"Filtered data: {filtered_data}")
+                filtered_data = {k: v for k, v in processed_data.items() if k in model_fields}
+                logger.debug("Filtered data", extra={"filtered_data": filtered_data})
 
                 # Create instance using constructor
                 model_instance = model(**filtered_data)
                 logger.debug("Created model instance using constructor")
-                return model_instance
             except Exception as e2:
-                logger.error(f"Failed to create model instance: {e2}")
-                logger.error(f"Processed data: {processed_data}")
+                logger.exception("Failed to create model instance(e2)")
 
                 # Try to create an empty instance with default values as last resort
                 try:
                     model_instance = model()
                     logger.warning("Created empty model instance as fallback")
-                    return model_instance
                 except Exception as e3:
-                    logger.error(f"Failed to create empty model instance: {e3}")
-                    raise e2  # Raise the original error
+                    logger.exception("Failed to create empty model instance")
+                    raise e2 from e3  # Raise the original error
+                else:
+                    return model_instance
+            else:
+                return model_instance
+        else:
+            return model_instance
 
-    def process_query_params(
-        self, param_name: str, model: Type[BaseModel], kwargs: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def process_query_params(self, param_name: str, model: type[BaseModel], kwargs: dict[str, Any]) -> dict[str, Any]:
         """Process query parameters for Flask-RESTful.
 
         Args:
@@ -341,8 +336,9 @@ class FlaskRestfulOpenAPIDecorator:
 
         Returns:
             Updated kwargs dictionary with the model instance
+
         """
-        from ...core.cache import MODEL_CACHE, make_cache_key
+        from flask_x_openapi_schema.core.cache import MODEL_CACHE, make_cache_key
 
         # Skip if we already have parsed arguments
         if self.parsed_args:
@@ -372,7 +368,7 @@ class FlaskRestfulOpenAPIDecorator:
 
         return kwargs
 
-    def _get_or_create_query_parser(self, model: Type[BaseModel]):
+    def _get_or_create_query_parser(self, model: type[BaseModel]) -> Any:
         """Get an existing query parser or create a new one for the model.
 
         Args:
@@ -380,9 +376,10 @@ class FlaskRestfulOpenAPIDecorator:
 
         Returns:
             A RequestParser instance for the model
+
         """
-        from ..flask_restful.utils import create_reqparse_from_pydantic
-        from ...core.cache import REQPARSE_CACHE
+        from flask_x_openapi_schema.core.cache import REQPARSE_CACHE
+        from flask_x_openapi_schema.x.flask_restful.utils import create_reqparse_from_pydantic
 
         # Create a unique key for query parsers
         model_id = (id(model), "query")
@@ -398,9 +395,7 @@ class FlaskRestfulOpenAPIDecorator:
         REQPARSE_CACHE[model_id] = parser
         return parser
 
-    def process_additional_params(
-        self, kwargs: Dict[str, Any], param_names: List[str]
-    ) -> Dict[str, Any]:
+    def process_additional_params(self, kwargs: dict[str, Any], param_names: list[str]) -> dict[str, Any]:
         """Process additional framework-specific parameters.
 
         Args:
@@ -409,6 +404,7 @@ class FlaskRestfulOpenAPIDecorator:
 
         Returns:
             Updated kwargs dictionary
+
         """
         # Add all parsed arguments to kwargs for regular parameters
         # This allows Flask-RESTful to access parameters directly without
@@ -427,17 +423,17 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 def openapi_metadata(
     *,
-    summary: Optional[Union[str, I18nStr]] = None,
-    description: Optional[Union[str, I18nStr]] = None,
-    tags: Optional[List[str]] = None,
-    operation_id: Optional[str] = None,
+    summary: str | I18nStr | None = None,
+    description: str | I18nStr | None = None,
+    tags: list[str] | None = None,
+    operation_id: str | None = None,
     deprecated: bool = False,
-    responses: Optional[OpenAPIMetaResponse] = None,
-    security: Optional[List[Dict[str, List[str]]]] = None,
-    external_docs: Optional[Dict[str, str]] = None,
-    language: Optional[str] = None,
-    prefix_config: Optional[ConventionalPrefixConfig] = None,
-) -> Union[Callable[[F], F], F]:
+    responses: OpenAPIMetaResponse | None = None,
+    security: list[dict[str, list[str]]] | None = None,
+    external_docs: dict[str, str] | None = None,
+    language: str | None = None,
+    prefix_config: ConventionalPrefixConfig | None = None,
+) -> Callable[[F], F] | F:
     """Decorator to add OpenAPI metadata to a Flask-RESTful Resource endpoint.
 
     This decorator adds OpenAPI metadata to a Flask-RESTful Resource endpoint and handles
@@ -491,24 +487,16 @@ def openapi_metadata(
         ...         operation_id="createItem",
         ...         responses=OpenAPIMetaResponse(
         ...             responses={
-        ...                 "201": OpenAPIMetaResponseItem(
-        ...                     model=ItemResponse,
-        ...                     description="Item created successfully"
-        ...                 ),
-        ...                 "400": OpenAPIMetaResponseItem(
-        ...                     description="Invalid request data"
-        ...                 )
+        ...                 "201": OpenAPIMetaResponseItem(model=ItemResponse, description="Item created successfully"),
+        ...                 "400": OpenAPIMetaResponseItem(description="Invalid request data"),
         ...             }
-        ...         )
+        ...         ),
         ...     )
         ...     def post(self, _x_body: ItemRequest):
         ...         # _x_body is automatically populated from the request JSON
-        ...         item = {
-        ...             "id": "123",
-        ...             "name": _x_body.name,
-        ...             "price": _x_body.price
-        ...         }
+        ...         item = {"id": "123", "name": _x_body.name, "price": _x_body.price}
         ...         return item, 201
+
     """
     return FlaskRestfulOpenAPIDecorator(
         summary=summary,

@@ -1,38 +1,35 @@
-"""
-Shared fixtures and test helpers for flask-x-openapi-schema tests.
-"""
+"""Shared fixtures and test helpers for flask-x-openapi-schema tests."""
 
 import pytest
-from flask import Flask, Blueprint
+from flask import Blueprint, Flask
 from flask.views import MethodView
+from flask_restful import Api, Resource
 from pydantic import BaseModel, Field
-
-from flask_x_openapi_schema.core.cache import clear_all_caches
 
 # Import the modules that contain doctest examples
 from flask_x_openapi_schema import (
-    ConventionalPrefixConfig,
-    configure_prefixes,
-    reset_prefixes,
-    I18nStr,
-    set_current_language,
-    get_current_language,
-    OpenAPIMetaResponse,
-    OpenAPIMetaResponseItem,
     BaseRespModel,
+    ConventionalPrefixConfig,
     FileUploadModel,
+    I18nStr,
     ImageUploadModel,
     MultipleFileUploadModel,
+    OpenAPIMetaResponse,
+    OpenAPIMetaResponseItem,
+    configure_prefixes,
+    get_current_language,
+    reset_prefixes,
+    set_current_language,
 )
-from flask_x_openapi_schema.x.flask import openapi_metadata
-from flask_x_openapi_schema.x.flask import OpenAPIMethodViewMixin
+from flask_x_openapi_schema.core.cache import clear_all_caches
+from flask_x_openapi_schema.x.flask import OpenAPIMethodViewMixin, openapi_metadata
+from flask_x_openapi_schema.x.flask_restful import (
+    OpenAPIBlueprintMixin,
+    OpenAPIIntegrationMixin,
+)
 from flask_x_openapi_schema.x.flask_restful import (
     openapi_metadata as flask_restful_openapi_metadata,
-    OpenAPIIntegrationMixin,
-    OpenAPIBlueprintMixin,
 )
-
-from flask_restful import Resource, Api
 
 HAS_FLASK_RESTFUL = True
 
@@ -51,6 +48,7 @@ def clear_caches():
 
     # Import and reset any module-level variables that might persist
     from importlib import reload
+
     from flask_x_openapi_schema.core import cache
 
     reload(cache)
@@ -59,8 +57,7 @@ def clear_caches():
 @pytest.fixture
 def app():
     """Create a Flask app for testing."""
-    app = Flask(__name__)
-    return app
+    return Flask(__name__)
 
 
 @pytest.fixture

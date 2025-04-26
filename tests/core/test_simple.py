@@ -1,20 +1,20 @@
-"""
-Simple test for the flask-x-openapi-schema library.
+"""Simple test for the flask-x-openapi-schema library.
 
 This module tests the basic functionality without using the openapi_metadata decorator.
 """
 
-import json
-import pytest
-from typing import List, Optional
+from __future__ import annotations
 
+import json
+
+import pytest
 from flask import Flask
-from flask_x_openapi_schema._opt_deps._flask_restful import Api, Resource
 from pydantic import BaseModel, Field
 
 from flask_x_openapi_schema import (
     BaseRespModel,
 )
+from flask_x_openapi_schema._opt_deps._flask_restful import Api, Resource
 
 
 # Define Pydantic models for request and response
@@ -22,9 +22,9 @@ class ItemRequest(BaseModel):
     """Request model for creating an item."""
 
     name: str = Field(..., description="The name of the item")
-    description: Optional[str] = Field(None, description="The description of the item")
+    description: str | None = Field(None, description="The description of the item")
     price: float = Field(..., description="The price of the item")
-    tags: List[str] = Field(default_factory=list, description="Tags for the item")
+    tags: list[str] = Field(default_factory=list, description="Tags for the item")
 
 
 class ItemResponse(BaseRespModel):
@@ -32,9 +32,9 @@ class ItemResponse(BaseRespModel):
 
     id: str = Field(..., description="The ID of the item")
     name: str = Field(..., description="The name of the item")
-    description: Optional[str] = Field(None, description="The description of the item")
+    description: str | None = Field(None, description="The description of the item")
     price: float = Field(..., description="The price of the item")
-    tags: List[str] = Field(default_factory=list, description="Tags for the item")
+    tags: list[str] = Field(default_factory=list, description="Tags for the item")
 
 
 # Define a Flask-RESTful resource without OpenAPI metadata

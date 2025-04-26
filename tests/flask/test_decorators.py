@@ -1,23 +1,24 @@
-"""
-Tests for the Flask-specific openapi_metadata decorator.
+"""Tests for the Flask-specific openapi_metadata decorator.
 
 This module tests the openapi_metadata decorator for Flask and its functionality.
 """
 
+from __future__ import annotations
+
 import inspect
+
 import pytest
 from flask import Flask
 from pydantic import BaseModel, Field
-from typing import Optional
 
-from flask_x_openapi_schema.x.flask import openapi_metadata
-from flask_x_openapi_schema.models.base import BaseRespModel
 from flask_x_openapi_schema.i18n.i18n_string import set_current_language
+from flask_x_openapi_schema.models.base import BaseRespModel
 from flask_x_openapi_schema.models.file_models import FileUploadModel
 from flask_x_openapi_schema.models.responses import (
     OpenAPIMetaResponse,
     OpenAPIMetaResponseItem,
 )
+from flask_x_openapi_schema.x.flask import openapi_metadata
 
 
 # Create a mock I18nString class that works with Pydantic v2
@@ -55,7 +56,7 @@ class SampleRequestModel(BaseModel):
 
     name: str = Field(..., description="The name")
     age: int = Field(..., description="The age")
-    email: Optional[str] = Field(None, description="The email")
+    email: str | None = Field(None, description="The email")
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -63,8 +64,8 @@ class SampleRequestModel(BaseModel):
 class SampleQueryModel(BaseModel):
     """Test query model."""
 
-    sort: Optional[str] = Field(None, description="Sort order")
-    limit: Optional[int] = Field(None, description="Limit results")
+    sort: str | None = Field(None, description="Sort order")
+    limit: int | None = Field(None, description="Limit results")
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -75,16 +76,13 @@ class SampleResponseModel(BaseRespModel):
     id: str = Field(..., description="The ID")
     name: str = Field(..., description="The name")
     age: int = Field(..., description="The age")
-    email: Optional[str] = Field(None, description="The email")
-
-    model_config = {"arbitrary_types_allowed": True}
+    email: str | None = Field(None, description="The email")
 
 
 @pytest.fixture
 def app():
     """Create a Flask app for testing."""
-    app = Flask(__name__)
-    return app
+    return Flask(__name__)
 
 
 @pytest.fixture
@@ -123,9 +121,7 @@ def test_openapi_metadata_with_i18n():
     # Set up I18nString objects
     summary = I18nString({"en-US": "Test endpoint", "zh-Hans": "测试端点"})
 
-    description = I18nString(
-        {"en-US": "This is a test endpoint", "zh-Hans": "这是一个测试端点"}
-    )
+    description = I18nString({"en-US": "This is a test endpoint", "zh-Hans": "这是一个测试端点"})
 
     # Set language to English
     set_current_language("en-US")
@@ -146,7 +142,7 @@ def test_openapi_metadata_with_i18n():
     # Apply the decorator with Chinese text
     @openapi_metadata(summary="测试端点", description="这是一个测试端点", tags=["test"])
     def test_function_zh():
-        return {"message": "你好，世界！"}
+        return {"message": "你好,世界！"}
 
     # Check metadata in Chinese
     metadata = test_function_zh._openapi_metadata
@@ -166,12 +162,12 @@ def test_openapi_metadata_with_path_params():
 
     # Define a function with path parameters
     @openapi_metadata(summary="Test endpoint")
-    def test_function(user_id: str, _x_path_user_id: str):
+    def example_function(user_id: str, _x_path_user_id: str):
         # Use the path parameter to avoid linter warnings
         return {"user_id": user_id, "path_param": _x_path_user_id}
 
     # Check metadata
-    metadata = test_function._openapi_metadata
+    metadata = example_function._openapi_metadata
 
     # Print metadata for debugging
     print(f"Metadata: {metadata}")
@@ -181,15 +177,11 @@ def test_openapi_metadata_with_path_params():
 
     # Find the path parameters
     path_params = [p for p in metadata["parameters"] if p["in"] == "path"]
-    assert len(path_params) == 1, (
-        f"Expected 1 path parameter, got {len(path_params)}: {path_params}"
-    )
+    assert len(path_params) == 1, f"Expected 1 path parameter, got {len(path_params)}: {path_params}"
 
     # Check parameter details
     user_id_param = path_params[0]
-    assert user_id_param["name"] == "user_id", (
-        f"Expected parameter name 'user_id', got '{user_id_param['name']}'"
-    )
+    assert user_id_param["name"] == "user_id", f"Expected parameter name 'user_id', got '{user_id_param['name']}'"
     assert user_id_param["required"] is True
 
 
@@ -207,7 +199,7 @@ def test_openapi_metadata_with_responses():
                 "404": OpenAPIMetaResponseItem(
                     description="Not found",
                 ),
-            }
+            },
         ),
     )
     def test_function():
@@ -231,15 +223,16 @@ def test_openapi_metadata_parameter_extraction():
 
     # Import necessary modules
     import inspect
+
+    from flask_x_openapi_schema.core.config import ConventionalPrefixConfig
     from flask_x_openapi_schema.core.decorator_base import (
         _extract_parameters_from_prefixes,
         _generate_openapi_metadata,
     )
-    from flask_x_openapi_schema.core.config import ConventionalPrefixConfig
 
     # Define a function with multiple parameter types
     @openapi_metadata(summary="Test endpoint")
-    def test_function_mixed(
+    def example_function_mixed(
         _x_body: SampleRequestModel,
         _x_query: SampleQueryModel,
         _x_path_user_id: str,
@@ -252,19 +245,17 @@ def test_openapi_metadata_parameter_extraction():
         }
 
     # Force parameter extraction
-    signature = inspect.signature(test_function_mixed)
+    signature = inspect.signature(example_function_mixed)
     type_hints = {}
     try:
-        type_hints = inspect.get_type_hints(test_function_mixed)
+        type_hints = inspect.get_type_hints(example_function_mixed)
     except Exception:
         # Fall back to __annotations__ if get_type_hints fails
-        type_hints = getattr(test_function_mixed, "__annotations__", {})
+        type_hints = getattr(example_function_mixed, "__annotations__", {})
 
     # Extract parameters manually
     config = ConventionalPrefixConfig()
-    request_body, query_model, path_params = _extract_parameters_from_prefixes(
-        signature, type_hints, config
-    )
+    request_body, query_model, path_params = _extract_parameters_from_prefixes(signature, type_hints, config)
 
     # Print debug information
     print(f"Extracted request_body: {request_body}")
@@ -272,9 +263,7 @@ def test_openapi_metadata_parameter_extraction():
     print(f"Extracted path_params: {path_params}")
 
     # Check that parameters were extracted correctly
-    assert request_body == SampleRequestModel, (
-        "Request body model not extracted correctly"
-    )
+    assert request_body == SampleRequestModel, "Request body model not extracted correctly"
     assert query_model == SampleQueryModel, "Query model not extracted correctly"
     assert path_params == ["user_id"], "Path parameters not extracted correctly"
 
@@ -311,11 +300,11 @@ def test_openapi_metadata_with_file_upload():
     """Test openapi_metadata decorator with file upload."""
 
     @openapi_metadata(summary="Test file upload")
-    def test_function(_x_file: FileUploadModel):
+    def example_function(_x_file: FileUploadModel):
         return {"filename": _x_file.file.filename}
 
     # Check metadata
-    metadata = test_function._openapi_metadata
+    metadata = example_function._openapi_metadata
 
     # Check parameters
     assert "parameters" in metadata
@@ -341,7 +330,7 @@ def test_openapi_metadata_wrapper_preserves_signature():
 
     # Define a function with multiple parameters
     @openapi_metadata(summary="Test endpoint")
-    def test_function(_x_body: SampleRequestModel, _x_query: SampleQueryModel):
+    def example_function(_x_body: SampleRequestModel, _x_query: SampleQueryModel):
         # Use parameters to avoid linter warnings
         return {
             "body": str(_x_body) if _x_body else None,
@@ -349,23 +338,17 @@ def test_openapi_metadata_wrapper_preserves_signature():
         }
 
     # Check that the wrapper has the same signature as the original function
-    signature = inspect.signature(test_function)
-    assert "_x_body" in signature.parameters, (
-        f"_x_body not found in signature parameters: {signature.parameters}"
-    )
-    assert "_x_query" in signature.parameters, (
-        f"_x_query not found in signature parameters: {signature.parameters}"
-    )
+    signature = inspect.signature(example_function)
+    assert "_x_body" in signature.parameters, f"_x_body not found in signature parameters: {signature.parameters}"
+    assert "_x_query" in signature.parameters, f"_x_query not found in signature parameters: {signature.parameters}"
 
     # Check that type annotations are preserved
-    annotations = test_function.__annotations__
+    annotations = example_function.__annotations__
     assert "_x_body" in annotations, f"_x_body not found in annotations: {annotations}"
     assert annotations["_x_body"] == SampleRequestModel, (
         f"Expected _x_body annotation to be SampleRequestModel, got {annotations['_x_body']}"
     )
-    assert "_x_query" in annotations, (
-        f"_x_query not found in annotations: {annotations}"
-    )
+    assert "_x_query" in annotations, f"_x_query not found in annotations: {annotations}"
     assert annotations["_x_query"] == SampleQueryModel, (
         f"Expected _x_query annotation to be SampleQueryModel, got {annotations['_x_query']}"
     )

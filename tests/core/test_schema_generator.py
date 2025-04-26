@@ -1,10 +1,9 @@
-"""
-Tests for the schema_generator module.
+"""Tests for the schema_generator module.
 
 This module tests the OpenAPISchemaGenerator class.
 """
 
-from typing import List, Optional
+from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
@@ -17,7 +16,7 @@ class SimpleModel(BaseModel):
 
     name: str = Field(..., description="The name")
     age: int = Field(..., description="The age")
-    email: Optional[str] = Field(None, description="The email")
+    email: str | None = Field(None, description="The email")
 
 
 class ComplexModel(BaseModel):
@@ -25,18 +24,16 @@ class ComplexModel(BaseModel):
 
     id: str = Field(..., description="The ID")
     name: str = Field(..., description="The name")
-    description: Optional[str] = Field(None, description="The description")
-    tags: List[str] = Field(default_factory=list, description="Tags")
-    items: List[SimpleModel] = Field(default_factory=list, description="Items")
+    description: str | None = Field(None, description="The description")
+    tags: list[str] = Field(default_factory=list, description="Tags")
+    items: list[SimpleModel] = Field(default_factory=list, description="Items")
     metadata: dict = Field(default_factory=dict, description="Metadata")
 
 
 def test_schema_generator_basic():
     """Test basic functionality of OpenAPISchemaGenerator."""
     # Create a schema generator
-    generator = OpenAPISchemaGenerator(
-        title="Test API", version="1.0.0", description="Test API Description"
-    )
+    generator = OpenAPISchemaGenerator(title="Test API", version="1.0.0", description="Test API Description")
 
     # Generate schema
     schema = generator.generate_schema()
@@ -54,9 +51,7 @@ def test_schema_generator_basic():
 def test_schema_generator_register_model():
     """Test registering models with OpenAPISchemaGenerator."""
     # Create a schema generator
-    generator = OpenAPISchemaGenerator(
-        title="Test API", version="1.0.0", description="Test API Description"
-    )
+    generator = OpenAPISchemaGenerator(title="Test API", version="1.0.0", description="Test API Description")
 
     # Register models
     generator._register_model(SimpleModel)
@@ -100,9 +95,7 @@ def test_schema_generator_register_model():
 def test_schema_generator_register_model_twice():
     """Test registering the same model twice."""
     # Create a schema generator
-    generator = OpenAPISchemaGenerator(
-        title="Test API", version="1.0.0", description="Test API Description"
-    )
+    generator = OpenAPISchemaGenerator(title="Test API", version="1.0.0", description="Test API Description")
 
     # Register the same model twice
     generator._register_model(SimpleModel)
@@ -118,9 +111,7 @@ def test_schema_generator_register_model_twice():
 def test_schema_generator_register_model_with_reference():
     """Test registering models with references to other models."""
     # Create a schema generator
-    generator = OpenAPISchemaGenerator(
-        title="Test API", version="1.0.0", description="Test API Description"
-    )
+    generator = OpenAPISchemaGenerator(title="Test API", version="1.0.0", description="Test API Description")
 
     # Register ComplexModel (which references SimpleModel)
     generator._register_model(ComplexModel)

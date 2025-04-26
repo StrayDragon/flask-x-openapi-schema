@@ -1,22 +1,21 @@
-"""
-Basic tests for the file upload features of flask-x-openapi-schema.
+"""Basic tests for the file upload features of flask-x-openapi-schema.
 
 This module tests the file upload functionality of the library without using the openapi_metadata decorator.
 """
 
 import io
 import json
-import pytest
 
+import pytest
 from flask import Flask
-from flask_x_openapi_schema._opt_deps._flask_restful import Api, Resource
 from werkzeug.datastructures import FileStorage
 
 from flask_x_openapi_schema import (
+    DocumentUploadModel,
     FileUploadModel,
     ImageUploadModel,
-    DocumentUploadModel,
 )
+from flask_x_openapi_schema._opt_deps._flask_restful import Api, Resource
 
 
 @pytest.fixture
@@ -64,12 +63,13 @@ class FileResource(Resource):
         # Create a FileUploadModel
         try:
             model = FileUploadModel(file=file)
+        except ValueError as e:
+            return {"error": str(e)}, 400
+        else:
             return {
                 "filename": model.file.filename,
                 "content_type": model.file.content_type,
             }
-        except ValueError as e:
-            return {"error": str(e)}, 400
 
 
 class ImageResource(Resource):
@@ -87,12 +87,13 @@ class ImageResource(Resource):
         # Create an ImageUploadModel
         try:
             model = ImageUploadModel(file=file)
+        except ValueError as e:
+            return {"error": str(e)}, 400
+        else:
             return {
                 "filename": model.file.filename,
                 "content_type": model.file.content_type,
             }
-        except ValueError as e:
-            return {"error": str(e)}, 400
 
 
 class DocumentResource(Resource):
@@ -110,12 +111,13 @@ class DocumentResource(Resource):
         # Create a DocumentUploadModel
         try:
             model = DocumentUploadModel(file=file)
+        except ValueError as e:
+            return {"error": str(e)}, 400
+        else:
             return {
                 "filename": model.file.filename,
                 "content_type": model.file.content_type,
             }
-        except ValueError as e:
-            return {"error": str(e)}, 400
 
 
 @pytest.fixture
@@ -180,8 +182,9 @@ def test_document_upload(client, test_document):
 def test_invalid_file_upload(client, test_document):
     """Test uploading an invalid file type."""
     # Create a fresh test document for each request to avoid closed file issues
-    from werkzeug.datastructures import FileStorage
     import io
+
+    from werkzeug.datastructures import FileStorage
 
     # Try to upload a document to the file endpoint
     test_doc1 = FileStorage(

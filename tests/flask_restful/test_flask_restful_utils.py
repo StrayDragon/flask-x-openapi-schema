@@ -1,9 +1,8 @@
-"""
-Tests for Flask-RESTful utility functions.
-"""
+"""Tests for Flask-RESTful utility functions."""
+
+from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, List, Optional, Union
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -40,9 +39,9 @@ class SampleRequestModel(BaseModel):
     age: int = Field(..., description="The age")
     is_active: bool = Field(False, description="Active status")
     score: float = Field(0.0, description="Score value")
-    tags: List[str] = Field([], description="Tags list")
-    metadata: Dict[str, str] = Field({}, description="Metadata dictionary")
-    category: Optional[str] = Field(None, description="Optional category")
+    tags: list[str] = Field([], description="Tags list")
+    metadata: dict[str, str] = Field({}, description="Metadata dictionary")
+    category: str | None = Field(None, description="Optional category")
     enum_field: SampleEnum = Field(SampleEnum.OPTION1, description="Enum field")
 
 
@@ -61,7 +60,7 @@ class SampleQueryModel(BaseModel):
     q: str = Field(..., description="Search query")
     limit: int = Field(10, description="Result limit")
     offset: int = Field(0, description="Result offset")
-    filter: Optional[str] = Field(None, description="Filter")
+    filter: str | None = Field(None, description="Filter")
 
 
 class SampleBodyModel(BaseModel):
@@ -69,7 +68,7 @@ class SampleBodyModel(BaseModel):
 
     name: str = Field(..., description="The name")
     age: int = Field(..., description="The age")
-    tags: List[str] = Field(default_factory=list, description="Tags")
+    tags: list[str] = Field(default_factory=list, description="Tags")
     color: SampleColor = Field(SampleColor.RED, description="Color")
     active: bool = Field(True, description="Active status")
 
@@ -94,9 +93,9 @@ class SampleComplexModel(BaseModel):
 
     name: str = Field(..., description="The name")
     nested: SampleNestedModel = Field(..., description="Nested model")
-    items: List[str] = Field(default_factory=list, description="List of items")
-    mapping: Dict[str, int] = Field(default_factory=dict, description="Mapping")
-    optional_value: Optional[float] = Field(None, description="Optional value")
+    items: list[str] = Field(default_factory=list, description="List of items")
+    mapping: dict[str, int] = Field(default_factory=dict, description="Mapping")
+    optional_value: float | None = Field(None, description="Optional value")
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -107,7 +106,7 @@ class SampleMixedFileModel(BaseModel):
     name: str = Field(..., description="The name")
     description: str = Field("", description="Description")
     file: FileField = Field(..., description="The file")
-    thumbnail: Optional[FileField] = Field(None, description="Thumbnail")
+    thumbnail: FileField | None = Field(None, description="Thumbnail")
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -216,7 +215,7 @@ def test_get_field_type():
     assert _get_field_type(dict) is dict
 
     # Test Optional types
-    assert _get_field_type(Optional[str]) is str
+    assert _get_field_type(str | None) is str
 
     # Test Enum types
     enum_converter = _get_field_type(SampleEnum)
@@ -307,18 +306,18 @@ def test_get_field_type_with_complex_types():
     """Test _get_field_type function with complex types."""
     # Test generic types - these should default to str since the function
     # doesn't handle generic types like List[str] directly
-    list_type = _get_field_type(List[str])
+    list_type = _get_field_type(list[str])
     assert list_type is str
 
-    dict_type = _get_field_type(Dict[str, int])
+    dict_type = _get_field_type(dict[str, int])
     assert dict_type is str
 
     # Test nested Optional types
-    optional_list_type = _get_field_type(Optional[List[str]])
+    optional_list_type = _get_field_type(list[str] | None)
     assert optional_list_type is str
 
     # Test Union type (not Optional)
-    union_type = _get_field_type(Union[str, int])
+    union_type = _get_field_type(str | int)
     assert union_type is str  # Should default to str
 
 
@@ -421,9 +420,7 @@ def test_pydantic_model_to_reqparse_with_file_field_in_non_files_location(
 @patch("flask_x_openapi_schema.x.flask_restful.utils.HAS_FLASK_RESTFUL", True)
 @patch("flask_x_openapi_schema.x.flask_restful.utils.reqparse")
 @patch("flask_x_openapi_schema.x.flask_restful.utils.pydantic_model_to_reqparse")
-def test_create_reqparse_from_pydantic_with_mixed_file_model(
-    mock_to_reqparse, mock_reqparse
-):
+def test_create_reqparse_from_pydantic_with_mixed_file_model(mock_to_reqparse, mock_reqparse):
     """Test create_reqparse_from_pydantic with a model containing both regular and file fields."""
     # Set up mocks
     mock_parser = MockRequestParser()
@@ -512,9 +509,7 @@ def test_pydantic_model_to_reqparse(mock_reqparse):
     # Test with exclude parameter
     # Create a new parser to avoid accumulating arguments
     mock_reqparse.RequestParser.return_value = MockRequestParser()
-    parser = pydantic_model_to_reqparse(
-        SampleQueryModel, location="args", exclude=["limit", "offset"]
-    )
+    parser = pydantic_model_to_reqparse(SampleQueryModel, location="args", exclude=["limit", "offset"])
 
     # Check that excluded arguments were not added
     args = parser.args
@@ -532,9 +527,7 @@ def test_create_reqparse_from_pydantic_with_mock(mock_reqparse):
     mock_reqparse.RequestParser.return_value = mock_parser
 
     # Mock the pydantic_model_to_reqparse function to avoid circular dependencies
-    with patch(
-        "flask_x_openapi_schema.x.flask_restful.utils.pydantic_model_to_reqparse"
-    ) as mock_to_reqparse:
+    with patch("flask_x_openapi_schema.x.flask_restful.utils.pydantic_model_to_reqparse") as mock_to_reqparse:
         # Set up mock parsers for each model type
         query_parser = MockRequestParser()
         for i in range(4):  # 4 query parameters
@@ -560,14 +553,14 @@ def test_create_reqparse_from_pydantic_with_mock(mock_reqparse):
         def side_effect(model, location="json", exclude=None):
             if model == SampleQueryModel:
                 return query_parser
-            elif model == SampleBodyModel:
+            if model == SampleBodyModel:
                 return body_parser
-            elif model == SampleFormModel:
+            if model == SampleFormModel:
                 return form_parser
-            elif model == SampleFileModel:
+            if model == SampleFileModel:
                 return file_parser
-            else:  # BodyWithFileModel
-                return file_body_parser
+            # BodyWithFileModel
+            return file_body_parser
 
         mock_to_reqparse.side_effect = side_effect
 

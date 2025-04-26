@@ -1,5 +1,4 @@
-"""
-Core components for OpenAPI schema generation.
+"""Core components for OpenAPI schema generation.
 
 This package contains the core functionality that is independent of any specific web framework.
 It provides configuration, schema generation, and utility functions for OpenAPI schema generation.
@@ -7,39 +6,39 @@ It provides configuration, schema generation, and utility functions for OpenAPI 
 
 from .cache import clear_all_caches, get_cache_stats
 from .config import (
+    GLOBAL_CONFIG_HOLDER,
     ConventionalPrefixConfig,
     OpenAPIConfig,
-    configure_prefixes,
     configure_openapi,
-    reset_prefixes,
-    reset_all_config,
+    configure_prefixes,
     get_openapi_config,
-    GLOBAL_CONFIG_HOLDER,
+    reset_all_config,
+    reset_prefixes,
 )
 from .schema_generator import OpenAPISchemaGenerator
 from .utils import (
+    clear_i18n_cache,
     pydantic_to_openapi_schema,
     python_type_to_openapi_type,
-    clear_i18n_cache,
 )
 
 __all__ = [
-    # Cache Management
-    "clear_all_caches",
-    "get_cache_stats",
+    "GLOBAL_CONFIG_HOLDER",
     # Configuration
     "ConventionalPrefixConfig",
     "OpenAPIConfig",
-    "configure_prefixes",
-    "configure_openapi",
-    "reset_prefixes",
-    "reset_all_config",
-    "get_openapi_config",
-    "GLOBAL_CONFIG_HOLDER",
     # Schema Generator
     "OpenAPISchemaGenerator",
+    # Cache Management
+    "clear_all_caches",
+    "clear_i18n_cache",
+    "configure_openapi",
+    "configure_prefixes",
+    "get_cache_stats",
+    "get_openapi_config",
     # Utilities
     "pydantic_to_openapi_schema",
     "python_type_to_openapi_type",
-    "clear_i18n_cache",
+    "reset_all_config",
+    "reset_prefixes",
 ]

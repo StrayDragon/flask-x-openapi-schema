@@ -1,9 +1,7 @@
-"""
-Internationalization support for strings in OpenAPI metadata.
-"""
+"""Internationalization support for strings in OpenAPI metadata."""
 
 import contextvars
-from typing import Any, ClassVar, Optional, Union
+from typing import Any, ClassVar
 
 from pydantic_core import CoreSchema, core_schema
 
@@ -24,6 +22,7 @@ def get_current_language() -> str:
         >>> from flask_x_openapi_schema import get_current_language
         >>> get_current_language()
         'en-US'
+
     """
     return _current_language.get()
 
@@ -41,6 +40,7 @@ def set_current_language(language: str) -> None:
     Example:
         >>> from flask_x_openapi_schema import set_current_language
         >>> set_current_language("zh-Hans")  # Switch to Simplified Chinese
+
     """
     _current_language.set(language)
 
@@ -60,11 +60,7 @@ class I18nStr:
         >>> from flask_x_openapi_schema import I18nStr
         >>>
         >>> # Create an I18nStr with multiple language versions
-        >>> greeting = I18nStr({
-        ...     "en-US": "Hello",
-        ...     "zh-Hans": "你好",
-        ...     "ja-JP": "こんにちは"
-        ... })
+        >>> greeting = I18nStr({"en-US": "Hello", "zh-Hans": "你好", "ja-JP": "こんにちは"})
         >>>
         >>> # Get the string in the current language
         >>> str(greeting)  # Outputs the greeting in the current language
@@ -83,12 +79,11 @@ class I18nStr:
         ... )
         >>> def get(self, item_id):
         ...     pass
+
     """
 
     @classmethod
-    def __get_pydantic_core_schema__(
-        cls, _source_type: Any, _handler: Any
-    ) -> CoreSchema:
+    def __get_pydantic_core_schema__(cls, _source_type: Any, _handler: Any) -> CoreSchema:
         """Generate a pydantic core schema for I18nString."""
         return core_schema.is_instance_schema(cls)
 
@@ -118,16 +113,16 @@ class I18nStr:
 
     def __init__(
         self,
-        strings: Union[dict[str, str], str],
+        strings: dict[str, str] | str,
         default_language: str = "en-US",
-    ):
-        """
-        Initialize an I18nString.
+    ) -> None:
+        """Initialize an I18nString.
 
         Args:
             strings: Either a dictionary mapping language codes to strings,
                     or a single string (which will be used for all languages)
             default_language: The default language to use if the requested language is not available
+
         """
         self.default_language = default_language
 
@@ -144,15 +139,12 @@ class I18nStr:
             if self.default_language not in self.strings:
                 # If default language is not provided, use the first available language
                 if self.strings:
-                    self.strings[self.default_language] = next(
-                        iter(self.strings.values())
-                    )
+                    self.strings[self.default_language] = next(iter(self.strings.values()))
                 else:
                     self.strings[self.default_language] = ""
 
-    def get(self, language: Optional[str] = None) -> str:
-        """
-        Get the string in the specified language.
+    def get(self, language: str | None = None) -> str:
+        """Get the string in the specified language.
 
         Args:
             language: The language code to get the string for.
@@ -160,6 +152,7 @@ class I18nStr:
 
         Returns:
             The string in the requested language, or the default language if not available
+
         """
         if language is None:
             language = get_current_language()
@@ -172,53 +165,48 @@ class I18nStr:
         return self.strings[self.default_language]
 
     def __str__(self) -> str:
-        """
-        Get the string in the current language.
+        """Get the string in the current language.
 
         Returns:
             The string in the current language
+
         """
         return self.get()
 
     def __repr__(self) -> str:
-        """
-        Get a string representation of the I18nString.
+        """Get a string representation of the I18nString.
 
         Returns:
             A string representation of the I18nString
+
         """
         return f"I18nString({self.strings})"
 
-    def __eq__(self, other: Any) -> bool:
-        """
-        Compare this I18nString with another object.
+    def __eq__(self, other: object) -> bool:
+        """Compare this I18nString with another object.
 
         Args:
             other: The object to compare with
 
         Returns:
             True if the objects are equal, False otherwise
+
         """
         if isinstance(other, I18nStr):
             return self.strings == other.strings
-        elif isinstance(other, str):
+        if isinstance(other, str):
             return str(self) == other
         return False
 
     @classmethod
     def create(cls, **kwargs) -> "I18nStr":
-        """
-        Create an I18nString from keyword arguments.
+        """Create an I18nString from keyword arguments.
 
         This is a convenience method for creating an I18nString with named language parameters.
 
         Example:
             ```python
-            greeting = I18nString.create(
-                en_US="Hello",
-                zh_Hans="你好",
-                ja_JP="こんにちは"
-            )
+            greeting = I18nString.create(en_US="Hello", zh_Hans="你好", ja_JP="こんにちは")
             ```
 
         Args:
@@ -227,6 +215,7 @@ class I18nStr:
 
         Returns:
             An I18nString instance
+
         """
         # Convert keys from snake_case to kebab-case (e.g., en_US -> en-US)
         strings = {k.replace("_", "-"): v for k, v in kwargs.items()}

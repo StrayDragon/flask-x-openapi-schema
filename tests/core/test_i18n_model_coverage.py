@@ -1,10 +1,11 @@
-"""
-Tests for the i18n_model module to improve coverage.
-"""
+"""Tests for the i18n_model module to improve coverage."""
+
+from __future__ import annotations
 
 import json
+from typing import Any
+
 from pydantic import Field
-from typing import Optional, List, Dict, Any
 
 from flask_x_openapi_schema.i18n.i18n_model import I18nBaseModel
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr, set_current_language
@@ -19,11 +20,9 @@ class TestI18nModelCoverage:
         # Create a model class that inherits from I18nBaseModel
         class TestModel(I18nBaseModel):
             name: I18nStr = Field(..., description="The name")
-            description: Optional[I18nStr] = Field(None, description="The description")
-            tags: List[str] = Field(default_factory=list, description="Tags")
-            metadata: Dict[str, Any] = Field(
-                default_factory=dict, description="Metadata"
-            )
+            description: I18nStr | None = Field(None, description="The description")
+            tags: list[str] = Field(default_factory=list, description="Tags")
+            metadata: dict[str, Any] = Field(default_factory=dict, description="Metadata")
 
         # Create a model instance with I18nStr objects
         model = TestModel(
@@ -65,7 +64,7 @@ class TestI18nModelCoverage:
         # Create a model class that inherits from I18nBaseModel
         class TestModel(I18nBaseModel):
             name: I18nStr = Field(..., description="The name")
-            description: Optional[I18nStr] = Field(None, description="The description")
+            description: I18nStr | None = Field(None, description="The description")
 
         # Create a model instance with I18nStr objects
         model = TestModel(
@@ -97,7 +96,7 @@ class TestI18nModelCoverage:
         # Create a model class that inherits from I18nBaseModel
         class TestModel(I18nBaseModel):
             name: I18nStr = Field(..., description="The name")
-            description: Optional[I18nStr] = Field(None, description="The description")
+            description: I18nStr | None = Field(None, description="The description")
 
         # Create a model instance with I18nStr objects
         model = TestModel(

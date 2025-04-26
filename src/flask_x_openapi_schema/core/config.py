@@ -1,5 +1,4 @@
-"""
-Configuration management for OpenAPI schema generation.
+"""Configuration management for OpenAPI schema generation.
 
 This module provides configuration classes and utilities for managing
 parameter prefixes and other settings for OpenAPI schema generation.
@@ -7,7 +6,7 @@ parameter prefixes and other settings for OpenAPI schema generation.
 
 import threading
 from dataclasses import dataclass, field
-from typing import Dict, Any
+from typing import Any
 
 # Default parameter prefixes
 DEFAULT_BODY_PREFIX = "_x_body"
@@ -45,15 +44,16 @@ class ConventionalPrefixConfig:
         ...     request_body_prefix="req_body",
         ...     request_query_prefix="req_query",
         ...     request_path_prefix="req_path",
-        ...     request_file_prefix="req_file"
+        ...     request_file_prefix="req_file",
         ... )
+
     """
 
     request_body_prefix: str = DEFAULT_BODY_PREFIX
     request_query_prefix: str = DEFAULT_QUERY_PREFIX
     request_path_prefix: str = DEFAULT_PATH_PREFIX
     request_file_prefix: str = DEFAULT_FILE_PREFIX
-    extra_options: Dict[str, Any] = field(default_factory=dict)
+    extra_options: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -68,22 +68,21 @@ class OpenAPIConfig:
         description: API description
         prefix_config: Parameter prefix configuration
         security_schemes: Security schemes configuration
+
     """
 
     title: str = DEFAULT_TITLE
     version: str = DEFAULT_VERSION
     description: str = DEFAULT_DESCRIPTION
-    prefix_config: ConventionalPrefixConfig = field(
-        default_factory=ConventionalPrefixConfig
-    )
-    security_schemes: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    prefix_config: ConventionalPrefixConfig = field(default_factory=ConventionalPrefixConfig)
+    security_schemes: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 # Global configuration instance with thread safety
 class ThreadSafeConfig:
     """Thread-safe configuration holder."""
 
-    def __init__(self):
+    def __init__(self) -> None:  # noqa: D107
         self._prefix_config = ConventionalPrefixConfig()
         self._openapi_config = OpenAPIConfig()
         self._lock = threading.RLock()
@@ -171,11 +170,9 @@ def configure_prefixes(config: ConventionalPrefixConfig) -> None:
 
     Example:
         >>> from flask_x_openapi_schema import ConventionalPrefixConfig, configure_prefixes
-        >>> custom_config = ConventionalPrefixConfig(
-        ...     request_body_prefix="req_body",
-        ...     request_query_prefix="req_query"
-        ... )
+        >>> custom_config = ConventionalPrefixConfig(request_body_prefix="req_body", request_query_prefix="req_query")
         >>> configure_prefixes(custom_config)
+
     """
     # Update the configuration in a thread-safe manner
     GLOBAL_CONFIG_HOLDER.set(config)
@@ -186,6 +183,7 @@ def configure_openapi(config: OpenAPIConfig) -> None:
 
     Args:
         config: Configuration object with OpenAPI settings
+
     """
     # Update the configuration in a thread-safe manner
     GLOBAL_CONFIG_HOLDER.set_openapi_config(config)
@@ -205,6 +203,7 @@ def reset_prefixes() -> None:
     Example:
         >>> from flask_x_openapi_schema import reset_prefixes
         >>> reset_prefixes()  # Resets to default prefixes
+
     """
     # Reset the configuration in a thread-safe manner
     GLOBAL_CONFIG_HOLDER.reset()
@@ -221,5 +220,6 @@ def get_openapi_config() -> OpenAPIConfig:
 
     Returns:
         Current OpenAPI configuration
+
     """
     return GLOBAL_CONFIG_HOLDER.get_openapi_config()

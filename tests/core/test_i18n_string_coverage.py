@@ -1,11 +1,9 @@
-"""
-Tests for the i18n_string module to improve coverage.
-"""
+"""Tests for the i18n_string module to improve coverage."""
 
 from flask_x_openapi_schema.i18n.i18n_string import (
     I18nStr,
-    set_current_language,
     get_current_language,
+    set_current_language,
 )
 
 
@@ -55,9 +53,7 @@ class TestI18nStringCoverage:
         assert i18n_str.get("fr-FR") == "Hello"  # Fallback to default
 
         # Test with a different default language
-        i18n_str = I18nStr(
-            {"en-US": "Hello", "zh-Hans": "你好"}, default_language="zh-Hans"
-        )
+        i18n_str = I18nStr({"en-US": "Hello", "zh-Hans": "你好"}, default_language="zh-Hans")
         # Note: The current implementation may not respect the default_language parameter as expected
         # This is a known issue that will be fixed in a future update
         # For now, we'll just check that the get method works with explicit language

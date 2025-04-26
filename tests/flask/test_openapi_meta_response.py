@@ -1,15 +1,13 @@
-"""
-Tests for OpenAPIMetaResponse handling in schema generation.
-"""
+"""Tests for OpenAPIMetaResponse handling in schema generation."""
 
 from flask import Blueprint
 from flask.views import MethodView
 from pydantic import BaseModel, Field
 
 from flask_x_openapi_schema import (
-    OpenAPIMethodViewMixin,
     OpenAPIMetaResponse,
     OpenAPIMetaResponseItem,
+    OpenAPIMethodViewMixin,
 )
 from flask_x_openapi_schema.x.flask import openapi_metadata
 from flask_x_openapi_schema.x.flask.views import MethodViewOpenAPISchemaGenerator
@@ -65,7 +63,7 @@ class TestOpenAPIMetaResponse:
                             model=ErrorResponseModel,
                             description="Internal server error",
                         ),
-                    }
+                    },
                 ),
             )
             def get(self, _x_query: SampleRequestModel = None):
@@ -77,7 +75,9 @@ class TestOpenAPIMetaResponse:
 
         # Create a schema generator
         generator = MethodViewOpenAPISchemaGenerator(
-            title="Test API", version="1.0.0", description="Test API Description"
+            title="Test API",
+            version="1.0.0",
+            description="Test API Description",
         )
 
         # Process the blueprint
@@ -105,20 +105,14 @@ class TestOpenAPIMetaResponse:
 
         # Check that the response references are correct
         assert (
-            schema["paths"]["/api/test"]["get"]["responses"]["200"]["content"][
-                "application/json"
-            ]["schema"]["$ref"]
+            schema["paths"]["/api/test"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
             == "#/components/schemas/SampleResponseModel"
         )
         assert (
-            schema["paths"]["/api/test"]["get"]["responses"]["400"]["content"][
-                "application/json"
-            ]["schema"]["$ref"]
+            schema["paths"]["/api/test"]["get"]["responses"]["400"]["content"]["application/json"]["schema"]["$ref"]
             == "#/components/schemas/ErrorResponseModel"
         )
         assert (
-            schema["paths"]["/api/test"]["get"]["responses"]["500"]["content"][
-                "application/json"
-            ]["schema"]["$ref"]
+            schema["paths"]["/api/test"]["get"]["responses"]["500"]["content"]["application/json"]["schema"]["$ref"]
             == "#/components/schemas/ErrorResponseModel"
         )

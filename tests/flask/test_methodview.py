@@ -1,14 +1,14 @@
-"""
-Test for the OpenAPIMethodViewMixin class.
+"""Test for the OpenAPIMethodViewMixin class.
 
 This module tests the OpenAPIMethodViewMixin class with the openapi_metadata decorator.
 """
 
-import json
-import pytest
-from typing import List, Optional
+from __future__ import annotations
 
-from flask import Flask, Blueprint
+import json
+
+import pytest
+from flask import Blueprint, Flask
 from flask.views import MethodView
 from pydantic import BaseModel, Field
 
@@ -31,9 +31,9 @@ class ItemRequest(BaseModel):
     """Request model for creating an item."""
 
     name: str = Field(..., description="The name of the item")
-    description: Optional[str] = Field(None, description="The description of the item")
+    description: str | None = Field(None, description="The description of the item")
     price: float = Field(..., description="The price of the item")
-    tags: List[str] = Field(default_factory=list, description="Tags for the item")
+    tags: list[str] = Field(default_factory=list, description="Tags for the item")
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -43,9 +43,9 @@ class ItemResponse(BaseRespModel):
 
     id: str = Field(..., description="The ID of the item")
     name: str = Field(..., description="The name of the item")
-    description: Optional[str] = Field(None, description="The description of the item")
+    description: str | None = Field(None, description="The description of the item")
     price: float = Field(..., description="The price of the item")
-    tags: List[str] = Field(default_factory=list, description="Tags for the item")
+    tags: list[str] = Field(default_factory=list, description="Tags for the item")
 
 
 # Create a custom Blueprint class with OpenAPI support
@@ -64,14 +64,13 @@ class ItemView(OpenAPIMethodViewMixin, MethodView):
     def get(self, item_id: str):
         """Get an item by ID."""
         # In a real app, this would fetch from a database
-        response = ItemResponse(
+        return ItemResponse(
             id=item_id,
             name="Test Item",
             description="This is a test item",
             price=10.99,
             tags=["test", "example"],
         )
-        return response
 
     @openapi_metadata(
         summary="Create an item",
@@ -109,12 +108,11 @@ def app():
     # Add a route to get the OpenAPI schema
     @flask_app.route("/openapi.yaml")
     def get_openapi_schema():
-        schema = api_bp.generate_openapi_schema(
+        return api_bp.generate_openapi_schema(
             title="Items API",
             version="1.0.0",
             description="API for managing items",
         )
-        return schema
 
     return flask_app
 
@@ -196,19 +194,20 @@ class TestMethodViewUtilsCoverage:
             name: str
             age: int
 
-        with flask_request_context() as app:
-            # Set up the request context
-            with app.test_request_context(
+        with (
+            flask_request_context() as app,
+            app.test_request_context(
                 json={"name": "Test", "age": 30},
                 method="POST",
                 headers={"Content-Type": "application/json"},
-            ):
-                # Extract data
-                model = extract_pydantic_data(TestModel)
+            ),
+        ):
+            # Extract data
+            model = extract_pydantic_data(TestModel)
 
-                # Check that the model was created correctly
-                assert model.name == "Test"
-                assert model.age == 30
+            # Check that the model was created correctly
+            assert model.name == "Test"
+            assert model.age == 30
 
     def test_extract_pydantic_data_form(self):
         """Test extract_pydantic_data with form data."""
@@ -218,19 +217,20 @@ class TestMethodViewUtilsCoverage:
             name: str
             age: int
 
-        with flask_request_context() as app:
-            # Set up the request context
-            with app.test_request_context(
+        with (
+            flask_request_context() as app,
+            app.test_request_context(
                 data={"name": "Test", "age": "30"},
                 method="POST",
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
-            ):
-                # Extract data
-                model = extract_pydantic_data(TestModel)
+            ),
+        ):
+            # Extract data
+            model = extract_pydantic_data(TestModel)
 
-                # Check that the model was created correctly
-                assert model.name == "Test"
-                assert model.age == 30
+            # Check that the model was created correctly
+            assert model.name == "Test"
+            assert model.age == 30
 
     def test_extract_pydantic_data_query(self):
         """Test extract_pydantic_data with query parameters."""
@@ -240,17 +240,17 @@ class TestMethodViewUtilsCoverage:
             name: str
             age: int
 
-        with flask_request_context() as app:
+        with (
+            flask_request_context() as app,
+            app.test_request_context(query_string={"name": "Test", "age": "30"}, method="GET"),
+        ):
             # Set up the request context
-            with app.test_request_context(
-                query_string={"name": "Test", "age": "30"}, method="GET"
-            ):
-                # Extract data
-                model = extract_pydantic_data(TestModel)
+            # Extract data
+            model = extract_pydantic_data(TestModel)
 
-                # Check that the model was created correctly
-                assert model.name == "Test"
-                assert model.age == 30
+            # Check that the model was created correctly
+            assert model.name == "Test"
+            assert model.age == 30
 
     def test_extract_pydantic_data_mixed(self):
         """Test extract_pydantic_data with mixed data sources."""
@@ -283,7 +283,9 @@ class TestMethodViewUtilsCoverage:
 
         # Extract parameters for GET method
         params = extract_openapi_parameters_from_methodview(
-            TestView, "get", "/items/<int:item_id>/categories/<category_id>"
+            TestView,
+            "get",
+            "/items/<int:item_id>/categories/<category_id>",
         )
 
         # Check that parameters were extracted correctly
@@ -299,9 +301,7 @@ class TestMethodViewUtilsCoverage:
         assert params[1]["schema"]["type"] == "string"
 
         # Extract parameters for POST method
-        params = extract_openapi_parameters_from_methodview(
-            TestView, "post", "/items/<int:item_id>"
-        )
+        params = extract_openapi_parameters_from_methodview(TestView, "post", "/items/<int:item_id>")
 
         # Check that parameters were extracted correctly
         assert len(params) == 1
@@ -311,14 +311,12 @@ class TestMethodViewUtilsCoverage:
         assert params[0]["schema"]["type"] == "integer"
 
         # Test with a method that doesn't exist
-        params = extract_openapi_parameters_from_methodview(
-            TestView, "put", "/items/<int:item_id>"
-        )
+        params = extract_openapi_parameters_from_methodview(TestView, "put", "/items/<int:item_id>")
         assert params == []
 
         # Test with different parameter types
         class TypesView(MethodView):
-            def get(self, int_id: int, float_id: float, bool_flag: bool, str_id: str):
+            def get(self, int_id: int, float_id: float, bool_flag: bool, str_id: str):  # noqa: ARG002, FBT001
                 return {"status": "ok"}
 
         params = extract_openapi_parameters_from_methodview(
@@ -377,7 +375,9 @@ class TestMethodViewUtilsCoverage:
 
         # Create a schema generator
         generator = MethodViewOpenAPISchemaGenerator(
-            title="Test API", version="1.0.0", description="Test API Description"
+            title="Test API",
+            version="1.0.0",
+            description="Test API Description",
         )
 
         # Process the blueprint
@@ -402,32 +402,15 @@ class TestMethodViewUtilsCoverage:
         assert "post" in schema["paths"]["/api/items"]
 
         # Check that metadata was added
-        assert (
-            schema["paths"]["/api/items/{item_id}"]["get"]["summary"]
-            == "Get an item by ID."
-        )
-        assert (
-            "Returns the item with the specified ID"
-            in schema["paths"]["/api/items/{item_id}"]["get"]["description"]
-        )
+        assert schema["paths"]["/api/items/{item_id}"]["get"]["summary"] == "Get an item by ID."
+        assert "Returns the item with the specified ID" in schema["paths"]["/api/items/{item_id}"]["get"]["description"]
         assert schema["paths"]["/api/items"]["post"]["summary"] == "Create a new item."
 
         # Check that parameters were added
         assert "parameters" in schema["paths"]["/api/items/{item_id}"]["get"]
-        assert (
-            schema["paths"]["/api/items/{item_id}"]["get"]["parameters"][0]["name"]
-            == "item_id"
-        )
-        assert (
-            schema["paths"]["/api/items/{item_id}"]["get"]["parameters"][0]["in"]
-            == "path"
-        )
-        assert (
-            schema["paths"]["/api/items/{item_id}"]["get"]["parameters"][0]["schema"][
-                "type"
-            ]
-            == "integer"
-        )
+        assert schema["paths"]["/api/items/{item_id}"]["get"]["parameters"][0]["name"] == "item_id"
+        assert schema["paths"]["/api/items/{item_id}"]["get"]["parameters"][0]["in"] == "path"
+        assert schema["paths"]["/api/items/{item_id}"]["get"]["parameters"][0]["schema"]["type"] == "integer"
 
     def test_process_methodview_resources_empty(self):
         """Test process_methodview_resources with a blueprint that has no resources."""

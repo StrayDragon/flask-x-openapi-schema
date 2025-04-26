@@ -1,16 +1,15 @@
-"""
-Decorators for adding OpenAPI metadata to Flask MethodView endpoints.
-"""
+"""Decorators for adding OpenAPI metadata to Flask MethodView endpoints."""
 
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from flask import request
 from pydantic import BaseModel
 
-from ...core.config import ConventionalPrefixConfig
-from ...i18n.i18n_string import I18nStr
-from ...models.responses import OpenAPIMetaResponse
-from ...core.cache import make_cache_key
+from flask_x_openapi_schema.core.cache import make_cache_key
+from flask_x_openapi_schema.core.config import ConventionalPrefixConfig
+from flask_x_openapi_schema.i18n.i18n_string import I18nStr
+from flask_x_openapi_schema.models.responses import OpenAPIMetaResponse
 
 
 class FlaskOpenAPIDecorator:
@@ -18,17 +17,17 @@ class FlaskOpenAPIDecorator:
 
     def __init__(
         self,
-        summary: Optional[Union[str, I18nStr]] = None,
-        description: Optional[Union[str, I18nStr]] = None,
-        tags: Optional[List[str]] = None,
-        operation_id: Optional[str] = None,
-        responses: Optional[OpenAPIMetaResponse] = None,
+        summary: str | I18nStr | None = None,
+        description: str | I18nStr | None = None,
+        tags: list[str] | None = None,
+        operation_id: str | None = None,
+        responses: OpenAPIMetaResponse | None = None,
         deprecated: bool = False,
-        security: Optional[List[Dict[str, List[str]]]] = None,
-        external_docs: Optional[Dict[str, str]] = None,
-        language: Optional[str] = None,
-        prefix_config: Optional[ConventionalPrefixConfig] = None,
-    ):
+        security: list[dict[str, list[str]]] | None = None,
+        external_docs: dict[str, str] | None = None,
+        language: str | None = None,
+        prefix_config: ConventionalPrefixConfig | None = None,
+    ) -> None:
         """Initialize the decorator with OpenAPI metadata parameters."""
         # Store parameters for later use
         self.summary = summary
@@ -46,12 +45,12 @@ class FlaskOpenAPIDecorator:
         # We'll initialize the base decorator when needed
         self.base_decorator = None
 
-    def __call__(self, func):
+    def __call__(self, func):  # noqa: ANN001, ANN204
         """Apply the decorator to the function."""
         # Initialize the base decorator if needed
         if self.base_decorator is None:
             # Import here to avoid circular imports
-            from ...core.decorator_base import OpenAPIDecoratorBase
+            from flask_x_openapi_schema.core.decorator_base import OpenAPIDecoratorBase
 
             self.base_decorator = OpenAPIDecoratorBase(
                 summary=self.summary,
@@ -69,23 +68,21 @@ class FlaskOpenAPIDecorator:
         return self.base_decorator(func)
 
     def extract_parameters_from_models(
-        self, query_model: Optional[Type[BaseModel]], path_params: Optional[List[str]]
-    ) -> List[Dict[str, Any]]:
+        self,
+        query_model: type[BaseModel] | None,
+        path_params: list[str] | None,
+    ) -> list[dict[str, Any]]:
         """Extract OpenAPI parameters from models."""
         # Create parameters for OpenAPI schema
-        parameters = []
-
-        # Add path parameters
-        if path_params:
-            for param in path_params:
-                parameters.append(
-                    {
-                        "name": param,
-                        "in": "path",
-                        "required": True,
-                        "schema": {"type": "string"},
-                    }
-                )
+        parameters = [
+            {
+                "name": param,
+                "in": "path",
+                "required": True,
+                "schema": {"type": "string"},
+            }
+            for param in path_params
+        ]
 
         # Add query parameters
         if query_model:
@@ -109,9 +106,7 @@ class FlaskOpenAPIDecorator:
 
         return parameters
 
-    def process_request_body(
-        self, param_name: str, model: Type[BaseModel], kwargs: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def process_request_body(self, param_name: str, model: type[BaseModel], kwargs: dict[str, Any]) -> dict[str, Any]:  # noqa: PLR0915
         """Process request body parameters for Flask.
 
         Args:
@@ -121,23 +116,21 @@ class FlaskOpenAPIDecorator:
 
         Returns:
             Updated kwargs dictionary with the model instance
+
         """
-        from ...core.decorator_base import preprocess_request_data
-        from ...core.cache import MODEL_CACHE
         import logging
 
+        from flask_x_openapi_schema.core.cache import MODEL_CACHE
+        from flask_x_openapi_schema.core.decorator_base import preprocess_request_data
+
         logger = logging.getLogger(__name__)
-        logger.debug(
-            f"Processing request body for {param_name} with model {model.__name__}"
-        )
+        logger.debug(f"Processing request body for {param_name} with model {model.__name__}")
         logger.debug(f"Request content type: {request.content_type}")
         logger.debug(f"Request is_json: {request.is_json}")
 
         # Skip processing if request is not JSON and not a form
         if not request.is_json and not request.form and not request.files:
-            logger.warning(
-                f"Request is not JSON or form, skipping request body processing for {param_name}"
-            )
+            logger.warning(f"Request is not JSON or form, skipping request body processing for {param_name}")
             return kwargs
 
         # Get data from request (JSON or form)
@@ -156,17 +149,16 @@ class FlaskOpenAPIDecorator:
             if body_data:
                 try:
                     model_instance = model.model_validate(body_data)
-                    logger.debug(
-                        f"Created model instance directly from JSON for {param_name}"
-                    )
+                    logger.debug(f"Created model instance directly from JSON for {param_name}")
                     kwargs[param_name] = model_instance
                     MODEL_CACHE.set(cache_key, model_instance)
-                    return kwargs
                 except Exception as e:
                     logger.warning(f"Failed to validate model from raw JSON: {e}")
+                else:
+                    return kwargs
         elif request.form:
             # Convert form data to dict
-            body_data = {key: value for key, value in request.form.items()}
+            body_data = dict(request.form.items())
             # Add files if present
             if request.files:
                 for key, file in request.files.items():
@@ -193,41 +185,31 @@ class FlaskOpenAPIDecorator:
         # Try to create model instance
         try:
             # Try model_validate first (better handling of complex types)
-            logger.debug(
-                f"Attempting to validate model {model.__name__} with processed data"
-            )
+            logger.debug(f"Attempting to validate model {model.__name__} with processed data")
             model_instance = model.model_validate(processed_body_data)
             logger.debug(f"Model validation successful for {param_name}")
         except Exception as e:
             # Log the validation error and try fallback approach
-            logger.warning(
-                f"Validation error: {e}. Falling back to manual construction."
-            )
+            logger.warning(f"Validation error: {e}. Falling back to manual construction.")
 
             # Filter data to only include fields in the model
             model_fields = model.model_fields
-            filtered_body_data = {
-                k: v for k, v in processed_body_data.items() if k in model_fields
-            }
+            filtered_body_data = {k: v for k, v in processed_body_data.items() if k in model_fields}
             logger.debug(f"Filtered body data: {filtered_body_data}")
 
             # Create instance using constructor
             try:
                 model_instance = model(**filtered_body_data)
-                logger.debug(
-                    f"Created model instance using constructor for {param_name}"
-                )
+                logger.debug(f"Created model instance using constructor for {param_name}")
             except Exception as e2:
-                logger.error(f"Failed to create model instance: {e2}")
+                logger.exception("Failed to create model instance e2", extra={"error": e2})
                 # Return empty model instance as fallback
                 try:
                     # Try to create an empty instance with default values
                     model_instance = model()
-                    logger.warning(
-                        f"Created empty model instance for {param_name} as fallback"
-                    )
+                    logger.warning(f"Created empty model instance for {param_name} as fallback")
                 except Exception as e3:
-                    logger.error(f"Failed to create empty model instance: {e3}")
+                    logger.exception("Failed to create empty model instance e3", extra={"error": e3})
                     # Return kwargs unchanged if all attempts fail
                     return kwargs
 
@@ -238,9 +220,7 @@ class FlaskOpenAPIDecorator:
 
         return kwargs
 
-    def process_query_params(
-        self, param_name: str, model: Type[BaseModel], kwargs: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def process_query_params(self, param_name: str, model: type[BaseModel], kwargs: dict[str, Any]) -> dict[str, Any]:
         """Process query parameters for Flask.
 
         Args:
@@ -250,8 +230,9 @@ class FlaskOpenAPIDecorator:
 
         Returns:
             Updated kwargs dictionary with the model instance
+
         """
-        from ...core.cache import MODEL_CACHE
+        from flask_x_openapi_schema.core.cache import MODEL_CACHE
 
         # Extract query parameters from request
         query_data = {}
@@ -263,7 +244,7 @@ class FlaskOpenAPIDecorator:
                 query_data[field_name] = request.args.get(field_name)
 
         # Create cache key for this request
-        from ...core.cache import make_cache_key
+        from flask_x_openapi_schema.core.cache import make_cache_key
 
         cache_key = make_cache_key(id(model), query_data)
 
@@ -282,9 +263,7 @@ class FlaskOpenAPIDecorator:
 
         return kwargs
 
-    def process_additional_params(
-        self, kwargs: Dict[str, Any], param_names: List[str]
-    ) -> Dict[str, Any]:
+    def process_additional_params(self, kwargs: dict[str, Any], param_names: list[str]) -> dict[str, Any]:
         """Process additional framework-specific parameters.
 
         Args:
@@ -293,15 +272,14 @@ class FlaskOpenAPIDecorator:
 
         Returns:
             Updated kwargs dictionary
+
         """
         # No additional processing needed for Flask
         # Just log the parameters for debugging
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.debug(
-            f"Processing additional parameters with kwargs keys: {list(kwargs.keys())}"
-        )
+        logger.debug(f"Processing additional parameters with kwargs keys: {list(kwargs.keys())}")
         logger.debug(f"Processed parameter names: {param_names}")
         return kwargs
 
@@ -312,16 +290,16 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 def openapi_metadata(
     *,
-    summary: Optional[Union[str, I18nStr]] = None,
-    description: Optional[Union[str, I18nStr]] = None,
-    tags: Optional[List[str]] = None,
-    operation_id: Optional[str] = None,
-    responses: Optional[OpenAPIMetaResponse] = None,
+    summary: str | I18nStr | None = None,
+    description: str | I18nStr | None = None,
+    tags: list[str] | None = None,
+    operation_id: str | None = None,
+    responses: OpenAPIMetaResponse | None = None,
     deprecated: bool = False,
-    security: Optional[List[Dict[str, List[str]]]] = None,
-    external_docs: Optional[Dict[str, str]] = None,
-    language: Optional[str] = None,
-    prefix_config: Optional[ConventionalPrefixConfig] = None,
+    security: list[dict[str, list[str]]] | None = None,
+    external_docs: dict[str, str] | None = None,
+    language: str | None = None,
+    prefix_config: ConventionalPrefixConfig | None = None,
 ) -> Callable[[F], F]:
     """Decorator to add OpenAPI metadata to a Flask MethodView endpoint.
 
@@ -376,24 +354,16 @@ def openapi_metadata(
         ...         operation_id="createItem",
         ...         responses=OpenAPIMetaResponse(
         ...             responses={
-        ...                 "201": OpenAPIMetaResponseItem(
-        ...                     model=ItemResponse,
-        ...                     description="Item created successfully"
-        ...                 ),
-        ...                 "400": OpenAPIMetaResponseItem(
-        ...                     description="Invalid request data"
-        ...                 )
+        ...                 "201": OpenAPIMetaResponseItem(model=ItemResponse, description="Item created successfully"),
+        ...                 "400": OpenAPIMetaResponseItem(description="Invalid request data"),
         ...             }
-        ...         )
+        ...         ),
         ...     )
         ...     def post(self, _x_body: ItemRequest):
         ...         # _x_body is automatically populated from the request JSON
-        ...         item = {
-        ...             "id": "123",
-        ...             "name": _x_body.name,
-        ...             "price": _x_body.price
-        ...         }
+        ...         item = {"id": "123", "name": _x_body.name, "price": _x_body.price}
         ...         return item, 201
+
     """
     return FlaskOpenAPIDecorator(
         summary=summary,

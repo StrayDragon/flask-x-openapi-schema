@@ -1,3 +1,1 @@
-"""
-Flask-specific tests for flask-x-openapi-schema.
-"""
+"""Flask-specific tests for flask-x-openapi-schema."""

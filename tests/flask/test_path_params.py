@@ -1,13 +1,11 @@
-"""
-Tests for path parameter handling in Flask MethodView.
-"""
+"""Tests for path parameter handling in Flask MethodView."""
 
 import pytest
-from flask import Flask, Blueprint
+from flask import Blueprint, Flask
 from flask.views import MethodView
 from pydantic import BaseModel, Field
 
-from flask_x_openapi_schema.x.flask import openapi_metadata, OpenAPIMethodViewMixin
+from flask_x_openapi_schema.x.flask import OpenAPIMethodViewMixin, openapi_metadata
 from flask_x_openapi_schema.x.flask.utils import generate_openapi_schema
 
 
@@ -31,13 +29,12 @@ class ItemView(OpenAPIMethodViewMixin, MethodView):
     )
     def get(self, _x_path_item_id: str):
         """Get a single item."""
-        response = ItemResponse(
+        return ItemResponse(
             id=_x_path_item_id,
             name="测试项目",
             description="这是一个测试项目",
             price=10.99,
         )
-        return response
 
 
 @pytest.fixture
@@ -47,9 +44,7 @@ def app_with_blueprint():
     blueprint = Blueprint("api", __name__)
 
     # Register the view
-    ItemView.register_to_blueprint(
-        blueprint, "/items/<string:_x_path_item_id>", endpoint="item"
-    )
+    ItemView.register_to_blueprint(blueprint, "/items/<string:_x_path_item_id>", endpoint="item")
 
     # Register the blueprint
     app.register_blueprint(blueprint, url_prefix="/api")

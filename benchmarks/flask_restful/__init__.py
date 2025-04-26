@@ -1,3 +1,1 @@
-"""
-Flask-RESTful benchmarks package.
-"""
+"""Flask-RESTful benchmarks package."""

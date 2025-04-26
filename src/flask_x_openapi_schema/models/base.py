@@ -1,10 +1,9 @@
-"""
-Base models for OpenAPI schema generation.
-"""
+"""Base models for OpenAPI schema generation."""
 
-from typing import Any, Optional, TypeVar, Union
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict
+from typing_extensions import Self
 
 T = TypeVar("T", bound="BaseRespModel")
 
@@ -26,21 +25,19 @@ class BaseRespModel(BaseModel):
         ...     id: str = Field(..., description="User ID")
         ...     name: str = Field(..., description="User name")
         ...     email: str = Field(..., description="User email")
-        ...
         >>> # In your API endpoint:
         >>> def get(self):
         ...     # Returns a dictionary that Flask will convert to JSON
         ...     return UserResponse(id="123", name="John Doe", email="john@example.com")
-        ...
         >>> # Or with a status code:
         >>> def post(self):
         ...     # Returns a tuple with the dictionary and status code
         ...     return UserResponse(id="123", name="John Doe", email="john@example.com"), 201
-        ...
         >>> # Or use the to_response method:
         >>> def put(self):
         ...     user = UserResponse(id="123", name="John Doe", email="john@example.com")
         ...     return user.to_response(status_code=200)
+
     """
 
     # Configure Pydantic model
@@ -52,7 +49,7 @@ class BaseRespModel(BaseModel):
     )
 
     @classmethod
-    def from_dict(cls: type[T], data: dict[str, Any]) -> T:
+    def from_dict(cls, data: dict[str, Any]) -> Self:
         """Create a model instance from a dictionary.
 
         :param data: Dictionary containing model data
@@ -63,6 +60,7 @@ class BaseRespModel(BaseModel):
         Example:
             >>> data = {"id": "123", "name": "John Doe", "email": "john@example.com"}
             >>> user = UserResponse.from_dict(data)
+
         """
         return cls(**data)
 
@@ -77,13 +75,12 @@ class BaseRespModel(BaseModel):
             >>> user_dict = user.to_dict()
             >>> user_dict
             {'id': '123', 'name': 'John Doe', 'email': 'john@example.com'}
+
         """
         # Use model_dump with custom encoder for datetime objects
         return self.model_dump(exclude_none=True, mode="json")
 
-    def to_response(
-        self, status_code: Optional[int] = None
-    ) -> Union[dict[str, Any], tuple[dict[str, Any], int]]:
+    def to_response(self, status_code: int | None = None) -> dict[str, Any] | tuple[dict[str, Any], int]:
         """Convert the model to a Flask-compatible response.
 
         :param status_code: Optional HTTP status code
@@ -97,6 +94,7 @@ class BaseRespModel(BaseModel):
             >>> response = user.to_response()
             >>> # With status code
             >>> response = user.to_response(status_code=201)
+
         """
         response_dict = self.to_dict()
 

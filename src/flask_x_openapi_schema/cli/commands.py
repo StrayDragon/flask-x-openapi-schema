@@ -1,17 +1,15 @@
-"""
-Commands for generating OpenAPI documentation.
-"""
+"""Commands for generating OpenAPI documentation."""
 
 import json
 import os
-from typing import Literal, Optional
+from typing import Literal
 
 import click
 from flask import Flask
 from flask.cli import with_appcontext
 
-from ..i18n import I18nStr, set_current_language
-from ..x.flask_restful import OpenAPIIntegrationMixin
+from flask_x_openapi_schema.i18n import I18nStr, set_current_language
+from flask_x_openapi_schema.x.flask_restful import OpenAPIIntegrationMixin
 
 
 @click.command("generate-openapi")
@@ -45,6 +43,7 @@ from ..x.flask_restful import OpenAPIIntegrationMixin
 @click.option(
     "--format",
     "-f",
+    "format_",
     default="yaml",
     type=click.Choice(["yaml", "json"]),
     help="Output format (yaml or json)",
@@ -59,11 +58,11 @@ from ..x.flask_restful import OpenAPIIntegrationMixin
 @with_appcontext
 def generate_openapi_command(
     output: str,
-    blueprint: Optional[str],
+    blueprint: str | None,
     title: str,
     version: str,
     description: str,
-    format: Literal["yaml", "json"],
+    format_: Literal["yaml", "json"],
     language: list[str],
 ) -> None:
     """Generate OpenAPI schema and documentation."""
@@ -76,9 +75,7 @@ def generate_openapi_command(
             blueprints.append((name, bp))
 
     if not blueprints:
-        click.echo(
-            f"No blueprints found{' with name ' + blueprint if blueprint else ''}."
-        )
+        click.echo(f"No blueprints found{' with name ' + blueprint if blueprint else ''}.")
         return
 
     # Create internationalized description
@@ -87,9 +84,7 @@ def generate_openapi_command(
     # Generate schema for each blueprint
     for name, bp in blueprints:
         if not hasattr(bp, "api") or not isinstance(bp.api, OpenAPIIntegrationMixin):
-            click.echo(
-                f"Blueprint {name} does not have an OpenAPIExternalApi instance."
-            )
+            click.echo(f"Blueprint {name} does not have an OpenAPIExternalApi instance.")
             continue
 
         api = bp.api
@@ -103,19 +98,19 @@ def generate_openapi_command(
             title=I18nStr(dict.fromkeys(language, f"{title} - {name}")),
             version=version,
             description=i18n_description,
-            output_format=format,
+            output_format=format_,
             language=default_lang,
         )
 
         # Save schema to file
         blueprint_output = output
         if len(blueprints) > 1:
-            base, ext = os.path.splitext(output)
+            base, ext = os.path.splitext(output)  # noqa: PTH122
             blueprint_output = f"{base}_{name}{ext}"
 
-        os.makedirs(os.path.dirname(os.path.abspath(blueprint_output)), exist_ok=True)
-        with open(blueprint_output, "w") as f:
-            if format == "yaml":
+        os.makedirs(os.path.dirname(os.path.abspath(blueprint_output)), exist_ok=True)  # noqa: PTH100, PTH103, PTH120
+        with open(blueprint_output, "w") as f:  # noqa: PTH123
+            if format_ == "yaml":
                 # Schema is already a YAML string
                 f.write(schema)
             else:
@@ -126,10 +121,10 @@ def generate_openapi_command(
 
 
 def register_commands(app: Flask) -> None:
-    """
-    Register OpenAPI commands with the Flask application.
+    """Register OpenAPI commands with the Flask application.
 
     Args:
         app: The Flask application
+
     """
     app.cli.add_command(generate_openapi_command)

@@ -1,16 +1,16 @@
-"""
-Performance tests for flask-x-openapi-schema.
+"""Performance tests for flask-x-openapi-schema.
 
 This module tests the performance of the library.
 """
 
+from __future__ import annotations
+
 import time
-from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from flask_x_openapi_schema.core.utils import pydantic_to_openapi_schema
 from flask_x_openapi_schema.core.schema_generator import OpenAPISchemaGenerator
+from flask_x_openapi_schema.core.utils import pydantic_to_openapi_schema
 
 
 # Define test models
@@ -19,7 +19,7 @@ class SimpleModel(BaseModel):
 
     name: str = Field(..., description="The name")
     age: int = Field(..., description="The age")
-    email: Optional[str] = Field(None, description="The email")
+    email: str | None = Field(None, description="The email")
 
 
 class ComplexModel(BaseModel):
@@ -27,9 +27,9 @@ class ComplexModel(BaseModel):
 
     id: str = Field(..., description="The ID")
     name: str = Field(..., description="The name")
-    description: Optional[str] = Field(None, description="The description")
-    tags: List[str] = Field(default_factory=list, description="Tags")
-    items: List[SimpleModel] = Field(default_factory=list, description="Items")
+    description: str | None = Field(None, description="The description")
+    tags: list[str] = Field(default_factory=list, description="Tags")
+    items: list[SimpleModel] = Field(default_factory=list, description="Items")
     metadata: dict = Field(default_factory=dict, description="Metadata")
 
 
@@ -72,9 +72,7 @@ def test_pydantic_to_openapi_schema_performance():
 def test_schema_generator_performance():
     """Test the performance of OpenAPISchemaGenerator."""
     # Create a schema generator
-    generator = OpenAPISchemaGenerator(
-        title="Test API", version="1.0.0", description="Test API Description"
-    )
+    generator = OpenAPISchemaGenerator(title="Test API", version="1.0.0", description="Test API Description")
 
     # Register models
     generator._register_model(SimpleModel)

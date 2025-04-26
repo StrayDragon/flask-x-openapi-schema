@@ -1,6 +1,4 @@
-"""
-Tests for CLI commands.
-"""
+"""Tests for CLI commands."""
 
 import json
 import os
@@ -9,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from click.testing import CliRunner
-from flask import Flask, Blueprint
+from flask import Blueprint, Flask
 
 from flask_x_openapi_schema.cli.commands import (
     generate_openapi_command,
@@ -21,8 +19,7 @@ from flask_x_openapi_schema.x.flask_restful import OpenAPIIntegrationMixin
 @pytest.fixture
 def app():
     """Create a Flask app for testing."""
-    app = Flask(__name__)
-    return app
+    return Flask(__name__)
 
 
 @pytest.fixture
@@ -122,7 +119,7 @@ def test_generate_openapi_command_with_blueprint(runner, app, mock_blueprint):
             assert os.path.exists(output_file)
 
             # Check the file content
-            with open(output_file, "r") as f:
+            with open(output_file) as f:
                 content = f.read()
                 assert content == "test schema"
 
@@ -178,7 +175,7 @@ def test_generate_openapi_command_json_format(runner, app, mock_blueprint):
             assert os.path.exists(output_file)
 
             # Check the file content
-            with open(output_file, "r") as f:
+            with open(output_file) as f:
                 content = json.load(f)
                 assert content["openapi"] == "3.0.0"
                 assert content["info"]["title"] == "Test API - test_api"
@@ -320,10 +317,7 @@ def test_generate_openapi_command_blueprint_without_api(runner, app):
         )
 
         # Check the output
-        assert (
-            "Blueprint test_api does not have an OpenAPIExternalApi instance"
-            in result.output
-        )
+        assert "Blueprint test_api does not have an OpenAPIExternalApi instance" in result.output
         assert result.exit_code == 0
 
 

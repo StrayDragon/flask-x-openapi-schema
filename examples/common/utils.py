@@ -1,31 +1,29 @@
-"""
-Utility functions for Flask-X-OpenAPI-Schema examples.
+"""Utility functions for Flask-X-OpenAPI-Schema examples.
 
 This module contains utility functions for formatting and displaying data.
 """
 
 import json
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
 from rich.json import JSON
+from rich.panel import Panel
 from rich.syntax import Syntax
-
+from rich.table import Table
 
 console = Console()
 
 
-def print_request_info(
+def print_request_info(  # noqa: PLR0913
     method: str,
     path: str,
-    path_params: Optional[Dict[str, Any]] = None,
-    query_params: Optional[Dict[str, Any]] = None,
-    body: Optional[Dict[str, Any]] = None,
-    headers: Optional[Dict[str, str]] = None,
-    file: Optional[Dict[str, Any]] = None,
+    path_params: dict[str, Any] | None = None,
+    query_params: dict[str, Any] | None = None,
+    body: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    file: dict[str, Any] | None = None,
 ):
     """Print request information in a formatted way."""
     console.print(
@@ -33,7 +31,7 @@ def print_request_info(
             f"[bold blue]{method}[/bold blue] [bold green]{path}[/bold green]",
             title="Request",
             border_style="blue",
-        )
+        ),
     )
 
     if path_params:
@@ -70,8 +68,8 @@ class DateTimeEncoder(json.JSONEncoder):
 
 def print_response_info(
     status_code: int,
-    data: Union[Dict[str, Any], List[Dict[str, Any]]],
-    headers: Optional[Dict[str, str]] = None,
+    data: dict[str, Any] | list[dict[str, Any]],
+    headers: dict[str, str] | None = None,
 ):
     """Print response information in a formatted way."""
     status_color = "green" if 200 <= status_code < 300 else "red"
@@ -81,7 +79,7 @@ def print_response_info(
             f"[bold {status_color}]Status: {status_code}[/bold {status_color}]",
             title="Response",
             border_style=status_color,
-        )
+        ),
     )
 
     if headers:
@@ -93,7 +91,7 @@ def print_response_info(
     console.print()
 
 
-def _print_params_table(params: Dict[str, Any]):
+def _print_params_table(params: dict[str, Any]):
     """Print parameters in a table format."""
     table = Table(show_header=True, header_style="bold magenta")
     table.add_column("Name", style="dim")
@@ -101,15 +99,15 @@ def _print_params_table(params: Dict[str, Any]):
 
     for name, value in params.items():
         if isinstance(value, (dict, list)):
-            value = json.dumps(value)
+            v = json.dumps(value)
         elif value is None:
-            value = "null"
+            v = "null"
         elif isinstance(value, datetime):
-            value = value.isoformat()
+            v = value.isoformat()
         else:
-            value = str(value)
+            v = str(value)
 
-        table.add_row(name, value)
+        table.add_row(name, v)
 
     console.print(table)
     console.print()
@@ -122,7 +120,7 @@ def print_code_example(code: str, language: str = "python"):
             Syntax(code, language, theme="monokai", line_numbers=True),
             title=f"{language.capitalize()} Example",
             border_style="green",
-        )
+        ),
     )
     console.print()
 

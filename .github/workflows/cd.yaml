@@ -3,7 +3,7 @@ name: CD
 on:
   push:
     tags:
-      - 'v*'  # 当推送以v开头的标签时触发，例如v0.1.0
+      - 'v*'  # 当推送以v开头的标签时触发,例如v0.1.0
 
 jobs:
   build:

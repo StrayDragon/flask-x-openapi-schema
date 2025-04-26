@@ -1,5 +1,4 @@
-"""
-Flask-RESTful example for Flask-X-OpenAPI-Schema.
+"""Flask-RESTful example for Flask-X-OpenAPI-Schema.
 
 This example demonstrates how to use Flask-X-OpenAPI-Schema with Flask-RESTful.
 """
@@ -9,39 +8,37 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from flask import Flask, send_file
-from flask_restful import Resource, Api
 import yaml
-
-from flask_x_openapi_schema.x.flask_restful import (
-    openapi_metadata,
-    OpenAPIIntegrationMixin,
-)
-from flask_x_openapi_schema import (
-    set_current_language,
-    OpenAPIMetaResponse,
-    OpenAPIMetaResponseItem,
-)
+from flask import Flask, send_file
+from flask_restful import Api, Resource
 
 from examples.common.models import (
+    ErrorResponse,
+    FileResponse,
+    ProductAudioUpload,
+    ProductCategory,
+    ProductDocumentUpload,
+    ProductImageUpload,
+    ProductQueryParams,
     ProductRequest,
     ProductResponse,
-    ProductQueryParams,
-    ProductCategory,
     ProductStatus,
-    ErrorResponse,
-    ProductImageUpload,
-    ProductDocumentUpload,
-    ProductAudioUpload,
     ProductVideoUpload,
-    FileResponse,
 )
 from examples.common.utils import (
     print_request_info,
     print_response_info,
     print_section_header,
 )
-
+from flask_x_openapi_schema import (
+    OpenAPIMetaResponse,
+    OpenAPIMetaResponseItem,
+    set_current_language,
+)
+from flask_x_openapi_schema.x.flask_restful import (
+    OpenAPIIntegrationMixin,
+    openapi_metadata,
+)
 
 # Create a Flask app
 app = Flask(__name__)
@@ -85,7 +82,7 @@ class ProductListResource(Resource):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def get(self, _x_query: ProductQueryParams = None):
@@ -102,35 +99,21 @@ class ProductListResource(Resource):
 
         if _x_query:
             if _x_query.category:
-                filtered_products = [
-                    p for p in filtered_products if p["category"] == _x_query.category
-                ]
+                filtered_products = [p for p in filtered_products if p["category"] == _x_query.category]
 
             if _x_query.min_price is not None:
-                filtered_products = [
-                    p for p in filtered_products if p["price"] >= _x_query.min_price
-                ]
+                filtered_products = [p for p in filtered_products if p["price"] >= _x_query.min_price]
 
             if _x_query.max_price is not None:
-                filtered_products = [
-                    p for p in filtered_products if p["price"] <= _x_query.max_price
-                ]
+                filtered_products = [p for p in filtered_products if p["price"] <= _x_query.max_price]
 
             if _x_query.in_stock is not None:
-                filtered_products = [
-                    p for p in filtered_products if p["in_stock"] == _x_query.in_stock
-                ]
+                filtered_products = [p for p in filtered_products if p["in_stock"] == _x_query.in_stock]
 
             # Apply sorting
-            if (
-                _x_query.sort_by and _x_query.sort_by in filtered_products[0]
-                if filtered_products
-                else False
-            ):
+            if _x_query.sort_by and _x_query.sort_by in filtered_products[0] if filtered_products else False:
                 reverse = _x_query.sort_order.lower() == "desc"
-                filtered_products.sort(
-                    key=lambda x: x[_x_query.sort_by], reverse=reverse
-                )
+                filtered_products.sort(key=lambda x: x[_x_query.sort_by], reverse=reverse)
 
             # Apply pagination
             start = _x_query.offset
@@ -164,7 +147,7 @@ class ProductListResource(Resource):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def post(self, _x_body: ProductRequest):
@@ -239,7 +222,7 @@ class ProductResource(Resource):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def get(self, product_id: str):
@@ -301,7 +284,7 @@ class ProductResource(Resource):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def put(self, product_id: str, _x_body: ProductRequest):
@@ -351,7 +334,7 @@ class ProductResource(Resource):
                 "quantity": _x_body.quantity,
                 "attributes": _x_body.attributes,
                 "updated_at": datetime.now(),
-            }
+            },
         )
 
         # Save to in-memory database
@@ -387,7 +370,7 @@ class ProductResource(Resource):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def delete(self, product_id: str):
@@ -447,7 +430,7 @@ class FileDownloadResource(Resource):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def get(self, file_id: str):
@@ -521,7 +504,7 @@ class ProductImageResource(Resource):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def post(self, product_id: str, _x_file: ProductImageUpload):
@@ -535,9 +518,7 @@ class ProductImageResource(Resource):
             path=f"/products/{product_id}/images",
             path_params={"product_id": product_id},
             file={
-                "filename": file.filename
-                if file and hasattr(file, "filename")
-                else None,
+                "filename": file.filename if file and hasattr(file, "filename") else None,
                 "description": _x_file.description,
                 "is_primary": _x_file.is_primary,
             },
@@ -637,7 +618,7 @@ class ProductDocumentResource(Resource):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def post(self, product_id: str, _x_file: ProductDocumentUpload):
@@ -651,9 +632,7 @@ class ProductDocumentResource(Resource):
             path=f"/products/{product_id}/documents",
             path_params={"product_id": product_id},
             file={
-                "filename": file.filename
-                if file and hasattr(file, "filename")
-                else None,
+                "filename": file.filename if file and hasattr(file, "filename") else None,
                 "title": _x_file.title,
                 "document_type": _x_file.document_type,
             },
@@ -783,9 +762,7 @@ def get_openapi_spec():
         print(f"  - {schema_name}")
 
     # Convert to YAML with proper settings
-    yaml_content = yaml.dump(
-        schema, sort_keys=False, default_flow_style=False, allow_unicode=True
-    )
+    yaml_content = yaml.dump(schema, sort_keys=False, default_flow_style=False, allow_unicode=True)
 
     return yaml_content, 200, {"Content-Type": "text/yaml"}
 
@@ -913,9 +890,7 @@ if __name__ == "__main__":
 
     # Print information about the example
     print_section_header("Flask-RESTful Example")
-    print(
-        "This example demonstrates how to use Flask-X-OpenAPI-Schema with Flask-RESTful."
-    )
+    print("This example demonstrates how to use Flask-X-OpenAPI-Schema with Flask-RESTful.")
     print("The API provides endpoints for managing products.")
     print()
     print("Available endpoints:")
@@ -932,4 +907,4 @@ if __name__ == "__main__":
     print("Starting server on http://localhost:5001")
 
     # Run the app on a different port
-    app.run(debug=True, port=5001)
+    app.run(debug=True, port=5001)  # noqa: S201

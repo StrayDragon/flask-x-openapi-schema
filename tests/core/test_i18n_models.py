@@ -1,12 +1,13 @@
-"""
-Tests for the i18n_model module.
+"""Tests for the i18n_model module.
 
 This module tests the I18nBaseModel class for internationalization support.
 """
 
+from __future__ import annotations
+
 import json
-from pydantic import Field, ConfigDict
-from typing import Optional, List
+
+from pydantic import ConfigDict, Field
 
 from flask_x_openapi_schema.i18n.i18n_model import I18nBaseModel
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr, set_current_language
@@ -18,9 +19,9 @@ class ProductModel(I18nBaseModel):
 
     id: str = Field(..., description="The product ID")
     name: I18nStr = Field(..., description="The product name")
-    description: Optional[I18nStr] = Field(None, description="The product description")
+    description: I18nStr | None = Field(None, description="The product description")
     price: float = Field(..., description="The product price")
-    tags: List[str] = Field(default_factory=list, description="Product tags")
+    tags: list[str] = Field(default_factory=list, description="Product tags")
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -47,9 +48,7 @@ def test_i18n_model_creation():
     product = ProductModel(
         id="prod-123",
         name=I18nStr({"en-US": "Test Product", "zh-Hans": "测试产品"}),
-        description=I18nStr(
-            {"en-US": "This is a test product", "zh-Hans": "这是一个测试产品"}
-        ),
+        description=I18nStr({"en-US": "This is a test product", "zh-Hans": "这是一个测试产品"}),
         price=10.99,
         tags=["test", "example"],
     )
@@ -68,9 +67,7 @@ def test_i18n_model_language_switching():
     product = ProductModel(
         id="prod-123",
         name=I18nStr({"en-US": "Test Product", "zh-Hans": "测试产品"}),
-        description=I18nStr(
-            {"en-US": "This is a test product", "zh-Hans": "这是一个测试产品"}
-        ),
+        description=I18nStr({"en-US": "This is a test product", "zh-Hans": "这是一个测试产品"}),
         price=10.99,
         tags=["test", "example"],
     )
@@ -96,9 +93,7 @@ def test_i18n_model_serialization():
     product = ProductModel(
         id="prod-123",
         name=I18nStr({"en-US": "Test Product", "zh-Hans": "测试产品"}),
-        description=I18nStr(
-            {"en-US": "This is a test product", "zh-Hans": "这是一个测试产品"}
-        ),
+        description=I18nStr({"en-US": "This is a test product", "zh-Hans": "这是一个测试产品"}),
         price=10.99,
         tags=["test", "example"],
     )

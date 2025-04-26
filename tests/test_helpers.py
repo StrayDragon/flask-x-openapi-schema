@@ -1,8 +1,7 @@
-"""
-Helper functions and classes for testing flask-x-openapi-schema.
-"""
+"""Helper functions and classes for testing flask-x-openapi-schema."""
 
 import contextlib
+
 from flask import Flask
 
 

@@ -1,9 +1,9 @@
-"""
-Tests for the schema_generator module to improve coverage.
-"""
+"""Tests for the schema_generator module to improve coverage."""
 
-from typing import List, Dict, Any
+from __future__ import annotations
+
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -20,9 +20,7 @@ class TestSchemaGeneratorCoverage:
         generator = OpenAPISchemaGenerator(
             title=I18nStr({"en-US": "Test API", "zh-Hans": "测试 API"}),
             version="1.0.0",
-            description=I18nStr(
-                {"en-US": "Test API Description", "zh-Hans": "测试 API 描述"}
-            ),
+            description=I18nStr({"en-US": "Test API Description", "zh-Hans": "测试 API 描述"}),
         )
 
         # Generate schema with English
@@ -62,9 +60,7 @@ class TestSchemaGeneratorCoverage:
             color: Color = Field(..., description="The color")
 
         # Create a schema generator
-        generator = OpenAPISchemaGenerator(
-            title="Test API", version="1.0.0", description="Test API Description"
-        )
+        generator = OpenAPISchemaGenerator(title="Test API", version="1.0.0", description="Test API Description")
 
         # Register the model
         generator._register_model(EnumModel)
@@ -96,9 +92,7 @@ class TestSchemaGeneratorCoverage:
             address: Address = Field(..., description="The address")
 
         # Create a schema generator
-        generator = OpenAPISchemaGenerator(
-            title="Test API", version="1.0.0", description="Test API Description"
-        )
+        generator = OpenAPISchemaGenerator(title="Test API", version="1.0.0", description="Test API Description")
 
         # Register the model
         generator._register_model(User)
@@ -121,21 +115,13 @@ class TestSchemaGeneratorCoverage:
 
         # Define a model with complex types
         class ComplexModel(BaseModel):
-            tags: List[str] = Field(default_factory=list, description="Tags")
-            metadata: Dict[str, Any] = Field(
-                default_factory=dict, description="Metadata"
-            )
-            nested_list: List[List[int]] = Field(
-                default_factory=list, description="Nested list"
-            )
-            nested_dict: Dict[str, Dict[str, str]] = Field(
-                default_factory=dict, description="Nested dict"
-            )
+            tags: list[str] = Field(default_factory=list, description="Tags")
+            metadata: dict[str, Any] = Field(default_factory=dict, description="Metadata")
+            nested_list: list[list[int]] = Field(default_factory=list, description="Nested list")
+            nested_dict: dict[str, dict[str, str]] = Field(default_factory=dict, description="Nested dict")
 
         # Create a schema generator
-        generator = OpenAPISchemaGenerator(
-            title="Test API", version="1.0.0", description="Test API Description"
-        )
+        generator = OpenAPISchemaGenerator(title="Test API", version="1.0.0", description="Test API Description")
 
         # Register the model
         generator._register_model(ComplexModel)
@@ -171,7 +157,4 @@ class TestSchemaGeneratorCoverage:
         assert "additionalProperties" in nested_dict_schema
         assert nested_dict_schema["additionalProperties"]["type"] == "object"
         assert "additionalProperties" in nested_dict_schema["additionalProperties"]
-        assert (
-            nested_dict_schema["additionalProperties"]["additionalProperties"]["type"]
-            == "string"
-        )
+        assert nested_dict_schema["additionalProperties"]["additionalProperties"]["type"] == "string"

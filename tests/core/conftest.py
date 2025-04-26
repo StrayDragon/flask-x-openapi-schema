@@ -1,8 +1,7 @@
-"""
-Shared fixtures for core functionality tests.
-"""
+"""Shared fixtures for core functionality tests."""
 
 import io
+
 import pytest
 from werkzeug.datastructures import FileStorage
 

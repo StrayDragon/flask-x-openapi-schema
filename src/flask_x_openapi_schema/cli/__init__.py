@@ -1,10 +1,8 @@
-"""
-Command-line interface for OpenAPI schema generation.
-"""
+"""Command-line interface for OpenAPI schema generation."""
 
-from .commands import register_commands, generate_openapi_command
+from .commands import generate_openapi_command, register_commands
 
 __all__ = [
-    "register_commands",
     "generate_openapi_command",
+    "register_commands",
 ]

@@ -5,8 +5,13 @@ format-and-lintfix:
 sync-all-deps:
 	uv sync --all-extras --dev
 
-test:
-	uv run pytest
+test *pattern='':
+    #!/usr/bin/env bash
+    if [ -z "{{pattern}}" ]; then
+        uv run pytest
+    else
+        uv run pytest {{pattern}}
+    fi
 
 benchmark-report:
 	uv run python benchmarks/generate_report.py
@@ -51,7 +56,7 @@ docs:
 		--footer-text "flask-x-openapi-schema - 自动生成OpenAPI文档的Flask工具"
 	echo "API文档已生成在 docs/api 目录中"
 	# 尝试打开文档（如果支持）
-	xdg-open docs/api/flask_x_openapi_schema.html &> /dev/null || open docs/api/flask_x_openapi_schema.html &> /dev/null || echo "无法自动打开文档，请手动打开 docs/api/flask_x_openapi_schema.html"
+	xdg-open docs/api/flask_x_openapi_schema.html &> /dev/null || open docs/api/flask_x_openapi_schema.html &> /dev/null || echo "无法自动打开文档,请手动打开 docs/api/flask_x_openapi_schema.html"
 
 docs-markdown:
 	mkdir -p docs/markdown

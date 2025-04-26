@@ -1,12 +1,11 @@
-"""
-Pydantic models for file uploads in OpenAPI.
+"""Pydantic models for file uploads in OpenAPI.
 
 These models provide a structured way to handle file uploads with validation and type hints.
 The models are designed to work with OpenAPI 3.0.x specification.
 """
 
 from enum import Enum
-from typing import Any, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_core import core_schema
@@ -24,7 +23,7 @@ class FileType(str, Enum):
     TEXT = "text"  # For text files
 
 
-class FileField(str):
+class FileField(str):  # noqa: SLOT000
     """Field for file uploads in OpenAPI schema.
 
     This class is used as a type annotation for file upload fields in Pydantic models.
@@ -32,7 +31,7 @@ class FileField(str):
     """
 
     @classmethod
-    def __get_pydantic_core_schema__(cls, _source_type, _handler):
+    def __get_pydantic_core_schema__(cls, _source_type, _handler):  # noqa: ANN001, ANN206
         """Define the Pydantic core schema for this type.
 
         This is the recommended way to define custom types in Pydantic v2.
@@ -43,18 +42,19 @@ class FileField(str):
         )
 
     @classmethod
-    def _validate(cls, v, info):
+    def _validate(cls, v, info):  # noqa: ANN001, ANN206, ARG003
         """Validate the value according to Pydantic v2 requirements."""
         if v is None:
-            raise ValueError("File is required")
+            msg = "File is required"
+            raise ValueError(msg)
         return v
 
     @classmethod
-    def __get_pydantic_json_schema__(cls, _schema_generator, _field_schema):
+    def __get_pydantic_json_schema__(cls, _schema_generator, _field_schema):  # noqa: ANN001, ANN206
         """Define the JSON schema for OpenAPI."""
         return {"type": "string", "format": "binary"}
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args, **kwargs):  # noqa: ANN204, ARG004
         """Create a new instance of the class.
 
         If a file object is provided, return it directly.
@@ -68,31 +68,21 @@ class FileField(str):
 class ImageField(FileField):
     """Field for image file uploads in OpenAPI schema."""
 
-    pass
-
 
 class AudioField(FileField):
     """Field for audio file uploads in OpenAPI schema."""
-
-    pass
 
 
 class VideoField(FileField):
     """Field for video file uploads in OpenAPI schema."""
 
-    pass
-
 
 class PDFField(FileField):
     """Field for PDF file uploads in OpenAPI schema."""
 
-    pass
-
 
 class TextField(FileField):
     """Field for text file uploads in OpenAPI schema."""
-
-    pass
 
 
 class FileUploadModel(BaseModel):
@@ -111,16 +101,16 @@ class FileUploadModel(BaseModel):
         >>> def post(self, _x_file: FileUploadModel):
         ...     # File is automatically injected and validated
         ...     return {"filename": _x_file.file.filename}
+
     """
 
     file: FileStorage = Field(..., description="The uploaded file")
 
     # Allow arbitrary types for FileStorage
-    model_config = ConfigDict(
-        arbitrary_types_allowed=True, json_schema_extra={"multipart/form-data": True}
-    )
+    model_config = ConfigDict(arbitrary_types_allowed=True, json_schema_extra={"multipart/form-data": True})
 
     @field_validator("file")
+    @classmethod
     def validate_file(cls, v: Any) -> FileStorage:
         """Validate that the file is a FileStorage instance.
 
@@ -131,7 +121,8 @@ class FileUploadModel(BaseModel):
         :raises ValueError: If the value is not a FileStorage instance
         """
         if not isinstance(v, FileStorage):
-            raise ValueError("Not a valid file upload")
+            msg = "Not a valid file upload"
+            raise ValueError(msg)  # noqa: TRY004
         return v
 
 
@@ -155,35 +146,35 @@ class ImageUploadModel(FileUploadModel):
         >>> def post(self, _x_file: ImageUploadModel):
         ...     # Image file is automatically injected and validated
         ...     return {"filename": _x_file.file.filename}
+
     """
 
     file: FileStorage = Field(..., description="The uploaded image file")
-    allowed_extensions: List[str] = Field(
+    allowed_extensions: list[str] = Field(
         default=["jpg", "jpeg", "png", "gif", "webp", "svg"],
         description="Allowed file extensions",
     )
-    max_size: Optional[int] = Field(
-        default=None, description="Maximum file size in bytes"
-    )
+    max_size: int | None = Field(default=None, description="Maximum file size in bytes")
 
     @field_validator("file")
-    def validate_image_file(cls, v: FileStorage, info) -> FileStorage:
+    @classmethod
+    def validate_image_file(cls, v: FileStorage, info) -> FileStorage:  # noqa: ANN001
         """Validate that the file is an image with allowed extension and size."""
         # Get values from info.data
         values = info.data
         # Check if it's a valid file
         if not v or not v.filename:
-            raise ValueError("No file provided")
+            msg = "No file provided"
+            raise ValueError(msg)
 
         # Check file extension
-        allowed_extensions = values.get(
-            "allowed_extensions", ["jpg", "jpeg", "png", "gif", "webp", "svg"]
-        )
+        allowed_extensions = values.get("allowed_extensions", ["jpg", "jpeg", "png", "gif", "webp", "svg"])
         if "." in v.filename:
             ext = v.filename.rsplit(".", 1)[1].lower()
             if ext not in allowed_extensions:
+                msg = f"File extension '{ext}' not allowed. Allowed extensions: {', '.join(allowed_extensions)}"
                 raise ValueError(
-                    f"File extension '{ext}' not allowed. Allowed extensions: {', '.join(allowed_extensions)}"
+                    msg,
                 )
 
         # Check file size if max_size is specified
@@ -194,9 +185,8 @@ class ImageUploadModel(FileUploadModel):
             v.seek(0)  # Rewind to the beginning
 
             if size > max_size:
-                raise ValueError(
-                    f"File size ({size} bytes) exceeds maximum allowed size ({max_size} bytes)"
-                )
+                msg = f"File size ({size} bytes) exceeds maximum allowed size ({max_size} bytes)"
+                raise ValueError(msg)
 
         return v
 
@@ -205,32 +195,31 @@ class DocumentUploadModel(FileUploadModel):
     """Model for document file uploads with validation."""
 
     file: FileStorage = Field(..., description="The uploaded document file")
-    allowed_extensions: List[str] = Field(
+    allowed_extensions: list[str] = Field(
         default=["pdf", "doc", "docx", "txt", "rtf", "md"],
         description="Allowed file extensions",
     )
-    max_size: Optional[int] = Field(
-        default=None, description="Maximum file size in bytes"
-    )
+    max_size: int | None = Field(default=None, description="Maximum file size in bytes")
 
     @field_validator("file")
-    def validate_document_file(cls, v: FileStorage, info) -> FileStorage:
+    @classmethod
+    def validate_document_file(cls, v: FileStorage, info) -> FileStorage:  # noqa: ANN001
         """Validate that the file is a document with allowed extension and size."""
         # Get values from info.data
         values = info.data
         # Check if it's a valid file
         if not v or not v.filename:
-            raise ValueError("No file provided")
+            msg = "No file provided"
+            raise ValueError(msg)
 
         # Check file extension
-        allowed_extensions = values.get(
-            "allowed_extensions", ["pdf", "doc", "docx", "txt", "rtf", "md"]
-        )
+        allowed_extensions = values.get("allowed_extensions", ["pdf", "doc", "docx", "txt", "rtf", "md"])
         if "." in v.filename:
             ext = v.filename.rsplit(".", 1)[1].lower()
             if ext not in allowed_extensions:
+                msg = f"File extension '{ext}' not allowed. Allowed extensions: {', '.join(allowed_extensions)}"
                 raise ValueError(
-                    f"File extension '{ext}' not allowed. Allowed extensions: {', '.join(allowed_extensions)}"
+                    msg,
                 )
 
         # Check file size if max_size is specified
@@ -241,9 +230,8 @@ class DocumentUploadModel(FileUploadModel):
             v.seek(0)  # Rewind to the beginning
 
             if size > max_size:
-                raise ValueError(
-                    f"File size ({size} bytes) exceeds maximum allowed size ({max_size} bytes)"
-                )
+                msg = f"File size ({size} bytes) exceeds maximum allowed size ({max_size} bytes)"
+                raise ValueError(msg)
 
         return v
 
@@ -264,15 +252,17 @@ class MultipleFileUploadModel(BaseModel):
         >>> def post(self, _x_file: MultipleFileUploadModel):
         ...     # Files are automatically injected and validated
         ...     return {"filenames": [f.filename for f in _x_file.files]}
+
     """
 
-    files: List[FileStorage] = Field(..., description="The uploaded files")
+    files: list[FileStorage] = Field(..., description="The uploaded files")
 
     # Allow arbitrary types for FileStorage
     model_config = {"arbitrary_types_allowed": True}
 
     @field_validator("files")
-    def validate_files(cls, v: List[Any]) -> List[FileStorage]:
+    @classmethod
+    def validate_files(cls, v: list[Any]) -> list[FileStorage]:
         """Validate that all files are FileStorage instances.
 
         :param v: List of values to validate
@@ -282,10 +272,12 @@ class MultipleFileUploadModel(BaseModel):
         :raises ValueError: If the list is empty or contains non-FileStorage objects
         """
         if not v:
-            raise ValueError("No files provided")
+            msg = "No files provided"
+            raise ValueError(msg)
 
         for file in v:
             if not isinstance(file, FileStorage):
-                raise ValueError("Not a valid file upload")
+                msg = "Not a valid file upload"
+                raise ValueError(msg)  # noqa: TRY004
 
         return v

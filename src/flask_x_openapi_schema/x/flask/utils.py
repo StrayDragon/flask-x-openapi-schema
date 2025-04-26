@@ -1,27 +1,25 @@
-"""
-Utility functions for Flask integration.
-"""
+"""Utility functions for Flask integration."""
 
-from typing import Any, Dict, Optional, Type, Union
+from typing import Any
 
 from flask import Blueprint
 from pydantic import BaseModel
 
-from ...core.schema_generator import OpenAPISchemaGenerator
-from ...i18n.i18n_string import I18nStr, get_current_language
+from flask_x_openapi_schema.core.schema_generator import OpenAPISchemaGenerator
+from flask_x_openapi_schema.i18n.i18n_string import I18nStr, get_current_language
+
 from .views import MethodViewOpenAPISchemaGenerator
 
 
 def generate_openapi_schema(
     blueprint: Blueprint,
-    title: Union[str, I18nStr],
+    title: str | I18nStr,
     version: str,
-    description: Union[str, I18nStr] = "",
+    description: str | I18nStr = "",
     output_format: str = "yaml",
-    language: Optional[str] = None,
-) -> Union[Dict[str, Any], str]:
-    """
-    Generate an OpenAPI schema from a Flask blueprint with MethodView classes.
+    language: str | None = None,
+) -> dict[str, Any] | str:
+    """Generate an OpenAPI schema from a Flask blueprint with MethodView classes.
 
     Args:
         blueprint: The Flask blueprint with registered MethodView classes
@@ -33,17 +31,21 @@ def generate_openapi_schema(
 
     Returns:
         The OpenAPI schema as a dictionary (if json) or string (if yaml)
+
     """
     # Use the specified language or get the current language
     current_lang = language or get_current_language()
 
     # Create a schema generator for MethodView classes
     generator = MethodViewOpenAPISchemaGenerator(
-        title=title, version=version, description=description, language=current_lang
+        title=title,
+        version=version,
+        description=description,
+        language=current_lang,
     )
 
     # Process MethodView resources
-    generator.process_methodview_resources(blueprint)
+    generator.process_methodview_resources(blueprint=blueprint)
 
     # Generate the schema
     schema = generator.generate_schema()
@@ -52,21 +54,16 @@ def generate_openapi_schema(
     if output_format == "yaml":
         import yaml
 
-        return yaml.dump(
-            schema, sort_keys=False, default_flow_style=False, allow_unicode=True
-        )
-    else:
-        return schema
+        return yaml.dump(schema, sort_keys=False, default_flow_style=False, allow_unicode=True)
+    return schema
 
 
-def register_model_schema(
-    generator: OpenAPISchemaGenerator, model: Type[BaseModel]
-) -> None:
-    """
-    Register a Pydantic model schema with an OpenAPI schema generator.
+def register_model_schema(generator: OpenAPISchemaGenerator, model: type[BaseModel]) -> None:
+    """Register a Pydantic model schema with an OpenAPI schema generator.
 
     Args:
         generator: The OpenAPI schema generator
         model: The Pydantic model to register
+
     """
-    generator._register_model(model)
+    generator._register_model(model)  # noqa: SLF001

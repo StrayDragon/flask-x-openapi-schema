@@ -1,12 +1,10 @@
-"""
-Flask-RESTful specific implementations for OpenAPI schema generation.
-"""
+"""Flask-RESTful specific implementations for OpenAPI schema generation."""
 
 from .decorators import openapi_metadata
-from .resources import OpenAPIIntegrationMixin, OpenAPIBlueprintMixin
+from .resources import OpenAPIBlueprintMixin, OpenAPIIntegrationMixin
 
 __all__ = [
-    "openapi_metadata",
-    "OpenAPIIntegrationMixin",
     "OpenAPIBlueprintMixin",
+    "OpenAPIIntegrationMixin",
+    "openapi_metadata",
 ]

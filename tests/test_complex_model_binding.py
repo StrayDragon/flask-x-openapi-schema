@@ -1,16 +1,18 @@
-"""
-Test complex model binding with nested structures.
+"""Test complex model binding with nested structures.
 
 This module tests the binding of complex Pydantic models with nested structures,
 including lists, dictionaries, and nested models.
 """
 
+from __future__ import annotations
+
 import json
+from typing import Any
+
 import pytest
-from typing import List, Dict, Any, Optional
+from flask import Flask
 from pydantic import BaseModel, Field
 
-from flask import Flask
 from flask_x_openapi_schema.x.flask import openapi_metadata
 
 
@@ -28,9 +30,9 @@ class Address(BaseModel):
 class ContactInfo(BaseModel):
     """Contact information model for testing."""
 
-    phone: Optional[str] = Field(None, description="Phone number")
-    alternative_email: Optional[str] = Field(None, description="Alternative email")
-    emergency_contact: Optional[str] = Field(None, description="Emergency contact")
+    phone: str | None = Field(None, description="Phone number")
+    alternative_email: str | None = Field(None, description="Alternative email")
+    emergency_contact: str | None = Field(None, description="Emergency contact")
 
 
 class ComplexUserRequest(BaseModel):
@@ -38,14 +40,10 @@ class ComplexUserRequest(BaseModel):
 
     username: str = Field(..., description="The username")
     email: str = Field(..., description="The email address")
-    tags: List[str] = Field(default_factory=list, description="Tags for the user")
-    addresses: List[Address] = Field(default_factory=list, description="User addresses")
-    contact_info: Optional[ContactInfo] = Field(
-        None, description="Additional contact information"
-    )
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata"
-    )
+    tags: list[str] = Field(default_factory=list, description="Tags for the user")
+    addresses: list[Address] = Field(default_factory=list, description="User addresses")
+    contact_info: ContactInfo | None = Field(None, description="Additional contact information")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
 @pytest.fixture
@@ -58,10 +56,10 @@ def app():
         summary="Test complex binding",
         description="Test binding of complex nested models",
     )
-    def test_complex_binding(_x_body: ComplexUserRequest = None):
+    def example_complex_binding(_x_body: ComplexUserRequest = None):
         """Test complex model binding."""
-        import logging
         import json
+        import logging
 
         logger = logging.getLogger(__name__)
 
@@ -71,8 +69,9 @@ def app():
         if _x_body is None:
             logger.warning("_x_body is None, trying to parse request data manually")
             try:
-                from flask import request
                 import json
+
+                from flask import request
 
                 if request.is_json:
                     data = request.get_json()
@@ -94,16 +93,11 @@ def app():
                             "metadata",
                         ] and isinstance(value, str):
                             try:
-                                if (
-                                    value.startswith("[")
-                                    and value.endswith("]")
-                                    or value.startswith("{")
-                                    and value.endswith("}")
+                                if (value.startswith("[") and value.endswith("]")) or (
+                                    value.startswith("{") and value.endswith("}")
                                 ):
                                     processed_data[key] = json.loads(value)
-                                    logger.warning(
-                                        f"Parsed {key} as JSON: {processed_data[key]}"
-                                    )
+                                    logger.warning(f"Parsed {key} as JSON: {processed_data[key]}")
                                 else:
                                     processed_data[key] = value
                             except json.JSONDecodeError:
@@ -117,9 +111,7 @@ def app():
                     logger.warning(f"Created model from form data: {_x_body}")
                 else:
                     logger.warning(f"Unknown content type: {request.content_type}")
-                    return {
-                        "error": f"Unsupported content type: {request.content_type}"
-                    }, 400
+                    return {"error": f"Unsupported content type: {request.content_type}"}, 400
             except Exception as e:
                 logger.warning(f"Failed to parse request data: {e}")
                 return {"error": f"Failed to parse request data: {e}"}, 400
@@ -179,9 +171,7 @@ def test_complex_model_binding_with_json(app, client):
 
     # Force the content type to be application/json
     headers = {"Content-Type": "application/json"}
-    response = client.post(
-        "/test_complex_binding", data=json.dumps(test_data), headers=headers
-    )
+    response = client.post("/test_complex_binding", data=json.dumps(test_data), headers=headers)
 
     # Check response
     assert response.status_code == 200

@@ -1,21 +1,21 @@
-"""
-Tests for the Flask-RESTful specific openapi_metadata decorator.
+"""Tests for the Flask-RESTful specific openapi_metadata decorator.
 
 This module tests the openapi_metadata decorator for Flask-RESTful and its functionality.
 """
 
+from __future__ import annotations
+
 import pytest
 from flask import Flask
-from flask_x_openapi_schema._opt_deps._flask_restful import Api, Resource
 from pydantic import BaseModel, Field
-from typing import Optional
 
-from flask_x_openapi_schema.x.flask_restful import openapi_metadata
+from flask_x_openapi_schema._opt_deps._flask_restful import Api, Resource
 from flask_x_openapi_schema.models.base import BaseRespModel
 from flask_x_openapi_schema.models.responses import (
     OpenAPIMetaResponse,
     OpenAPIMetaResponseItem,
 )
+from flask_x_openapi_schema.x.flask_restful import openapi_metadata
 
 
 # Define test models
@@ -24,7 +24,7 @@ class SampleRequestModel(BaseModel):
 
     name: str = Field(..., description="The name")
     age: int = Field(..., description="The age")
-    email: Optional[str] = Field(None, description="The email")
+    email: str | None = Field(None, description="The email")
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -35,9 +35,7 @@ class SampleResponseModel(BaseRespModel):
     id: str = Field(..., description="The ID")
     name: str = Field(..., description="The name")
     age: int = Field(..., description="The age")
-    email: Optional[str] = Field(None, description="The email")
-
-    model_config = {"arbitrary_types_allowed": True}
+    email: str | None = Field(None, description="The email")
 
 
 class SampleResource(Resource):
@@ -51,8 +49,8 @@ class SampleResource(Resource):
                 "200": OpenAPIMetaResponseItem(
                     model=SampleResponseModel,
                     description="Successful response",
-                )
-            }
+                ),
+            },
         ),
     )
     def get(self, test_id):
@@ -67,8 +65,8 @@ class SampleResource(Resource):
                 "201": OpenAPIMetaResponseItem(
                     model=SampleResponseModel,
                     description="Created successfully",
-                )
-            }
+                ),
+            },
         ),
     )
     def post(self, _x_body: SampleRequestModel):
@@ -79,8 +77,7 @@ class SampleResource(Resource):
 @pytest.fixture
 def app():
     """Create a Flask app for testing."""
-    app = Flask(__name__)
-    return app
+    return Flask(__name__)
 
 
 @pytest.fixture

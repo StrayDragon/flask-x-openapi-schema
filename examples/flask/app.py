@@ -1,5 +1,4 @@
-"""
-Flask MethodView example for Flask-X-OpenAPI-Schema.
+"""Flask MethodView example for Flask-X-OpenAPI-Schema.
 
 This example demonstrates how to use Flask-X-OpenAPI-Schema with Flask MethodView.
 """
@@ -9,36 +8,34 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from flask import Flask, Blueprint, jsonify, send_file, url_for
-from flask.views import MethodView
 import yaml
-
-from flask_x_openapi_schema.x.flask import openapi_metadata, OpenAPIMethodViewMixin
-from flask_x_openapi_schema import (
-    set_current_language,
-    OpenAPIMetaResponse,
-    OpenAPIMetaResponseItem,
-)
+from flask import Blueprint, Flask, jsonify, send_file, url_for
+from flask.views import MethodView
 
 from examples.common.models import (
+    ErrorResponse,
+    FileResponse,
+    ProductAudioUpload,
+    ProductCategory,
+    ProductDocumentUpload,
+    ProductImageUpload,
+    ProductQueryParams,
     ProductRequest,
     ProductResponse,
-    ProductQueryParams,
-    ProductCategory,
     ProductStatus,
-    ErrorResponse,
-    ProductImageUpload,
-    ProductDocumentUpload,
-    ProductAudioUpload,
     ProductVideoUpload,
-    FileResponse,
 )
 from examples.common.utils import (
     print_request_info,
     print_response_info,
     print_section_header,
 )
-
+from flask_x_openapi_schema import (
+    OpenAPIMetaResponse,
+    OpenAPIMetaResponseItem,
+    set_current_language,
+)
+from flask_x_openapi_schema.x.flask import OpenAPIMethodViewMixin, openapi_metadata
 
 # Create a Flask app
 app = Flask(__name__)
@@ -73,7 +70,7 @@ class ProductView(OpenAPIMethodViewMixin, MethodView):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def get(self, _x_query: ProductQueryParams = None):
@@ -90,35 +87,21 @@ class ProductView(OpenAPIMethodViewMixin, MethodView):
 
         if _x_query:
             if _x_query.category:
-                filtered_products = [
-                    p for p in filtered_products if p["category"] == _x_query.category
-                ]
+                filtered_products = [p for p in filtered_products if p["category"] == _x_query.category]
 
             if _x_query.min_price is not None:
-                filtered_products = [
-                    p for p in filtered_products if p["price"] >= _x_query.min_price
-                ]
+                filtered_products = [p for p in filtered_products if p["price"] >= _x_query.min_price]
 
             if _x_query.max_price is not None:
-                filtered_products = [
-                    p for p in filtered_products if p["price"] <= _x_query.max_price
-                ]
+                filtered_products = [p for p in filtered_products if p["price"] <= _x_query.max_price]
 
             if _x_query.in_stock is not None:
-                filtered_products = [
-                    p for p in filtered_products if p["in_stock"] == _x_query.in_stock
-                ]
+                filtered_products = [p for p in filtered_products if p["in_stock"] == _x_query.in_stock]
 
             # Apply sorting
-            if (
-                _x_query.sort_by and _x_query.sort_by in filtered_products[0]
-                if filtered_products
-                else False
-            ):
+            if _x_query.sort_by and _x_query.sort_by in filtered_products[0] if filtered_products else False:
                 reverse = _x_query.sort_order.lower() == "desc"
-                filtered_products.sort(
-                    key=lambda x: x[_x_query.sort_by], reverse=reverse
-                )
+                filtered_products.sort(key=lambda x: x[_x_query.sort_by], reverse=reverse)
 
             # Apply pagination
             start = _x_query.offset
@@ -159,7 +142,7 @@ class ProductView(OpenAPIMethodViewMixin, MethodView):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def post(self, _x_body: ProductRequest):
@@ -234,7 +217,7 @@ class ProductDetailView(OpenAPIMethodViewMixin, MethodView):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def get(self, product_id: str):
@@ -296,7 +279,7 @@ class ProductDetailView(OpenAPIMethodViewMixin, MethodView):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def put(self, product_id: str, _x_body: ProductRequest):
@@ -346,7 +329,7 @@ class ProductDetailView(OpenAPIMethodViewMixin, MethodView):
                 "quantity": _x_body.quantity,
                 "attributes": _x_body.attributes,
                 "updated_at": datetime.now(),
-            }
+            },
         )
 
         # Save to in-memory database
@@ -382,7 +365,7 @@ class ProductDetailView(OpenAPIMethodViewMixin, MethodView):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def delete(self, product_id: str):
@@ -447,7 +430,7 @@ class ProductImageView(OpenAPIMethodViewMixin, MethodView):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def post(self, product_id: str, _x_file_image: ProductImageUpload):
@@ -461,9 +444,7 @@ class ProductImageView(OpenAPIMethodViewMixin, MethodView):
             path=f"/api/products/{product_id}/images",
             path_params={"product_id": product_id},
             file={
-                "filename": file.filename
-                if file and hasattr(file, "filename")
-                else None,
+                "filename": file.filename if file and hasattr(file, "filename") else None,
                 "description": _x_file_image.description,
                 "is_primary": _x_file_image.is_primary,
             },
@@ -563,7 +544,7 @@ class ProductDocumentView(OpenAPIMethodViewMixin, MethodView):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def post(self, product_id: str, _x_file_document: ProductDocumentUpload):
@@ -577,9 +558,7 @@ class ProductDocumentView(OpenAPIMethodViewMixin, MethodView):
             path=f"/api/products/{product_id}/documents",
             path_params={"product_id": product_id},
             file={
-                "filename": file.filename
-                if file and hasattr(file, "filename")
-                else None,
+                "filename": file.filename if file and hasattr(file, "filename") else None,
                 "title": _x_file_document.title,
                 "document_type": _x_file_document.document_type,
             },
@@ -726,7 +705,7 @@ class ProductAudioView(OpenAPIMethodViewMixin, MethodView):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def post(self, product_id: str, _x_file_audio: ProductAudioUpload):
@@ -740,9 +719,7 @@ class ProductAudioView(OpenAPIMethodViewMixin, MethodView):
             path=f"/api/products/{product_id}/audio",
             path_params={"product_id": product_id},
             file={
-                "filename": file.filename
-                if file and hasattr(file, "filename")
-                else None,
+                "filename": file.filename if file and hasattr(file, "filename") else None,
                 "title": _x_file_audio.title,
                 "duration_seconds": _x_file_audio.duration_seconds,
             },
@@ -842,7 +819,7 @@ class ProductVideoView(OpenAPIMethodViewMixin, MethodView):
                     model=ErrorResponse,
                     description="Internal server error",
                 ),
-            }
+            },
         ),
     )
     def post(self, product_id: str, _x_file_video: ProductVideoUpload):
@@ -856,9 +833,7 @@ class ProductVideoView(OpenAPIMethodViewMixin, MethodView):
             path=f"/api/products/{product_id}/video",
             path_params={"product_id": product_id},
             file={
-                "filename": file.filename
-                if file and hasattr(file, "filename")
-                else None,
+                "filename": file.filename if file and hasattr(file, "filename") else None,
                 "title": _x_file_video.title,
                 "duration_seconds": _x_file_video.duration_seconds,
                 "resolution": _x_file_video.resolution,
@@ -936,21 +911,11 @@ class ProductVideoView(OpenAPIMethodViewMixin, MethodView):
 
 # Register the views using OpenAPIMethodViewMixin's register_to_blueprint method
 ProductView.register_to_blueprint(blueprint, "/products", "products")
-ProductDetailView.register_to_blueprint(
-    blueprint, "/products/<product_id>", "product_detail"
-)
-ProductImageView.register_to_blueprint(
-    blueprint, "/products/<product_id>/images", "product_images"
-)
-ProductDocumentView.register_to_blueprint(
-    blueprint, "/products/<product_id>/documents", "product_documents"
-)
-ProductAudioView.register_to_blueprint(
-    blueprint, "/products/<product_id>/audio", "product_audio"
-)
-ProductVideoView.register_to_blueprint(
-    blueprint, "/products/<product_id>/video", "product_video"
-)
+ProductDetailView.register_to_blueprint(blueprint, "/products/<product_id>", "product_detail")
+ProductImageView.register_to_blueprint(blueprint, "/products/<product_id>/images", "product_images")
+ProductDocumentView.register_to_blueprint(blueprint, "/products/<product_id>/documents", "product_documents")
+ProductAudioView.register_to_blueprint(blueprint, "/products/<product_id>/audio", "product_audio")
+ProductVideoView.register_to_blueprint(blueprint, "/products/<product_id>/video", "product_video")
 
 # Register the blueprint
 app.register_blueprint(blueprint)
@@ -997,9 +962,7 @@ def get_openapi_spec():
         print(f"  - {schema_name}")
 
     # Convert to YAML with proper settings
-    yaml_content = yaml.dump(
-        schema, sort_keys=False, default_flow_style=False, allow_unicode=True
-    )
+    yaml_content = yaml.dump(schema, sort_keys=False, default_flow_style=False, allow_unicode=True)
 
     return yaml_content, 200, {"Content-Type": "text/yaml"}
 
@@ -1123,9 +1086,7 @@ if __name__ == "__main__":
 
     # Print information about the example
     print_section_header("Flask MethodView Example")
-    print(
-        "This example demonstrates how to use Flask-X-OpenAPI-Schema with Flask MethodView."
-    )
+    print("This example demonstrates how to use Flask-X-OpenAPI-Schema with Flask MethodView.")
     print("The API provides endpoints for managing products.")
     print()
     print("Available endpoints:")
@@ -1142,4 +1103,4 @@ if __name__ == "__main__":
     print("Starting server on http://localhost:5002")
 
     # Run the app on a different port
-    app.run(debug=True, port=5002)
+    app.run(debug=True, port=5002)  # noqa: S201

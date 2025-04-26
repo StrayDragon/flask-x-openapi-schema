@@ -1,3 +1,1 @@
-"""
-Common utilities and models for benchmarks.
-"""
+"""Common utilities and models for benchmarks."""

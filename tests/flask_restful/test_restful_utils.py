@@ -1,13 +1,15 @@
-"""
-Tests for the restful_utils module.
+"""Tests for the restful_utils module.
 
 This module tests the utilities for integrating Pydantic models with Flask-RESTful.
 """
 
+from __future__ import annotations
+
 from enum import Enum
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from typing import Any
+
 import pytest
+from pydantic import BaseModel, Field
 
 from flask_x_openapi_schema.x.flask_restful.utils import (
     _get_field_type,
@@ -30,9 +32,9 @@ class SampleModel(BaseModel):
     int_field: int = Field(..., description="An integer field")
     float_field: float = Field(..., description="A float field")
     bool_field: bool = Field(..., description="A boolean field")
-    optional_field: Optional[str] = Field(None, description="An optional field")
-    list_field: List[str] = Field(default_factory=list, description="A list field")
-    dict_field: Dict[str, Any] = Field(default_factory=dict, description="A dict field")
+    optional_field: str | None = Field(None, description="An optional field")
+    list_field: list[str] = Field(default_factory=list, description="A list field")
+    dict_field: dict[str, Any] = Field(default_factory=dict, description="A dict field")
     enum_field: SampleEnum = Field(SampleEnum.VALUE1, description="An enum field")
 
     model_config = {"arbitrary_types_allowed": True}
@@ -41,9 +43,9 @@ class SampleModel(BaseModel):
 class SampleQueryModel(BaseModel):
     """Test model for query parameters."""
 
-    sort: Optional[str] = Field(None, description="Sort order")
-    limit: Optional[int] = Field(None, description="Limit results")
-    page: Optional[int] = Field(None, description="Page number")
+    sort: str | None = Field(None, description="Sort order")
+    limit: int | None = Field(None, description="Limit results")
+    page: int | None = Field(None, description="Page number")
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -53,7 +55,7 @@ class SampleBodyModel(BaseModel):
 
     name: str = Field(..., description="The name")
     age: int = Field(..., description="The age")
-    email: Optional[str] = Field(None, description="The email")
+    email: str | None = Field(None, description="The email")
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -102,7 +104,7 @@ def test_get_field_type():
     assert _get_field_type(dict) is dict
 
     # Test Optional types
-    assert _get_field_type(Optional[str]) is str
+    assert _get_field_type(str | None) is str
 
     # Test Enum types
     enum_converter = _get_field_type(SampleEnum)

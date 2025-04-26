@@ -1,11 +1,12 @@
-"""
-Tests for the utils module.
+"""Tests for the utils module.
 
 This module tests the utility functions for converting Pydantic models to OpenAPI schemas.
 """
 
-from typing import List, Optional, Dict, Any
+from __future__ import annotations
+
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -18,7 +19,7 @@ class SimpleModel(BaseModel):
 
     name: str = Field(..., description="The name")
     age: int = Field(..., description="The age")
-    email: Optional[str] = Field(None, description="The email")
+    email: str | None = Field(None, description="The email")
 
 
 class Color(str, Enum):
@@ -34,10 +35,10 @@ class ComplexModel(BaseModel):
 
     id: str = Field(..., description="The ID")
     name: str = Field(..., description="The name")
-    description: Optional[str] = Field(None, description="The description")
-    tags: List[str] = Field(default_factory=list, description="Tags")
+    description: str | None = Field(None, description="The description")
+    tags: list[str] = Field(default_factory=list, description="Tags")
     color: Color = Field(Color.RED, description="The color")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Metadata")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Metadata")
 
 
 def test_pydantic_to_openapi_schema_simple():

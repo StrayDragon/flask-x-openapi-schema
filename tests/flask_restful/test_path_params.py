@@ -1,16 +1,14 @@
-"""
-Tests for path parameter handling in Flask-RESTful.
-"""
+"""Tests for path parameter handling in Flask-RESTful."""
 
 import pytest
 from flask import Flask
-from flask_x_openapi_schema._opt_deps._flask_restful import Resource
-
-from flask_x_openapi_schema.x.flask_restful import (
-    openapi_metadata,
-    OpenAPIIntegrationMixin,
-)
 from pydantic import BaseModel, Field
+
+from flask_x_openapi_schema._opt_deps._flask_restful import Resource
+from flask_x_openapi_schema.x.flask_restful import (
+    OpenAPIIntegrationMixin,
+    openapi_metadata,
+)
 
 
 class ItemResponse(BaseModel):
@@ -33,10 +31,7 @@ class ItemResource(Resource):
     )
     def get(self, item_id: str):
         """Get a single item."""
-        response = ItemResponse(
-            id=item_id, name="测试项目", description="这是一个测试项目", price=10.99
-        )
-        return response
+        return ItemResponse(id=item_id, name="测试项目", description="这是一个测试项目", price=10.99)
 
 
 @pytest.fixture
@@ -126,7 +121,7 @@ def test_non_ascii_characters(app_with_api):
 
     # Check that non-ASCII characters are preserved in the operation summary and description
     path_item = schema["paths"][item_path]
-    # 注意：在 Flask-RESTful 中，如果有 docstring，则会使用 docstring 作为 summary
+    # 注意:在 Flask-RESTful 中,如果有 docstring,则会使用 docstring 作为 summary
     assert path_item["get"]["summary"] in ["Get a single item.", "获取单个项目"]
     assert path_item["get"]["description"] in ["", "通过ID获取项目"]
 
@@ -140,6 +135,6 @@ def test_non_ascii_characters(app_with_api):
 
     # Check that the YAML schema contains non-ASCII characters
     assert "测试 API" in yaml_schema
-    # 注意：在 Flask-RESTful 中，如果有 docstring，则会使用 docstring 作为 summary
+    # 注意:在 Flask-RESTful 中,如果有 docstring,则会使用 docstring 作为 summary
     # 所以我们只检查标题和描述中的非 ASCII 字符
     assert "项目" in yaml_schema  # 检查 tags 中的非 ASCII 字符

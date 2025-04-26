@@ -1,5 +1,4 @@
-"""
-Tests for the commands module.
+"""Tests for the commands module.
 
 This module tests the command-line interface for generating OpenAPI documentation.
 """
@@ -12,8 +11,8 @@ import pytest
 import yaml
 from click.testing import CliRunner
 from flask import Blueprint, Flask
-from flask_x_openapi_schema._opt_deps._flask_restful import Api, Resource
 
+from flask_x_openapi_schema._opt_deps._flask_restful import Api, Resource
 from flask_x_openapi_schema.cli.commands import (
     generate_openapi_command,
     register_commands,
@@ -24,14 +23,11 @@ from flask_x_openapi_schema.x.flask_restful.resources import OpenAPIIntegrationM
 class SampleOpenAPIApi(OpenAPIIntegrationMixin, Api):
     """Test API class with OpenAPI integration."""
 
-    pass
-
 
 @pytest.fixture
 def app():
     """Create a Flask app for testing."""
-    app = Flask(__name__)
-    return app
+    return Flask(__name__)
 
 
 @pytest.fixture
@@ -41,9 +37,7 @@ def blueprint():
     api = SampleOpenAPIApi(bp)
 
     # Mock the generate_openapi_schema method
-    def mock_generate_openapi_schema(
-        title, version, description, output_format="yaml", language=None
-    ):
+    def mock_generate_openapi_schema(title, version, description, output_format="yaml", language=None):
         schema = {
             "openapi": "3.0.0",
             "info": {
@@ -126,7 +120,7 @@ def test_generate_openapi_command_with_blueprint(app_with_blueprint, tmp_path):
     assert os.path.exists(output_file)
 
     # Check the content of the generated file
-    with open(output_file, "r") as f:
+    with open(output_file) as f:
         content = f.read()
 
     schema = yaml.safe_load(content)
@@ -162,7 +156,7 @@ def test_generate_openapi_command_json_format(app_with_blueprint, tmp_path):
     assert os.path.exists(output_file)
 
     # Check the content of the generated file
-    with open(output_file, "r") as f:
+    with open(output_file) as f:
         schema = json.load(f)
 
     assert schema["info"]["title"] == "Test API - service_api"
@@ -318,49 +312,46 @@ class TestCommandsCoverage:
         runner = CliRunner()
 
         # Create a temporary directory for output
-        with runner.isolated_filesystem():
+        with runner.isolated_filesystem(), app.app_context():
             # Run the command with multiple languages within the app context
-            with app.app_context():
-                result = runner.invoke(
-                    generate_openapi_command,
-                    [
-                        "--output",
-                        "openapi.yaml",
-                        "--blueprint",
-                        "test_api",
-                        "--title",
-                        "Test API",
-                        "--version",
-                        "1.0.0",
-                        "--description",
-                        "Test API Description",
-                        "--format",
-                        "json",  # Test JSON format
-                        "--language",
-                        "en-US",
-                        "--language",
-                        "zh-Hans",
-                        "--language",
-                        "fr-FR",
-                    ],
-                )
+            result = runner.invoke(
+                generate_openapi_command,
+                [
+                    "--output",
+                    "openapi.yaml",
+                    "--blueprint",
+                    "test_api",
+                    "--title",
+                    "Test API",
+                    "--version",
+                    "1.0.0",
+                    "--description",
+                    "Test API Description",
+                    "--format",
+                    "json",  # Test JSON format
+                    "--language",
+                    "en-US",
+                    "--language",
+                    "zh-Hans",
+                    "--language",
+                    "fr-FR",
+                ],
+            )
 
-                # Check that the command ran successfully
-                assert result.exit_code == 0
+            # Check that the command ran successfully
+            assert result.exit_code == 0
 
-                # Check that the output file was created
-                assert os.path.exists("openapi.yaml")
+            # Check that the output file was created
+            assert os.path.exists("openapi.yaml")
 
-                # Check that generate_openapi_schema was called with the correct parameters
-                api.generate_openapi_schema.assert_any_call(
-                    title=api.generate_openapi_schema.call_args_list[0][1]["title"],
-                    version="1.0.0",
-                    description=api.generate_openapi_schema.call_args_list[0][1][
-                        "description"
-                    ],
-                    output_format="json",
-                    language="en-US",
-                )
+            # Check that generate_openapi_schema was called with the correct parameters
+            api.generate_openapi_schema.assert_any_call(
+                title=api.generate_openapi_schema.call_args_list[0][1]["title"],
+                version="1.0.0",
+                description=api.generate_openapi_schema.call_args_list[0][1]["description"],
+                output_format="json",
+                language="en-US",
+            )
 
     def test_generate_openapi_command_invalid_blueprint(self):
         """Test generate_openapi_command with an invalid blueprint name."""
@@ -451,10 +442,7 @@ class TestCommandsCoverage:
 
             # Check that the command ran successfully but with a message
             assert result.exit_code == 0
-            assert (
-                "Blueprint test_api does not have an OpenAPIExternalApi instance"
-                in result.output
-            )
+            assert "Blueprint test_api does not have an OpenAPIExternalApi instance" in result.output
 
     def test_generate_openapi_command_multiple_blueprints(self):
         """Test generate_openapi_command with multiple blueprints."""
@@ -474,14 +462,13 @@ class TestCommandsCoverage:
         assert "generate-openapi" in app.cli.commands
 
         # Create a temporary directory for output
-        with runner.isolated_filesystem():
+        with runner.isolated_filesystem(), app.app_context():
             # Run the command with the --help flag to test basic functionality
-            with app.app_context():
-                result = runner.invoke(
-                    generate_openapi_command,
-                    ["--help"],
-                )
+            result = runner.invoke(
+                generate_openapi_command,
+                ["--help"],
+            )
 
-                # Check that the command ran successfully
-                assert result.exit_code == 0
-                assert "Generate OpenAPI schema and documentation" in result.output
+            # Check that the command ran successfully
+            assert result.exit_code == 0
+            assert "Generate OpenAPI schema and documentation" in result.output

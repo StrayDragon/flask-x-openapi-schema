@@ -1,26 +1,26 @@
-"""
-Tests for the OpenAPIConfig functionality.
+"""Tests for the OpenAPIConfig functionality.
 
 This module tests the configurable parameter prefixes.
 """
 
+from __future__ import annotations
+
 from pydantic import BaseModel, Field
-from typing import Optional
 
 from flask_x_openapi_schema.core.config import (
-    ConventionalPrefixConfig,
     GLOBAL_CONFIG_HOLDER,
-    configure_prefixes,
-    reset_prefixes,
-    reset_all_config,
+    ConventionalPrefixConfig,
     OpenAPIConfig,
     configure_openapi,
+    configure_prefixes,
     get_openapi_config,
+    reset_all_config,
+    reset_prefixes,
 )
 from flask_x_openapi_schema.x.flask import openapi_metadata
 from flask_x_openapi_schema.x.flask_restful.resources import (
-    OpenAPIIntegrationMixin,
     OpenAPIBlueprintMixin,
+    OpenAPIIntegrationMixin,
 )
 
 
@@ -35,8 +35,8 @@ class ConfigTestRequestModel(BaseModel):
 class ConfigTestQueryModel(BaseModel):
     """Test query model."""
 
-    sort: Optional[str] = Field(None, description="Sort order")
-    limit: Optional[int] = Field(None, description="Limit results")
+    sort: str | None = Field(None, description="Sort order")
+    limit: int | None = Field(None, description="Limit results")
 
 
 def test_openapi_config_defaults():
@@ -89,9 +89,7 @@ def test_openapi_metadata_with_custom_prefixes():
 
         # Apply the decorator with custom config
         @openapi_metadata(summary="Test endpoint", prefix_config=custom_config)
-        def test_function(
-            req_body: ConfigTestRequestModel, req_query: ConfigTestQueryModel
-        ):
+        def test_function(req_body: ConfigTestRequestModel, req_query: ConfigTestQueryModel):
             # Use parameters to avoid linter warnings
             return {"body": str(req_body), "query": str(req_query)}
 
@@ -108,9 +106,7 @@ def test_openapi_metadata_with_custom_prefixes():
         assert "content" in metadata["requestBody"]
         assert "application/json" in metadata["requestBody"]["content"]
         assert "schema" in metadata["requestBody"]["content"]["application/json"]
-        assert (
-            "$ref" in metadata["requestBody"]["content"]["application/json"]["schema"]
-        )
+        assert "$ref" in metadata["requestBody"]["content"]["application/json"]["schema"]
         assert (
             metadata["requestBody"]["content"]["application/json"]["schema"]["$ref"]
             == "#/components/schemas/ConfigTestRequestModel"
@@ -146,9 +142,7 @@ def test_openapi_metadata_with_per_function_config():
         )
 
         @openapi_metadata(summary="Test endpoint", prefix_config=custom_config)
-        def test_function(
-            custom_body: ConfigTestRequestModel, custom_query: ConfigTestQueryModel
-        ):
+        def test_function(custom_body: ConfigTestRequestModel, custom_query: ConfigTestQueryModel):
             # Use parameters to avoid linter warnings
             return {"body": str(custom_body), "query": str(custom_query)}
 
@@ -165,9 +159,7 @@ def test_openapi_metadata_with_per_function_config():
         assert "content" in metadata["requestBody"]
         assert "application/json" in metadata["requestBody"]["content"]
         assert "schema" in metadata["requestBody"]["content"]["application/json"]
-        assert (
-            "$ref" in metadata["requestBody"]["content"]["application/json"]["schema"]
-        )
+        assert "$ref" in metadata["requestBody"]["content"]["application/json"]["schema"]
         assert (
             metadata["requestBody"]["content"]["application/json"]["schema"]["$ref"]
             == "#/components/schemas/ConfigTestRequestModel"
@@ -185,14 +177,12 @@ def test_openapi_metadata_with_per_function_config():
 
         # Define another function with default prefixes
         @openapi_metadata(summary="Default endpoint")
-        def test_function_default(
-            _x_body: ConfigTestRequestModel, _x_query: ConfigTestQueryModel
-        ):
+        def example_function_default(_x_body: ConfigTestRequestModel, _x_query: ConfigTestQueryModel):
             # Use parameters to avoid linter warnings
             return {"body": str(_x_body), "query": str(_x_query)}
 
         # Check metadata
-        metadata = test_function_default._openapi_metadata
+        metadata = example_function_default._openapi_metadata
 
         # Verify metadata exists
         assert metadata is not None
@@ -204,9 +194,7 @@ def test_openapi_metadata_with_per_function_config():
         assert "content" in metadata["requestBody"]
         assert "application/json" in metadata["requestBody"]["content"]
         assert "schema" in metadata["requestBody"]["content"]["application/json"]
-        assert (
-            "$ref" in metadata["requestBody"]["content"]["application/json"]["schema"]
-        )
+        assert "$ref" in metadata["requestBody"]["content"]["application/json"]["schema"]
         assert (
             metadata["requestBody"]["content"]["application/json"]["schema"]["$ref"]
             == "#/components/schemas/ConfigTestRequestModel"
@@ -235,17 +223,13 @@ def test_openapi_integration_mixin_configure():
     api = MockApi()
 
     # Create a custom config
-    custom_config = ConventionalPrefixConfig(
-        request_body_prefix="api_body", request_query_prefix="api_query"
-    )
+    custom_config = ConventionalPrefixConfig(request_body_prefix="api_body", request_query_prefix="api_query")
 
     # Configure through the mixin using the object
     api.configure_openapi(prefix_config=custom_config)
 
     # Test the kwargs approach for backward compatibility
-    api.configure_openapi(
-        request_body_prefix="api_body2", request_query_prefix="api_query2"
-    )
+    api.configure_openapi(request_body_prefix="api_body2", request_query_prefix="api_query2")
 
     # Since we can't easily test the global state in a reliable way,
     # we'll just verify that the method doesn't raise exceptions
@@ -264,17 +248,13 @@ def test_openapi_blueprint_mixin_configure():
     blueprint = MockBlueprint()
 
     # Create a custom config
-    custom_config = ConventionalPrefixConfig(
-        request_body_prefix="bp_body", request_query_prefix="bp_query"
-    )
+    custom_config = ConventionalPrefixConfig(request_body_prefix="bp_body", request_query_prefix="bp_query")
 
     # Configure through the mixin using the object
     blueprint.configure_openapi(prefix_config=custom_config)
 
     # Test the kwargs approach for backward compatibility
-    blueprint.configure_openapi(
-        request_body_prefix="bp_body2", request_query_prefix="bp_query2"
-    )
+    blueprint.configure_openapi(request_body_prefix="bp_body2", request_query_prefix="bp_query2")
 
 
 def test_reset_config_functions():
@@ -332,10 +312,7 @@ def test_reset_config_functions():
         reset_openapi_config = get_openapi_config()
         assert reset_openapi_config.title == "API Documentation"
         assert reset_openapi_config.version == "1.0.0"
-        assert (
-            reset_openapi_config.description
-            == "API Documentation generated by flask-x-openapi-schema"
-        )
+        assert reset_openapi_config.description == "API Documentation generated by flask-x-openapi-schema"
         assert reset_openapi_config.prefix_config.request_body_prefix == "_x_body"
     finally:
         # Restore original global config

@@ -1,16 +1,13 @@
-"""
-Manage optional dependencies imports.
+"""Manage optional dependencies imports.
 
 This module provides a centralized way to handle optional dependencies.
 It allows the library to work even when optional dependencies are not installed.
 """
 
-from .._import_utils import import_optional_dependency
+from flask_x_openapi_schema._opt_deps._import_utils import import_optional_dependency
 
 # 检测 flask_restful 是否已安装
-flask_restful = import_optional_dependency(
-    "flask_restful", "Flask-RESTful integration", raise_error=False
-)
+flask_restful = import_optional_dependency("flask_restful", "Flask-RESTful integration", raise_error=False)
 HAS_FLASK_RESTFUL = flask_restful is not None
 
 # Re-export flask-restful components if available

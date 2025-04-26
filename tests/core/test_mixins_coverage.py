@@ -1,13 +1,12 @@
-"""
-Tests for the mixins module to improve coverage.
-"""
+"""Tests for the mixins module to improve coverage."""
 
 from unittest.mock import MagicMock
+
 import yaml
 
 from flask_x_openapi_schema.x.flask_restful.resources import (
-    OpenAPIIntegrationMixin,
     OpenAPIBlueprintMixin,
+    OpenAPIIntegrationMixin,
 )
 
 
@@ -35,7 +34,9 @@ class TestMixinsCoverage:
 
         # Test generate_openapi_schema with default parameters
         schema_yaml = mixin.generate_openapi_schema(
-            title="Test API", version="1.0.0", description="Test API Description"
+            title="Test API",
+            version="1.0.0",
+            description="Test API Description",
         )
 
         # Check that the result is a string (YAML)
@@ -69,7 +70,9 @@ class TestMixinsCoverage:
 
         # Test generate_openapi_schema with default parameters
         schema_yaml = mixin.generate_openapi_schema(
-            title="Test API", version="1.0.0", description="Test API Description"
+            title="Test API",
+            version="1.0.0",
+            description="Test API Description",
         )
 
         # Check that the result is a string (YAML)

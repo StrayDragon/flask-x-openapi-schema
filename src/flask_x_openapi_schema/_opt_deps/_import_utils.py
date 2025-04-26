@@ -1,18 +1,17 @@
-"""
-Utility functions for managing optional dependencies.
+"""Utility functions for managing optional dependencies.
 
 This module provides utility functions for handling optional dependencies in a consistent way.
 It is inspired by the approach used in popular libraries like Pandas and SQLAlchemy.
 """
 
 import importlib
-from typing import Any, Optional, Type
+from typing import Any
 
 
 class MissingDependencyError(ImportError):
     """Error raised when an optional dependency is used but not installed."""
 
-    def __init__(self, dependency: str, feature: str):
+    def __init__(self, dependency: str, feature: str) -> None:
         self.dependency = dependency
         self.feature = feature
         message = (
@@ -27,9 +26,8 @@ def import_optional_dependency(
     name: str,
     feature: str,
     raise_error: bool = True,
-) -> Optional[Any]:
-    """
-    Import an optional dependency.
+) -> Any | None:
+    """Import an optional dependency.
 
     Parameters
     ----------
@@ -50,18 +48,18 @@ def import_optional_dependency(
     ------
     MissingDependencyError
         If the dependency is not installed and raise_error is True.
+
     """
     try:
         return importlib.import_module(name)
-    except ImportError:
+    except ImportError as e:
         if raise_error:
-            raise MissingDependencyError(name, feature)
+            raise MissingDependencyError(name, feature) from e
         return None
 
 
-def create_placeholder_class(name: str, dependency: str, feature: str) -> Type:
-    """
-    Create a placeholder class for an optional dependency.
+def create_placeholder_class(name: str, dependency: str, feature: str) -> type:
+    """Create a placeholder class for an optional dependency.
 
     Parameters
     ----------
@@ -76,15 +74,16 @@ def create_placeholder_class(name: str, dependency: str, feature: str) -> Type:
     -------
     cls : Type
         A placeholder class that raises MissingDependencyError when instantiated or accessed.
+
     """
 
     class PlaceholderClass:
         """Placeholder for an optional dependency."""
 
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args, **kwargs) -> None:  # noqa: ARG002
             raise MissingDependencyError(dependency, feature)
 
-        def __getattr__(self, attr):
+        def __getattr__(self, attr):  # noqa: ANN001, ANN204
             raise MissingDependencyError(dependency, feature)
 
     PlaceholderClass.__name__ = name

@@ -1,6 +1,4 @@
-"""
-Pydantic models for OpenAPI schema generation.
-"""
+"""Pydantic models for OpenAPI schema generation."""
 
 from .base import BaseRespModel
 from .file_models import (
@@ -12,8 +10,8 @@ from .file_models import (
 
 __all__ = [
     "BaseRespModel",
+    "DocumentUploadModel",
     "FileUploadModel",
     "ImageUploadModel",
-    "DocumentUploadModel",
     "MultipleFileUploadModel",
 ]

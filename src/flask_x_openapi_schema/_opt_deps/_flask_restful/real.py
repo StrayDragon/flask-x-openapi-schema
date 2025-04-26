@@ -1,5 +1,4 @@
-"""
-Re-export flask-restful components.
+"""Re-export flask-restful components.
 
 This module re-exports the flask-restful components that are used by the library.
 It should only be imported when flask-restful is installed.

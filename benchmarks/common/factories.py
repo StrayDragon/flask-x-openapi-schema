@@ -1,17 +1,16 @@
-"""
-Factory classes for generating valid test data.
+"""Factory classes for generating valid test data.
 
 This module contains factory classes for generating valid test data using polyfactory.
 """
 
 from polyfactory.factories.pydantic_factory import ModelFactory
+
 from benchmarks.common.models import (
-    UserRequest,
-    UserQueryParams,
-    UserRole,
     AddressModel,
     ContactInfo,
     Preferences,
+    UserQueryParams,
+    UserRequest,
 )
 
 
@@ -43,8 +42,3 @@ class UserQueryParamsFactory(ModelFactory[UserQueryParams]):
     """Factory for generating valid query parameters."""
 
     __model__ = UserQueryParams
-
-    # 使用自定义提供者来确保生成有效的数据
-    __custom_providers__ = {
-        "filter_role": lambda: UserRole.USER.value,
-    }

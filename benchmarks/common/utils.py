@@ -1,5 +1,4 @@
-"""
-Shared utilities for benchmarking.
+"""Shared utilities for benchmarking.
 
 This module contains utility functions used in benchmarks.
 """
@@ -7,12 +6,12 @@ This module contains utility functions used in benchmarks.
 import random
 import time
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any
 
-from benchmarks.common.factories import UserRequestFactory, UserQueryParamsFactory
+from benchmarks.common.factories import UserQueryParamsFactory, UserRequestFactory
 
 
-def get_random_user_data() -> Dict[str, Any]:
+def get_random_user_data() -> dict[str, Any]:
     """Get a random user data dictionary.
 
     Uses polyfactory to generate valid data that will pass validation.
@@ -43,7 +42,7 @@ def get_query_params() -> dict:
     return query_params.model_dump(mode="json", exclude_none=True)
 
 
-def get_performance_metrics() -> Dict[str, Any]:
+def get_performance_metrics() -> dict[str, Any]:
     """Get performance metrics for the current request."""
     return {
         "timestamp": datetime.now().isoformat(),

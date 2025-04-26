@@ -1,3 +1,1 @@
-"""
-Flask-RESTful specific tests for flask-x-openapi-schema.
-"""
+"""Flask-RESTful specific tests for flask-x-openapi-schema."""

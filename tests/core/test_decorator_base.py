@@ -1,15 +1,16 @@
-"""
-Tests for the decorator_base module.
-"""
+"""Tests for the decorator_base module."""
+
+from __future__ import annotations
 
 import inspect
-from typing import List, Any
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 from flask import Flask
 from pydantic import BaseModel, Field
 
+from flask_x_openapi_schema.core.config import ConventionalPrefixConfig
 from flask_x_openapi_schema.core.decorator_base import (
     OpenAPIDecoratorBase,
     _detect_file_parameters,
@@ -19,7 +20,6 @@ from flask_x_openapi_schema.core.decorator_base import (
     _process_i18n_value,
     preprocess_request_data,
 )
-from flask_x_openapi_schema.core.config import ConventionalPrefixConfig
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr
 from flask_x_openapi_schema.models.base import BaseRespModel
 from flask_x_openapi_schema.models.file_models import FileField
@@ -32,7 +32,7 @@ class SampleRequestModel(BaseModel):
 
     name: str = Field(..., description="The name")
     age: int = Field(..., description="The age")
-    tags: List[str] = Field(default_factory=list, description="Tags")
+    tags: list[str] = Field(default_factory=list, description="Tags")
 
 
 class SampleQueryModel(BaseModel):
@@ -66,8 +66,7 @@ class SampleFileModel(BaseModel):
 @pytest.fixture
 def app():
     """Create a Flask app for testing."""
-    app = Flask(__name__)
-    return app
+    return Flask(__name__)
 
 
 def test_preprocess_request_data():
@@ -100,7 +99,7 @@ def test_preprocess_request_data():
 
     # Test with non-model input
     data = {"name": "Test", "age": 30}
-    result = preprocess_request_data(data, dict)  # type: ignore
+    result = preprocess_request_data(data, dict)
     assert result == data
 
 
@@ -108,7 +107,7 @@ def test_extract_parameters_from_prefixes():
     """Test _extract_parameters_from_prefixes function."""
 
     # Define a test function with various parameter types
-    def test_func(
+    def example_func(
         _x_body_request: SampleRequestModel,  # 使用正确的前缀格式
         _x_query_params: SampleQueryModel,  # 使用正确的前缀格式
         _x_path_user_id: str,
@@ -118,7 +117,7 @@ def test_extract_parameters_from_prefixes():
         pass
 
     # Get function signature and type hints
-    signature = inspect.signature(test_func)
+    signature = inspect.signature(example_func)
     type_hints = {
         "_x_body_request": SampleRequestModel,
         "_x_query_params": SampleQueryModel,
@@ -130,12 +129,10 @@ def test_extract_parameters_from_prefixes():
     # 删除调试信息
 
     # Extract parameters
-    request_body, query_model, path_params = _extract_parameters_from_prefixes(
-        signature, type_hints
-    )
+    request_body, query_model, path_params = _extract_parameters_from_prefixes(signature, type_hints)
 
     # Check results
-    # 注意：在当前实现中，_extract_parameters_from_prefixes 函数不会识别以 _x_body 开头的参数
+    # 注意:在当前实现中,_extract_parameters_from_prefixes 函数不会识别以 _x_body 开头的参数
     # 因为它期望参数名是 _x_body 而不是 _x_body_request
     assert request_body is None
     assert query_model is None
@@ -168,9 +165,7 @@ def test_extract_parameters_from_prefixes():
     }
 
     # Extract parameters with custom config
-    request_body, query_model, path_params = _extract_parameters_from_prefixes(
-        signature, type_hints, custom_config
-    )
+    request_body, query_model, path_params = _extract_parameters_from_prefixes(signature, type_hints, custom_config)
 
     # Check results
     assert request_body == SampleRequestModel
@@ -220,13 +215,13 @@ def test_generate_openapi_metadata():
     assert "responses" not in metadata
 
     # Test with all parameters
-    from flask_x_openapi_schema.models.responses import success_response, error_response
+    from flask_x_openapi_schema.models.responses import error_response, success_response
 
     responses = OpenAPIMetaResponse(
         responses={
             **success_response(SampleResponseModel, "Success"),
             **error_response("Bad Request", 400),
-        }
+        },
     )
 
     metadata = _generate_openapi_metadata(
@@ -353,18 +348,16 @@ def test_openapi_decorator_base():
     decorator.framework_decorator = mock_framework_decorator
 
     # Define a test function
-    def test_func(
+    def example_func(
         _x_body_request: SampleRequestModel,
         _x_query_params: SampleQueryModel,
         _x_path_user_id: str,
         normal_param: str = "default",
     ):
-        return SampleResponseModel(
-            id="1", name=_x_body_request.name, age=_x_body_request.age
-        )
+        return SampleResponseModel(id="1", name=_x_body_request.name, age=_x_body_request.age)
 
     # Apply the decorator
-    decorated_func = decorator(test_func)
+    decorated_func = decorator(example_func)
 
     # Check that metadata was attached
     assert hasattr(decorated_func, "_openapi_metadata")
@@ -373,7 +366,7 @@ def test_openapi_decorator_base():
     assert metadata["description"] == "Test description"
     assert metadata["tags"] == ["test"]
     assert metadata["operationId"] == "testOperation"
-    # 注意：在当前实现中，_extract_parameters_from_prefixes 函数不会识别以 _x_body 开头的参数
+    # 注意:在当前实现中,_extract_parameters_from_prefixes 函数不会识别以 _x_body 开头的参数
     # 因为它期望参数名是 _x_body 而不是 _x_body_request
     # assert "requestBody" in metadata
     assert "parameters" in metadata
@@ -386,9 +379,7 @@ def test_openapi_decorator_base():
         _x_path_user_id: str,
         normal_param: str = "default",
     ):
-        return SampleResponseModel(
-            id="1", name=_x_body_request.name, age=_x_body_request.age
-        )
+        return SampleResponseModel(id="1", name=_x_body_request.name, age=_x_body_request.age)
 
     decorator = OpenAPIDecoratorBase(
         summary="Another API",
@@ -413,7 +404,7 @@ def test_openapi_decorator_base():
     assert metadata["tags"] == ["another"]
     assert metadata["operationId"] == "anotherOperation"
     assert metadata["deprecated"] is True
-    # 注意：在当前实现中，_extract_parameters_from_prefixes 函数不会识别以 _x_body 开头的参数
+    # 注意:在当前实现中,_extract_parameters_from_prefixes 函数不会识别以 _x_body 开头的参数
     # 因为它期望参数名是 _x_body 而不是 _x_body_request
     # assert "requestBody" in metadata
     assert "parameters" in metadata
@@ -429,13 +420,13 @@ def test_openapi_decorator_base_with_responses():
     mock_framework_decorator.process_additional_params.return_value = {}
 
     # Create responses
-    from flask_x_openapi_schema.models.responses import success_response, error_response
+    from flask_x_openapi_schema.models.responses import error_response, success_response
 
     responses = OpenAPIMetaResponse(
         responses={
             **success_response(SampleResponseModel, "Success"),
             **error_response("Bad Request", 400),
-        }
+        },
     )
 
     # Create a decorator instance
@@ -452,18 +443,16 @@ def test_openapi_decorator_base_with_responses():
     decorator.framework_decorator = mock_framework_decorator
 
     # Define a test function
-    def test_func(
+    def example_func(
         _x_body_request: SampleRequestModel,
         _x_query_params: SampleQueryModel,
         _x_path_user_id: str,
         normal_param: str = "default",
     ):
-        return SampleResponseModel(
-            id="1", name=_x_body_request.name, age=_x_body_request.age
-        )
+        return SampleResponseModel(id="1", name=_x_body_request.name, age=_x_body_request.age)
 
     # Apply the decorator
-    decorated_func = decorator(test_func)
+    decorated_func = decorator(example_func)
 
     # Check that metadata was attached
     assert hasattr(decorated_func, "_openapi_metadata")
@@ -506,23 +495,21 @@ def test_openapi_decorator_base_with_custom_prefixes():
     decorator.framework_decorator = mock_framework_decorator
 
     # Define a test function with custom prefixes
-    def test_func(
+    def example_func(
         custom_body_request: SampleRequestModel,
         custom_query_params: SampleQueryModel,
         custom_path_user_id: str,
         normal_param: str = "default",
     ):
-        return SampleResponseModel(
-            id="1", name=custom_body_request.name, age=custom_body_request.age
-        )
+        return SampleResponseModel(id="1", name=custom_body_request.name, age=custom_body_request.age)
 
     # Apply the decorator
-    decorated_func = decorator(test_func)
+    decorated_func = decorator(example_func)
 
     # Check that metadata was attached
     assert hasattr(decorated_func, "_openapi_metadata")
     metadata = decorated_func._openapi_metadata
-    # 注意：在当前实现中，_extract_parameters_from_prefixes 函数不会识别以 custom_body 开头的参数
+    # 注意:在当前实现中,_extract_parameters_from_prefixes 函数不会识别以 custom_body 开头的参数
     # 因为它期望参数名是 custom_body 而不是 custom_body_request
     # assert "requestBody" in metadata
     assert "parameters" in metadata
@@ -565,7 +552,7 @@ def test_detect_file_parameters():
     """Test _detect_file_parameters function."""
 
     # Define a function with file parameters
-    def test_func(
+    def example_func(
         _x_file: FileField,
         _x_file_avatar: FileField,
         _x_file_document: SampleFileModel,
@@ -676,20 +663,18 @@ def test_generate_openapi_metadata_with_file_model():
 @pytest.mark.usefixtures("app")
 def test_openapi_decorator_base_with_unsupported_framework():
     """Test OpenAPIDecoratorBase with unsupported framework."""
-    # Try to create a decorator with an unsupported framework
+    decorator = OpenAPIDecoratorBase(
+        summary="Test API",
+        description="Test description",
+        framework="unsupported",
+    )
+
+    # Define a test function
+    def example_func(normal_param: str = "default"):
+        return {"result": normal_param}
+
     with pytest.raises(ValueError, match="Unsupported framework: unsupported"):
-        decorator = OpenAPIDecoratorBase(
-            summary="Test API",
-            description="Test description",
-            framework="unsupported",
-        )
-
-        # Define a test function
-        def test_func(normal_param: str = "default"):
-            return {"result": normal_param}
-
-        # This should raise a ValueError
-        _ = decorator(test_func)
+        _ = decorator(example_func)
 
 
 @pytest.mark.usefixtures("app")
@@ -714,18 +699,16 @@ def test_openapi_decorator_base_with_cached_function():
     decorator1.framework_decorator = mock_framework_decorator
 
     # Define a test function
-    def test_func(
+    def example_func(
         _x_body_request: SampleRequestModel,
         _x_query_params: SampleQueryModel,
         _x_path_user_id: str,
         normal_param: str = "default",
     ):
-        return SampleResponseModel(
-            id="1", name=_x_body_request.name, age=_x_body_request.age
-        )
+        return SampleResponseModel(id="1", name=_x_body_request.name, age=_x_body_request.age)
 
     # Apply the first decorator
-    _ = decorator1(test_func)
+    _ = decorator1(example_func)
 
     # Create a second decorator instance
     decorator2 = OpenAPIDecoratorBase(
@@ -741,7 +724,7 @@ def test_openapi_decorator_base_with_cached_function():
 
     # Apply the second decorator to the same function
     # This should use the cached metadata
-    decorated_func2 = decorator2(test_func)
+    decorated_func2 = decorator2(example_func)
 
     # Check that the metadata is from the first decorator (cached)
     assert hasattr(decorated_func2, "_openapi_metadata")
@@ -772,11 +755,11 @@ def test_openapi_decorator_base_process_request_without_request_context():
     decorator.framework_decorator = mock_framework_decorator
 
     # Define a test function
-    def test_func(normal_param: str = "default"):
+    def example_func(normal_param: str = "default"):
         return {"result": normal_param}
 
     # Apply the decorator
-    decorated_func = decorator(test_func)
+    decorated_func = decorator(example_func)
 
     # Call the decorated function outside of a request context
     # This should not call any of the request processing methods
@@ -818,11 +801,11 @@ def test_openapi_decorator_base_with_external_docs():
     decorator.framework_decorator = mock_framework_decorator
 
     # Define a test function
-    def test_func(normal_param: str = "default"):
+    def example_func(normal_param: str = "default"):
         return {"result": normal_param}
 
     # Apply the decorator
-    decorated_func = decorator(test_func)
+    decorated_func = decorator(example_func)
 
     # Check that metadata was attached
     assert hasattr(decorated_func, "_openapi_metadata")
@@ -854,11 +837,11 @@ def test_openapi_decorator_base_with_security():
     decorator.framework_decorator = mock_framework_decorator
 
     # Define a test function
-    def test_func(normal_param: str = "default"):
+    def example_func(normal_param: str = "default"):
         return {"result": normal_param}
 
     # Apply the decorator
-    decorated_func = decorator(test_func)
+    decorated_func = decorator(example_func)
 
     # Check that metadata was attached
     assert hasattr(decorated_func, "_openapi_metadata")

@@ -1,5 +1,4 @@
-"""
-Locust load test for Flask-RESTful with and without flask-x-openapi-schema.
+"""Locust load test for Flask-RESTful with and without flask-x-openapi-schema.
 
 This file contains a Locust load test that simulates real-world usage of the library.
 It compares the performance of a standard Flask-RESTful application versus one using flask-x-openapi-schema.
@@ -8,12 +7,12 @@ To run:
     locust -f benchmarks/flask_restful/locustfile.py --headless -u 10 -r 10 -t 10s --csv=benchmarks/results/flask_restful
 """
 
-from locust import HttpUser, task, between
+from locust import HttpUser, between, task
 
 from benchmarks.common.utils import (
+    get_query_params,
     get_random_user_data,
     get_random_user_id,
-    get_query_params,
 )
 
 

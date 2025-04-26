@@ -1,25 +1,28 @@
-"""
-Utilities for integrating Pydantic models with Flask-RESTful.
-"""
+"""Utilities for integrating Pydantic models with Flask-RESTful."""
 
 import inspect
 from collections.abc import Callable
 from enum import Enum
-from typing import Any, Optional, Union
-
-from flask_x_openapi_schema._opt_deps._flask_restful import reqparse, HAS_FLASK_RESTFUL
-
+from typing import Any, Union, get_args, get_origin
 
 from pydantic import BaseModel
 
-from ...models.file_models import FileField
+from flask_x_openapi_schema._opt_deps._flask_restful import HAS_FLASK_RESTFUL, reqparse
+from flask_x_openapi_schema.models.file_models import FileField
+
+IMPORT_ERROR_MSG = """
+The 'Flask-RESTful integration' feature requires the 'flask-restful' package, "
+which is not installed. Please install it with: pip install flask-restful or "
+pip install flask-x-openapi-schema[flask-restful]
+""".strip()
 
 
 def pydantic_model_to_reqparse(
-    model: type[BaseModel], location: str = "json", exclude: Optional[list[str]] = None
+    model: type[BaseModel],
+    location: str = "json",
+    exclude: list[str] | None = None,
 ) -> reqparse.RequestParser:
-    """
-    Convert a Pydantic model to a Flask-RESTful RequestParser.
+    """Convert a Pydantic model to a Flask-RESTful RequestParser.
 
     Args:
         model: The Pydantic model to convert
@@ -28,13 +31,10 @@ def pydantic_model_to_reqparse(
 
     Returns:
         A Flask-RESTful RequestParser
+
     """
     if not HAS_FLASK_RESTFUL:
-        raise ImportError(
-            "The 'Flask-RESTful integration' feature requires the 'flask-restful' package, "
-            "which is not installed. Please install it with: pip install flask-restful or "
-            "pip install flask-x-openapi-schema[flask-restful]"
-        )
+        raise ImportError(IMPORT_ERROR_MSG)
 
     parser = reqparse.RequestParser()
     exclude = exclude or []
@@ -57,16 +57,26 @@ def pydantic_model_to_reqparse(
         is_required = field_name in required
 
         # Get field type
-        field_type = _get_field_type(field_info.annotation)
+        # Handle special cases for new style union types (X | None)
+        annotation_str = str(field_info.annotation)
+        if annotation_str == "float | None":
+            field_type = float
+        elif annotation_str == "int | None":
+            field_type = int
+        elif annotation_str == "str | None":
+            field_type = str
+        elif annotation_str == "bool | None":
+            # Use the same bool conversion function as in _get_field_type
+            field_type = bool
+        else:
+            field_type = _get_field_type(field_info.annotation)
 
         # Get field description
         description = field_schema.get("description", "")
 
         # Check if this is a file field
         is_file_field = False
-        if inspect.isclass(field_info.annotation) and issubclass(
-            field_info.annotation, FileField
-        ):
+        if inspect.isclass(field_info.annotation) and issubclass(field_info.annotation, FileField):
             is_file_field = True
 
         # Add argument to parser with appropriate settings
@@ -94,37 +104,49 @@ def pydantic_model_to_reqparse(
     return parser
 
 
-def _get_field_type(annotation: Any) -> Callable:
-    """
-    Get the appropriate type function for a field annotation.
+def _get_field_type(annotation: Any) -> Callable:  # noqa: PLR0911
+    """Get the appropriate type function for a field annotation.
 
     Args:
         annotation: The field annotation
 
     Returns:
         A type function
+
     """
     # Handle basic types
     if annotation is str:
         return str
-    elif annotation is int:
+    if annotation is int:
         return int
-    elif annotation is float:
+    if annotation is float:
         return float
-    elif annotation is bool:
+    if annotation is bool:
         return lambda x: x.lower() == "true" if isinstance(x, str) else bool(x)
-    elif annotation is list:
+    if annotation is list:
         return list
-    elif annotation is dict:
+    if annotation is dict:
         return dict
 
-    # Handle Optional types
-    origin = getattr(annotation, "__origin__", None)
-    if origin == Union:
-        args = getattr(annotation, "__args__", [])
-        # Check if it's Optional[X]
-        if len(args) == 2 and args[1] is type(None):
-            return _get_field_type(args[0])
+    # Handle Union types (including Optional)
+    origin = get_origin(annotation)
+    if origin is Union:
+        args = get_args(annotation)
+        # Check if it's Optional[X] (Union[X, None])
+        if len(args) == 2 and args[1] is type(None):  # noqa: PLR2004
+            # Get the type of the first argument (the non-None type)
+            non_none_type = args[0]
+            # Handle specific types directly
+            if non_none_type is float:
+                return float
+            if non_none_type is int:
+                return int
+            if non_none_type is str:
+                return str
+            if non_none_type is bool:
+                return lambda x: x.lower() == "true" if isinstance(x, str) else bool(x)
+            # For other types, recurse
+            return _get_field_type(non_none_type)
 
     # Handle Enum types
     if inspect.isclass(annotation) and issubclass(annotation, Enum):
@@ -140,13 +162,12 @@ def _get_field_type(annotation: Any) -> Callable:
 
 
 def create_reqparse_from_pydantic(
-    query_model: Optional[type[BaseModel]] = None,
-    body_model: Optional[type[BaseModel]] = None,
-    form_model: Optional[type[BaseModel]] = None,
-    file_model: Optional[type[BaseModel]] = None,
+    query_model: type[BaseModel] | None = None,
+    body_model: type[BaseModel] | None = None,
+    form_model: type[BaseModel] | None = None,
+    file_model: type[BaseModel] | None = None,
 ) -> reqparse.RequestParser:
-    """
-    Create a Flask-RESTful RequestParser from Pydantic models.
+    """Create a Flask-RESTful RequestParser from Pydantic models.
 
     Args:
         query_model: Pydantic model for query parameters
@@ -156,12 +177,11 @@ def create_reqparse_from_pydantic(
 
     Returns:
         A Flask-RESTful RequestParser
+
     """
     if not HAS_FLASK_RESTFUL:
         raise ImportError(
-            "The 'Flask-RESTful integration' feature requires the 'flask-restful' package, "
-            "which is not installed. Please install it with: pip install flask-restful or "
-            "pip install flask-x-openapi-schema[flask-restful]"
+            IMPORT_ERROR_MSG,
         )
 
     parser = reqparse.RequestParser()
@@ -175,7 +195,7 @@ def create_reqparse_from_pydantic(
         # Check if this is a file upload model
         has_file_fields = False
         if hasattr(body_model, "model_fields"):
-            for field_name, field_info in body_model.model_fields.items():
+            for field_info in body_model.model_fields.values():
                 field_type = field_info.annotation
                 if inspect.isclass(field_type) and issubclass(field_type, FileField):
                     has_file_fields = True

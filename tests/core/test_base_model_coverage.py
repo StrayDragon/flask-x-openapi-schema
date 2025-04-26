@@ -1,9 +1,8 @@
-"""
-Tests for the base model to improve coverage.
-"""
+"""Tests for the base model to improve coverage."""
+
+from __future__ import annotations
 
 from pydantic import Field
-from typing import Optional
 
 from flask_x_openapi_schema.models.base import BaseRespModel
 
@@ -18,7 +17,7 @@ class TestBaseModelCoverage:
         class TestModel(BaseRespModel):
             id: str = Field(..., description="The ID")
             name: str = Field(..., description="The name")
-            age: Optional[int] = Field(None, description="The age")
+            age: int | None = Field(None, description="The age")
 
         # Create a dictionary
         data = {"id": "123", "name": "Test", "age": 30}
@@ -38,7 +37,7 @@ class TestBaseModelCoverage:
         class TestModel(BaseRespModel):
             id: str = Field(..., description="The ID")
             name: str = Field(..., description="The name")
-            age: Optional[int] = Field(None, description="The age")
+            age: int | None = Field(None, description="The age")
 
         # Create a model instance
         model = TestModel(id="123", name="Test", age=30)
@@ -63,7 +62,7 @@ class TestBaseModelCoverage:
         class TestModel(BaseRespModel):
             id: str = Field(..., description="The ID")
             name: str = Field(..., description="The name")
-            age: Optional[int] = Field(None, description="The age")
+            age: int | None = Field(None, description="The age")
 
         # Create a model instance
         model = TestModel(id="123", name="Test", age=30)
