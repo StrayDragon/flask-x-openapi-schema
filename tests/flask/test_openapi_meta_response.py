@@ -7,9 +7,8 @@ from pydantic import BaseModel, Field
 from flask_x_openapi_schema import (
     OpenAPIMetaResponse,
     OpenAPIMetaResponseItem,
-    OpenAPIMethodViewMixin,
 )
-from flask_x_openapi_schema.x.flask import openapi_metadata
+from flask_x_openapi_schema.x.flask import OpenAPIMethodViewMixin, openapi_metadata
 from flask_x_openapi_schema.x.flask.views import MethodViewOpenAPISchemaGenerator
 
 

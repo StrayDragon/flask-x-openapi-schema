@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from flask import Blueprint
+from flask import Blueprint, request
 from pydantic import BaseModel
 
 from flask_x_openapi_schema.core.schema_generator import OpenAPISchemaGenerator
@@ -67,3 +67,33 @@ def register_model_schema(generator: OpenAPISchemaGenerator, model: type[BaseMod
 
     """
     generator._register_model(model)  # noqa: SLF001
+
+
+def extract_pydantic_data(model_class: type[BaseModel]) -> BaseModel:
+    """Extract data from the request based on a Pydantic model.
+
+    Args:
+        model_class: The Pydantic model class to use for validation
+
+    Returns:
+        A Pydantic model instance with validated data
+
+    Raises:
+        ValidationError: If the data doesn't match the model
+
+    """
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+    elif request.form:
+        data = request.form.to_dict()
+    else:
+        data = {}
+
+    # Add query parameters
+    if request.args:
+        for key, value in request.args.items():
+            if key not in data:
+                data[key] = value
+
+    # Validate with Pydantic and return the model instance
+    return model_class(**data)

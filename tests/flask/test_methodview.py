@@ -12,17 +12,14 @@ from flask import Blueprint, Flask
 from flask.views import MethodView
 from pydantic import BaseModel, Field
 
-from flask_x_openapi_schema import (
-    BaseRespModel,
-    OpenAPIBlueprintMixin,
-    OpenAPIMethodViewMixin,
-)
-from flask_x_openapi_schema.x.flask import openapi_metadata
+from flask_x_openapi_schema import BaseRespModel
+from flask_x_openapi_schema.x.flask import OpenAPIMethodViewMixin, openapi_metadata
+from flask_x_openapi_schema.x.flask.utils import extract_pydantic_data
 from flask_x_openapi_schema.x.flask.views import (
     MethodViewOpenAPISchemaGenerator,
     extract_openapi_parameters_from_methodview,
-    extract_pydantic_data,
 )
+from flask_x_openapi_schema.x.flask_restful import OpenAPIBlueprintMixin
 from tests.test_helpers import flask_request_context
 
 

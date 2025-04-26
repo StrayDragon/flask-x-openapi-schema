@@ -110,6 +110,7 @@ def test_generate_openapi_schema_yaml_with_real_view(blueprint):
 
     # Manually register models
     register_model_schema(generator, SampleResponse)
+    register_model_schema(generator, SampleItemModel)
 
     # Process MethodView resources
     generator.process_methodview_resources(blueprint=blueprint)
@@ -251,6 +252,7 @@ def test_generate_openapi_schema_json_with_real_view(blueprint):
 
     # Manually register models
     register_model_schema(generator, SampleResponse)
+    register_model_schema(generator, SampleItemModel)
 
     # Process MethodView resources
     generator.process_methodview_resources(blueprint=blueprint)

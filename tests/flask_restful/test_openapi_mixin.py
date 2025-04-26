@@ -9,11 +9,9 @@ import pytest
 from flask import Flask
 from pydantic import BaseModel, Field
 
-from flask_x_openapi_schema import (
-    BaseRespModel,
-    OpenAPIIntegrationMixin,
-)
+from flask_x_openapi_schema import BaseRespModel
 from flask_x_openapi_schema._opt_deps._flask_restful import Api, Resource
+from flask_x_openapi_schema.x.flask_restful import OpenAPIIntegrationMixin
 
 
 # Define Pydantic models for request and response

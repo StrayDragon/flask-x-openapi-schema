@@ -2,7 +2,6 @@
 
 from typing import Any, get_type_hints
 
-from flask import request
 from flask.views import MethodView
 from pydantic import BaseModel
 
@@ -69,36 +68,6 @@ class OpenAPIMethodViewMixin:
         blueprint._methodview_openapi_resources.append((cls, url))  # noqa: SLF001
 
         return view_func
-
-
-def extract_pydantic_data(model_class: type[BaseModel]) -> BaseModel:
-    """Extract data from the request based on a Pydantic model.
-
-    Args:
-        model_class: The Pydantic model class to use for validation
-
-    Returns:
-        A Pydantic model instance with validated data
-
-    Raises:
-        ValidationError: If the data doesn't match the model
-
-    """
-    if request.is_json:
-        data = request.get_json(silent=True) or {}
-    elif request.form:
-        data = request.form.to_dict()
-    else:
-        data = {}
-
-    # Add query parameters
-    if request.args:
-        for key, value in request.args.items():
-            if key not in data:
-                data[key] = value
-
-    # Validate with Pydantic and return the model instance
-    return model_class(**data)
 
 
 def extract_openapi_parameters_from_methodview(
