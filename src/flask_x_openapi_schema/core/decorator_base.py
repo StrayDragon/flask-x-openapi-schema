@@ -1,7 +1,7 @@
 """Base classes and utilities for OpenAPI metadata decorators."""
 
-import contextlib
 import inspect
+import logging
 from collections.abc import Callable
 from functools import wraps
 from typing import (
@@ -11,7 +11,6 @@ from typing import (
     get_type_hints,
 )
 
-from flask import request
 from pydantic import BaseModel
 
 # For Python 3.10+, use typing directly; for older versions, use typing_extensions
@@ -36,117 +35,18 @@ from .cache import (
     get_parameter_prefixes,
 )
 from .config import GLOBAL_CONFIG_HOLDER, ConventionalPrefixConfig
+from .param_binding import ParameterProcessor
 from .utils import _fix_references
 
 # Type variables for function parameters and return type
 P = ParamSpec("P")
 R = TypeVar("R")
 
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
-def preprocess_request_data(data: dict[str, Any], model: type[BaseModel]) -> dict[str, Any]:  # noqa: PLR0915
-    """Pre-process request data to handle list fields and other complex types correctly.
 
-    Args:
-        data: The request data to process
-        model: The Pydantic model to use for type information
-
-    Returns:
-        Processed data that can be validated by Pydantic
-
-    """
-    import json
-    import logging
-
-    logger = logging.getLogger(__name__)
-
-    if not hasattr(model, "model_fields"):
-        return data
-
-    result = {}
-
-    # Process each field based on its type annotation
-    for field_name, field_info in model.model_fields.items():
-        if field_name not in data:
-            continue
-
-        field_value = data[field_name]
-        field_type = field_info.annotation
-
-        # Get the origin type (for generics like List, Dict)
-        origin = getattr(field_type, "__origin__", None)
-
-        # Handle list fields
-        if origin is list or origin is list:
-            # If the value is a string that looks like a JSON array, parse it
-            if isinstance(field_value, str) and field_value.startswith("[") and field_value.endswith("]"):
-                try:
-                    result[field_name] = json.loads(field_value)
-                    logger.debug(f"Parsed string to list for field {field_name}: {result[field_name]}")
-                    continue
-                except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse string as JSON list for field {field_name}: {e}")
-
-            # If it's already a list, use it as is
-            if isinstance(field_value, list):
-                result[field_name] = field_value
-            else:
-                # Try to convert to a list if possible
-                try:
-                    result[field_name] = [field_value]
-                except Exception as e:
-                    logger.warning(f"Failed to convert value to list for field {field_name}: {e}")
-                    # If conversion fails, keep the original value
-                    result[field_name] = field_value
-
-        # Handle dictionary fields
-        elif origin is dict or origin is dict:
-            # If the value is a string that looks like a JSON object, parse it
-            if isinstance(field_value, str) and field_value.startswith("{") and field_value.endswith("}"):
-                try:
-                    result[field_name] = json.loads(field_value)
-                    logger.debug(f"Parsed string to dict for field {field_name}: {result[field_name]}")
-                    continue
-                except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse string as JSON dict for field {field_name}: {e}")
-
-            # If it's already a dict, use it as is
-            if isinstance(field_value, dict):
-                result[field_name] = field_value
-            else:
-                # For non-dict values, keep the original (will likely fail validation)
-                logger.warning(f"Non-dict value for dict field {field_name}: {field_value}")
-                result[field_name] = field_value
-
-        # Handle nested model fields
-        elif (
-            isinstance(field_type, type)
-            and issubclass(field_type, BaseModel)
-            and isinstance(field_value, str)
-            and field_value.startswith("{")
-            and field_value.endswith("}")
-        ):
-            # If the value is a string that looks like a JSON object, parse it
-            try:
-                parsed_value = json.loads(field_value)
-                if isinstance(parsed_value, dict):
-                    result[field_name] = parsed_value
-                    logger.debug(f"Parsed string to dict for nested model field {field_name}")
-                    continue
-            except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse string as JSON for nested model field {field_name}: {e}")
-
-            # If parsing fails, keep the original value
-            result[field_name] = field_value
-        else:
-            # For other fields, keep the original value
-            result[field_name] = field_value
-
-    # Add any fields from the original data that weren't processed
-    for key, value in data.items():
-        if key not in result:
-            result[key] = value
-
-    return result
+# Import preprocess_request_data from request_processing module
 
 
 def _extract_parameters_from_prefixes(
@@ -486,9 +386,11 @@ class OpenAPIDecoratorBase:
         # We'll initialize the framework-specific decorator when needed
         # to avoid circular imports
 
-    def __call__(self, func: Callable[P, R]) -> Callable[P, R]:  # noqa: PLR0915
-        """Apply the decorator to the function."""
-        # Initialize the framework-specific decorator if needed
+    def _initialize_framework_decorator(self) -> None:
+        """Initialize the framework-specific decorator.
+
+        This method uses lazy loading to avoid circular imports.
+        """
         if self.framework_decorator is None:
             if self.framework == "flask":
                 # Import here to avoid circular imports
@@ -526,55 +428,69 @@ class OpenAPIDecoratorBase:
                 msg = f"Unsupported framework: {self.framework}"
                 raise ValueError(msg)
 
-        # Check if we've already decorated this function
-        if func in FUNCTION_METADATA_CACHE:
-            cached_data = FUNCTION_METADATA_CACHE[func]
+    def _create_cached_wrapper(self, func: Callable[P, R], cached_data: dict[str, Any]) -> Callable[P, R]:
+        """Create a wrapper function that reuses cached metadata.
 
-            # Debug information
-            import logging
+        Args:
+            func: The decorated function
+            cached_data: Cached metadata and other information
 
-            logger = logging.getLogger(__name__)
-            logger.debug(f"Using cached metadata for function {func.__name__}")
-            logger.debug(f"Cached metadata: {cached_data['metadata']}")
+        Returns:
+            A wrapper function that reuses cached metadata
 
-            # Create a wrapper function that reuses the cached metadata
-            @wraps(func)
-            def cached_wrapper(*args, **kwargs):  # noqa: ANN202
-                return self._process_request(func, cached_data, *args, **kwargs)
+        """
+        logger.debug(f"Using cached metadata for function {func.__name__}")
+        logger.debug(f"Cached metadata: {cached_data['metadata']}")
 
-            # Copy cached metadata and annotations
-            cached_wrapper._openapi_metadata = cached_data["metadata"]  # noqa: SLF001
-            cached_wrapper.__annotations__ = cached_data["annotations"]
+        # Create a wrapper function that reuses the cached metadata
+        @wraps(func)
+        def cached_wrapper(*args, **kwargs):  # noqa: ANN202
+            return self._process_request(func, cached_data, *args, **kwargs)
 
-            return cast("Callable[P, R]", cached_wrapper)
+        # Copy cached metadata and annotations
+        cached_wrapper._openapi_metadata = cached_data["metadata"]  # noqa: SLF001
+        cached_wrapper.__annotations__ = cached_data["annotations"]
 
-        # Get the function signature to find parameters with special prefixes
-        signature = inspect.signature(func)
-        param_names = list(signature.parameters.keys())
+        return cast("Callable[P, R]", cached_wrapper)
 
-        # Get type hints from the function
-        type_hints = get_type_hints(func)
+    def _extract_parameters(
+        self, signature: inspect.Signature, type_hints: dict[str, Any]
+    ) -> tuple[type[BaseModel] | None, type[BaseModel] | None, list[str]]:
+        """Extract parameters from function signature.
 
-        # Extract parameters based on prefixes
-        extracted_request_body = None
-        extracted_query_model = None
-        extracted_path_params = []
+        Args:
+            signature: Function signature
+            type_hints: Function type hints
 
+        Returns:
+            Tuple of (request_body, query_model, path_params)
+
+        """
         # Use helper function to extract parameters based on prefixes (cached)
-        extracted_request_body, extracted_query_model, extracted_path_params = _extract_parameters_from_prefixes(
+        return _extract_parameters_from_prefixes(
             signature,
             type_hints,
             self.prefix_config,
         )
 
-        # Use extracted parameters
-        actual_request_body = extracted_request_body
-        actual_query_model = extracted_query_model
-        actual_path_params = extracted_path_params
+    def _generate_metadata_cache_key(
+        self,
+        actual_request_body: type[BaseModel] | dict[str, Any] | None,
+        actual_query_model: type[BaseModel] | None,
+        actual_path_params: list[str],
+    ) -> tuple:
+        """Generate a cache key for metadata.
 
-        # Generate OpenAPI metadata using helper function
-        # Create a cache key for metadata
-        cache_key = (
+        Args:
+            actual_request_body: Request body model or dict
+            actual_query_model: Query parameters model
+            actual_path_params: Path parameters
+
+        Returns:
+            A cache key for metadata
+
+        """
+        return (
             str(self.summary),
             str(self.description),
             str(self.tags) if self.tags else None,
@@ -589,110 +505,269 @@ class OpenAPIDecoratorBase:
             self.language,
         )
 
-        # Debug information
-        import logging
+    def _get_or_generate_metadata(
+        self,
+        cache_key: tuple,
+        actual_request_body: type[BaseModel] | dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        """Get metadata from cache or generate it.
 
-        logger = logging.getLogger(__name__)
-        logger.debug(
-            f"Generating metadata with request_body={actual_request_body}, query_model={actual_query_model}, path_params={actual_path_params}",  # noqa: E501
-        )
+        Args:
+            cache_key: Cache key for metadata
+            actual_request_body: Request body model or dict
 
+        Returns:
+            OpenAPI metadata dictionary
+
+        """
         # Check if we've already generated metadata for these parameters
         if cache_key in METADATA_CACHE:
-            metadata = METADATA_CACHE[cache_key]
-        else:
-            # Generate metadata
-            metadata = _generate_openapi_metadata(
-                summary=self.summary,
-                description=self.description,
-                tags=self.tags,
-                operation_id=self.operation_id,
-                deprecated=self.deprecated,
-                security=self.security,
-                external_docs=self.external_docs,
-                actual_request_body=actual_request_body,
-                responses=self.responses,
-                language=self.language,
-            )
+            return METADATA_CACHE[cache_key]
 
-            # Cache the result (limit cache size to prevent memory issues)
-            if len(METADATA_CACHE) > MAX_METADATA_CACHE_SIZE:
-                METADATA_CACHE.clear()
-            METADATA_CACHE[cache_key] = metadata
+        # Generate metadata
+        metadata = _generate_openapi_metadata(
+            summary=self.summary,
+            description=self.description,
+            tags=self.tags,
+            operation_id=self.operation_id,
+            deprecated=self.deprecated,
+            security=self.security,
+            external_docs=self.external_docs,
+            actual_request_body=actual_request_body,
+            responses=self.responses,
+            language=self.language,
+        )
 
-        # Initialize parameters list
+        # Cache the result (limit cache size to prevent memory issues)
+        if len(METADATA_CACHE) > MAX_METADATA_CACHE_SIZE:
+            METADATA_CACHE.clear()
+        METADATA_CACHE[cache_key] = metadata
+
+        return metadata
+
+    def _generate_openapi_parameters(
+        self,
+        actual_query_model: type[BaseModel] | None,
+        actual_path_params: list[str],
+        param_names: list[str],
+        func_annotations: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Generate OpenAPI parameters.
+
+        This method generates OpenAPI parameters from query models, path parameters,
+        and file parameters. It uses caching to avoid regenerating parameters for
+        the same models and parameters.
+
+        Args:
+            actual_query_model: Query parameters model
+            actual_path_params: Path parameters
+            param_names: Function parameter names
+            func_annotations: Function type annotations
+
+        Returns:
+            List of OpenAPI parameters
+
+        """
         openapi_parameters = []
 
         # Add parameters from query_model and path_params
         if actual_query_model or actual_path_params:
-            # Create a cache key for parameters
-            cache_key = (
-                id(actual_query_model),
-                tuple(sorted(actual_path_params)) if actual_path_params else None,
-            )
-            if cache_key in OPENAPI_PARAMS_CACHE:
-                model_parameters = OPENAPI_PARAMS_CACHE[cache_key]
-            else:
-                # Create parameters for OpenAPI schema
-                model_parameters = []
-
-                # Add path parameters
-                if actual_path_params:
-                    for param in actual_path_params:
-                        model_parameters.append(
-                            {
-                                "name": param,
-                                "in": "path",
-                                "required": True,
-                                "schema": {"type": "string"},
-                            },
-                        )
-
-                # Add query parameters
-                if actual_query_model:
-                    schema = actual_query_model.model_json_schema()
-                    properties = schema.get("properties", {})
-                    required = schema.get("required", [])
-
-                    for field_name, field_schema in properties.items():
-                        # Fix references in field_schema
-                        fixed_schema = _fix_references(field_schema)
-                        param = {
-                            "name": field_name,
-                            "in": "query",
-                            "required": field_name in required,
-                            "schema": fixed_schema,
-                        }
-
-                        # Add description if available
-                        if "description" in field_schema:
-                            param["description"] = field_schema["description"]
-
-                        model_parameters.append(param)
-
-                # Cache the parameters (limit cache size to prevent memory issues)
-                if len(OPENAPI_PARAMS_CACHE) > MAX_OPENAPI_PARAMS_CACHE_SIZE:  # Limit cache size
-                    OPENAPI_PARAMS_CACHE.clear()
-                OPENAPI_PARAMS_CACHE[cache_key] = model_parameters
-
-            # Add parameters to metadata
+            model_parameters = self._get_or_generate_model_parameters(actual_query_model, actual_path_params)
             if model_parameters:
-                metadata["parameters"] = model_parameters
                 logger.debug(f"Added parameters to metadata: {model_parameters}")
-
-            openapi_parameters.extend(model_parameters)
+                openapi_parameters.extend(model_parameters)
 
         # Add file parameters based on function signature
-        file_params = []
-        # Get function annotations
-        func_annotations = get_type_hints(func)
         file_params = _detect_file_parameters(param_names, func_annotations, self.prefix_config)
-
-        # If we have file parameters, set the consumes property to multipart/form-data
         if file_params:
-            metadata["consumes"] = ["multipart/form-data"]
             openapi_parameters.extend(file_params)
 
+        return openapi_parameters
+
+    def _get_or_generate_model_parameters(
+        self,
+        query_model: type[BaseModel] | None,
+        path_params: list[str],
+    ) -> list[dict[str, Any]]:
+        """Get or generate parameters from models and path parameters.
+
+        This method is extracted from _generate_openapi_parameters to improve readability.
+        It handles caching and generation of parameters from query models and path parameters.
+
+        Args:
+            query_model: Query parameters model
+            path_params: Path parameters
+
+        Returns:
+            List of OpenAPI parameters
+
+        """
+        # Create a cache key for parameters
+        cache_key = (
+            id(query_model),
+            tuple(sorted(path_params)) if path_params else None,
+        )
+
+        # Check if we've already generated parameters for these models
+        if cache_key in OPENAPI_PARAMS_CACHE:
+            return OPENAPI_PARAMS_CACHE[cache_key]
+
+        # Create parameters for OpenAPI schema
+        model_parameters = []
+
+        # Add path parameters
+        if path_params:
+            model_parameters.extend(self._generate_path_parameters(path_params))
+
+        # Add query parameters
+        if query_model:
+            model_parameters.extend(self._generate_query_parameters(query_model))
+
+        # Cache the parameters (limit cache size to prevent memory issues)
+        if len(OPENAPI_PARAMS_CACHE) > MAX_OPENAPI_PARAMS_CACHE_SIZE:
+            OPENAPI_PARAMS_CACHE.clear()
+        OPENAPI_PARAMS_CACHE[cache_key] = model_parameters
+
+        return model_parameters
+
+    def _generate_path_parameters(self, path_params: list[str]) -> list[dict[str, Any]]:
+        """Generate OpenAPI parameters for path parameters.
+
+        Args:
+            path_params: List of path parameter names
+
+        Returns:
+            List of OpenAPI parameters for path parameters
+
+        """
+        return [
+            {
+                "name": param,
+                "in": "path",
+                "required": True,
+                "schema": {"type": "string"},
+            }
+            for param in path_params
+        ]
+
+    def _generate_query_parameters(self, query_model: type[BaseModel]) -> list[dict[str, Any]]:
+        """Generate OpenAPI parameters for query parameters.
+
+        Args:
+            query_model: Query parameters model
+
+        Returns:
+            List of OpenAPI parameters for query parameters
+
+        """
+        parameters = []
+        schema = query_model.model_json_schema()
+        properties = schema.get("properties", {})
+        required = schema.get("required", [])
+
+        for field_name, field_schema in properties.items():
+            # Fix references in field_schema
+            fixed_schema = _fix_references(field_schema)
+            param = {
+                "name": field_name,
+                "in": "query",
+                "required": field_name in required,
+                "schema": fixed_schema,
+            }
+
+            # Add description if available
+            if "description" in field_schema:
+                param["description"] = field_schema["description"]
+
+            parameters.append(param)
+
+        return parameters
+
+    def _create_function_wrapper(
+        self,
+        func: Callable[P, R],
+        cached_data: dict[str, Any],
+        metadata: dict[str, Any],
+        merged_hints: dict[str, Any],
+    ) -> Callable[P, R]:
+        """Create a wrapper function for the decorated function.
+
+        Args:
+            func: The decorated function
+            cached_data: Cached metadata and other information
+            metadata: OpenAPI metadata
+            merged_hints: Merged type hints
+
+        Returns:
+            A wrapper function
+
+        """
+
+        # Create a wrapper function that handles parameter binding
+        @wraps(func)
+        def wrapper(*args, **kwargs):  # noqa: ANN202
+            return self._process_request(func, cached_data, *args, **kwargs)
+
+        # Copy OpenAPI metadata to the wrapper
+        wrapper._openapi_metadata = metadata  # noqa: SLF001
+
+        # Add type hints to the wrapper function
+        wrapper.__annotations__ = merged_hints
+
+        return cast("Callable[P, R]", wrapper)
+
+    def __call__(self, func: Callable[P, R]) -> Callable[P, R]:
+        """Apply the decorator to the function.
+
+        This method has been refactored to use smaller, more focused methods.
+
+        Args:
+            func: The function to decorate
+
+        Returns:
+            The decorated function
+
+        """
+        # Initialize the framework-specific decorator if needed
+        self._initialize_framework_decorator()
+
+        # Check if we've already decorated this function
+        if func in FUNCTION_METADATA_CACHE:
+            cached_data = FUNCTION_METADATA_CACHE[func]
+            return self._create_cached_wrapper(func, cached_data)
+
+        # Get the function signature to find parameters with special prefixes
+        signature = inspect.signature(func)
+        param_names = list(signature.parameters.keys())
+
+        # Get type hints from the function
+        type_hints = get_type_hints(func)
+
+        # Extract parameters based on prefixes
+        actual_request_body, actual_query_model, actual_path_params = self._extract_parameters(signature, type_hints)
+
+        # Generate OpenAPI metadata
+        logger.debug(
+            f"Generating metadata with request_body={actual_request_body}, query_model={actual_query_model}, path_params={actual_path_params}",  # noqa: E501
+        )
+
+        # Create a cache key for metadata
+        cache_key = self._generate_metadata_cache_key(actual_request_body, actual_query_model, actual_path_params)
+
+        # Get or generate metadata
+        metadata = self._get_or_generate_metadata(cache_key, actual_request_body)
+
+        # Generate OpenAPI parameters
+        func_annotations = get_type_hints(func)
+        openapi_parameters = self._generate_openapi_parameters(
+            actual_query_model, actual_path_params, param_names, func_annotations
+        )
+
+        # If we have file parameters, set the consumes property to multipart/form-data
+        if any(param.get("in") == "formData" for param in openapi_parameters):
+            metadata["consumes"] = ["multipart/form-data"]
+
+        # Add parameters to metadata
         if openapi_parameters:
             metadata["parameters"] = openapi_parameters
 
@@ -707,9 +782,8 @@ class OpenAPIDecoratorBase:
             query_model=actual_query_model,
         )
 
-        # Get existing type hints
+        # Get existing type hints and merge with new type hints from Pydantic models
         existing_hints = get_type_hints(func)
-        # Merge with new type hints from Pydantic models
         merged_hints = {**existing_hints, **param_types}
 
         # Cache the metadata and other information for future use
@@ -725,171 +799,37 @@ class OpenAPIDecoratorBase:
         }
         FUNCTION_METADATA_CACHE[func] = cached_data
 
-        # Create a wrapper function that handles parameter binding
-        @wraps(func)
-        def wrapper(*args, **kwargs):  # noqa: ANN202
-            return self._process_request(func, cached_data, *args, **kwargs)
+        # Create and return the wrapper function
+        return self._create_function_wrapper(func, cached_data, metadata, merged_hints)
 
-        # Copy OpenAPI metadata to the wrapper
-        wrapper._openapi_metadata = metadata  # noqa: SLF001
+    def _process_request(self, func: Callable[P, R], cached_data: dict[str, Any], *args, **kwargs) -> Any:
+        """Process a request using cached metadata.
 
-        # Add type hints to the wrapper function
-        wrapper.__annotations__ = merged_hints
+        This method uses the ParameterProcessor to handle parameter binding using the Strategy pattern.
 
-        return cast("Callable[P, R]", wrapper)
+        Args:
+            func: The decorated function
+            cached_data: Cached metadata and other information
+            args: Positional arguments to the function
+            kwargs: Keyword arguments to the function
 
-    def _process_request(self, func: Callable[P, R], cached_data: dict[str, Any], *args, **kwargs) -> Any:  # noqa: PLR0915
-        """Process a request using cached metadata."""
-        # Extract cached data
+        Returns:
+            The result of calling the function with bound parameters
+
+        """
+        # Extract signature for filtering kwargs
         signature = cached_data["signature"]
-        param_names = cached_data["param_names"]
-        type_hints = cached_data["type_hints"]
-        actual_request_body = cached_data["actual_request_body"]
-        actual_query_model = cached_data["actual_query_model"]
-        actual_path_params = cached_data["actual_path_params"]
 
-        # Request-specific caching is handled by the framework-specific implementations
+        # Use the parameter processor to handle parameter binding
+        parameter_processor = ParameterProcessor(
+            prefix_config=self.prefix_config,
+            framework_decorator=self.framework_decorator,
+        )
 
-        # Check if we're in a request context
-        has_request_context = False
-        with contextlib.suppress(RuntimeError):  # Not in a request context, skip request-dependent processing
-            has_request_context = bool(request)
-
-        if has_request_context:
-            # Process special parameters that depend on request context
-            # Skip 'self' and 'cls' parameters
-            skip_params = {"self", "cls"}
-
-            # Get parameter prefixes (cached)
-            body_prefix, query_prefix, path_prefix, file_prefix = get_parameter_prefixes(self.prefix_config)
-
-            # Precompute prefix lengths for path and file parameters
-            path_prefix_len = len(path_prefix) + 1  # +1 for the underscore
-            file_prefix_len = len(file_prefix) + 1  # +1 for the underscore
-
-            # Process request body parameters
-            if (
-                actual_request_body
-                and isinstance(actual_request_body, type)
-                and issubclass(actual_request_body, BaseModel)
-            ):
-                for param_name in param_names:
-                    if param_name in skip_params:
-                        continue
-
-                    if param_name.startswith(body_prefix):
-                        # Process request body
-                        kwargs = self.framework_decorator.process_request_body(param_name, actual_request_body, kwargs)
-                        break  # Only process the first request body parameter
-
-            # Process query parameters
-            if actual_query_model:
-                for param_name in param_names:
-                    if param_name in skip_params:
-                        continue
-
-                    if param_name.startswith(query_prefix):
-                        # Process query parameters
-                        kwargs = self.framework_decorator.process_query_params(param_name, actual_query_model, kwargs)
-                        break  # Only process the first query parameter
-
-            # Process path parameters
-            if actual_path_params:
-                for param_name in param_names:
-                    if param_name in skip_params:
-                        continue
-
-                    if param_name.startswith(path_prefix):
-                        # Extract the path parameter name
-                        param_suffix = param_name[path_prefix_len:]
-                        if param_suffix in kwargs:
-                            kwargs[param_name] = kwargs[param_suffix]
-
-            # Process file parameters
-            for param_name in param_names:
-                if param_name in skip_params:
-                    continue
-
-                if param_name.startswith(file_prefix):
-                    # Get the parameter type annotation
-                    param_type = type_hints.get(param_name)
-
-                    # Check if the parameter is a Pydantic model
-                    is_pydantic_model = (
-                        param_type
-                        and isinstance(param_type, type)
-                        and issubclass(param_type, BaseModel)
-                        and hasattr(param_type, "model_fields")
-                        and "file" in param_type.model_fields
-                    )
-
-                    # Extract the file parameter name
-                    param_suffix = param_name[file_prefix_len:]
-
-                    # Handle _x_file (default to 'file' parameter)
-                    if param_suffix == "":
-                        file_param_name = "file"
-                    # Handle _x_file_XXX (extract XXX as parameter name)
-                    elif param_suffix.startswith("_"):
-                        file_param_name = param_suffix[1:]
-                    else:
-                        file_param_name = param_suffix
-
-                    # Check if the file exists in request.files
-                    if file_param_name in request.files:
-                        file_obj = request.files[file_param_name]
-                        if is_pydantic_model:
-                            # Create a Pydantic model instance with the file and other form data
-                            model_data = {}
-                            # Add form data to model_data
-                            for field_name, field_value in request.form.items():
-                                model_data[field_name] = field_value  # noqa: PERF403
-                            # Add file to model_data
-                            model_data["file"] = file_obj
-                            # Create model instance
-                            kwargs[param_name] = param_type(**model_data)
-                        else:
-                            # Just pass the file directly
-                            kwargs[param_name] = file_obj
-                    # If the specific file name is not found, try fallbacks
-                    # First try 'file' as a common default
-                    elif "file" in request.files:
-                        file_obj = request.files["file"]
-                        if is_pydantic_model:
-                            # Create a Pydantic model instance with the file and other form data
-                            model_data = {}
-                            # Add form data to model_data
-                            for field_name, field_value in request.form.items():
-                                model_data[field_name] = field_value
-                            # Add file to model_data
-                            model_data["file"] = file_obj
-                            # Create model instance
-                            kwargs[param_name] = param_type(**model_data)
-                        else:
-                            # Just pass the file directly
-                            kwargs[param_name] = file_obj
-                    # If there's only one file, use that as a last resort
-                    elif len(request.files) == 1:
-                        file_obj = next(iter(request.files.values()))
-                        if is_pydantic_model:
-                            # Create a Pydantic model instance with the file and other form data
-                            model_data = {}
-                            # Add form data to model_data
-                            for field_name, field_value in request.form.items():
-                                model_data[field_name] = field_value
-                            # Add file to model_data
-                            model_data["file"] = file_obj
-                            # Create model instance
-                            kwargs[param_name] = param_type(**model_data)
-                        else:
-                            # Just pass the file directly
-                            kwargs[param_name] = file_obj
-
-            # Process any additional framework-specific parameters
-            kwargs = self.framework_decorator.process_additional_params(kwargs, param_names)
+        # Process all parameters
+        kwargs = parameter_processor.process_parameters(func, cached_data, args, kwargs)
 
         # Filter out any kwargs that are not in the function signature
-        # Get the function signature parameters once
         sig_params = signature.parameters
         valid_kwargs = {k: v for k, v in kwargs.items() if k in sig_params}
 

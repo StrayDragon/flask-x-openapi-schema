@@ -121,7 +121,7 @@ class FlaskOpenAPIDecorator:
         import logging
 
         from flask_x_openapi_schema.core.cache import MODEL_CACHE
-        from flask_x_openapi_schema.core.decorator_base import preprocess_request_data
+        from flask_x_openapi_schema.core.request_processing import preprocess_request_data
 
         logger = logging.getLogger(__name__)
         logger.debug(f"Processing request body for {param_name} with model {model.__name__}")
@@ -365,6 +365,7 @@ def openapi_metadata(
         ...         return item, 201
 
     """
+    # Create the decorator directly
     return FlaskOpenAPIDecorator(
         summary=summary,
         description=description,

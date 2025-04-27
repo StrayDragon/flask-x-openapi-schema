@@ -3,6 +3,23 @@
 This module provides thread-safe caching utilities to improve performance
 when generating OpenAPI schemas. It implements various caching strategies
 to reduce computation overhead during schema generation.
+
+Cache Types:
+    - ThreadSafeCache: A generic, thread-safe cache with LRU eviction policy
+    - WeakKeyDictionary: For function metadata to avoid memory leaks
+    - Regular dictionaries with size limits: For parameter detection, OpenAPI parameters, etc.
+    - LRU cache decorator: For frequently called functions with stable inputs
+
+Performance Considerations:
+    - All caches implement size limits to prevent unbounded memory growth
+    - Thread safety is ensured using RLock for all shared caches
+    - Cache keys are carefully designed to be both unique and hashable
+    - Weak references are used where appropriate to avoid memory leaks
+    - Cache clearing is provided to support testing and memory management
+
+Thread Safety:
+    This module is designed to be thread-safe for use in multi-threaded web servers.
+    All cache operations use appropriate locking mechanisms to prevent race conditions.
 """
 
 import threading

@@ -8,7 +8,7 @@ from flask import request
 from pydantic import BaseModel
 
 from flask_x_openapi_schema.core.config import ConventionalPrefixConfig
-from flask_x_openapi_schema.core.decorator_base import preprocess_request_data
+from flask_x_openapi_schema.core.request_processing import preprocess_request_data
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr
 from flask_x_openapi_schema.models.responses import OpenAPIMetaResponse
 
@@ -498,6 +498,7 @@ def openapi_metadata(
         ...         return item, 201
 
     """
+    # Create the decorator directly
     return FlaskRestfulOpenAPIDecorator(
         summary=summary,
         description=description,
