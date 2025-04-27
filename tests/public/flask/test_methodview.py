@@ -20,7 +20,7 @@ from flask_x_openapi_schema.x.flask.views import (
     extract_openapi_parameters_from_methodview,
 )
 from flask_x_openapi_schema.x.flask_restful import OpenAPIBlueprintMixin
-from tests.test_helpers import flask_request_context
+from tests.internal.test_helpers import flask_request_context
 
 
 # Define Pydantic models for request and response

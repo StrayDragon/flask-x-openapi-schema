@@ -1,4 +1,7 @@
-"""Tests for optional dependencies handling."""
+"""Tests for optional dependencies handling.
+
+This module tests the internal implementation of optional dependencies handling.
+"""
 
 import pytest
 

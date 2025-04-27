@@ -1,4 +1,7 @@
-"""Helper functions and classes for testing flask-x-openapi-schema."""
+"""Helper functions and classes for testing flask-x-openapi-schema.
+
+This module provides internal helper functions for testing.
+"""
 
 import contextlib
 
