@@ -68,6 +68,11 @@ class OpenAPIConfig:
         description: API description
         prefix_config: Parameter prefix configuration
         security_schemes: Security schemes configuration
+        openapi_version: OpenAPI specification version
+        servers: List of server objects
+        external_docs: External documentation
+        webhooks: Webhook definitions
+        jsonSchemaDialect: JSON Schema dialect
 
     """
 
@@ -76,6 +81,11 @@ class OpenAPIConfig:
     description: str = DEFAULT_DESCRIPTION
     prefix_config: ConventionalPrefixConfig = field(default_factory=ConventionalPrefixConfig)
     security_schemes: dict[str, dict[str, Any]] = field(default_factory=dict)
+    openapi_version: str = "3.1.0"
+    servers: list[dict[str, Any]] = field(default_factory=list)
+    external_docs: dict[str, Any] | None = None
+    webhooks: dict[str, dict[str, Any]] = field(default_factory=dict)
+    json_schema_dialect: str | None = None
 
 
 # Global configuration instance with thread safety
@@ -109,6 +119,13 @@ class ThreadSafeConfig:
                 description=self._openapi_config.description,
                 prefix_config=self.get(),
                 security_schemes=dict(self._openapi_config.security_schemes),
+                openapi_version=self._openapi_config.openapi_version,
+                servers=[dict(server) for server in self._openapi_config.servers]
+                if self._openapi_config.servers
+                else [],
+                external_docs=dict(self._openapi_config.external_docs) if self._openapi_config.external_docs else None,
+                webhooks=dict(self._openapi_config.webhooks) if self._openapi_config.webhooks else {},
+                json_schema_dialect=self._openapi_config.json_schema_dialect,
             )
 
     def set(self, config: ConventionalPrefixConfig) -> None:
@@ -131,6 +148,11 @@ class ThreadSafeConfig:
                 description=config.description,
                 prefix_config=config.prefix_config,
                 security_schemes=dict(config.security_schemes),
+                openapi_version=config.openapi_version,
+                servers=[dict(server) for server in config.servers] if config.servers else [],
+                external_docs=dict(config.external_docs) if config.external_docs else None,
+                webhooks=dict(config.webhooks) if config.webhooks else {},
+                json_schema_dialect=config.json_schema_dialect,
             )
             # Also update prefix config
             self.set(config.prefix_config)

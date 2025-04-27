@@ -12,7 +12,6 @@ from typing import Any, get_type_hints
 from flask import Blueprint
 from pydantic import BaseModel
 
-from flask_x_openapi_schema._opt_deps._flask_restful import Resource
 from flask_x_openapi_schema.i18n.i18n_model import I18nBaseModel
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr, get_current_language
 
@@ -72,6 +71,7 @@ class OpenAPISchemaGenerator:
             "securitySchemes": config.security_schemes.copy() if config.security_schemes else {},
         }
         self.tags: list[dict[str, str]] = []
+        self.webhooks: dict[str, dict[str, Any]] = {}
         self._registered_models: set[type[BaseModel]] = set()
 
         # Thread safety locks
@@ -80,6 +80,7 @@ class OpenAPISchemaGenerator:
         self._components_lock = threading.RLock()
         self._tags_lock = threading.RLock()
         self._models_lock = threading.RLock()
+        self._webhooks_lock = threading.RLock()
 
     def add_security_scheme(self, name: str, scheme: dict[str, Any]) -> None:
         """Add a security scheme to the OpenAPI schema.
@@ -103,6 +104,17 @@ class OpenAPISchemaGenerator:
         with self._tags_lock:
             self.tags.append({"name": name, "description": description})
 
+    def add_webhook(self, name: str, webhook_data: dict[str, Any]) -> None:
+        """Add a webhook to the OpenAPI schema.
+
+        Args:
+            name: The name of the webhook
+            webhook_data: The webhook definition
+
+        """
+        with self._webhooks_lock:
+            self.webhooks[name] = webhook_data
+
     def scan_blueprint(self, blueprint: Blueprint) -> None:
         """Scan a Flask blueprint for API resources and add them to the schema.
 
@@ -117,7 +129,7 @@ class OpenAPISchemaGenerator:
         for resource, urls, _ in blueprint.resources:
             self._process_resource(resource, urls, blueprint.url_prefix)
 
-    def _process_resource(self, resource: type[Resource], urls: tuple[str], prefix: str | None = None) -> None:
+    def _process_resource(self, resource: Any, urls: tuple[str], prefix: str | None = None) -> None:
         """Process a Flask-RESTful resource and add its endpoints to the schema.
 
         Args:
@@ -258,7 +270,7 @@ class OpenAPISchemaGenerator:
         }
         return converter_map.get(converter, {"type": "string"})
 
-    def _build_operation_from_method(self, method: Any, resource_cls: type[Resource]) -> dict[str, Any]:
+    def _build_operation_from_method(self, method: Any, resource_cls: Any) -> dict[str, Any]:
         """Build an OpenAPI operation object from a Flask-RESTful resource method.
 
         Args:
@@ -523,8 +535,11 @@ class OpenAPISchemaGenerator:
         """
         # Use a lock to ensure consistent state during schema generation
         with self._lock:
-            return {
-                "openapi": "3.0.3",
+            # Get OpenAPI configuration
+            config = get_openapi_config()
+
+            schema = {
+                "openapi": config.openapi_version,
                 "info": {
                     "title": self.title,
                     "version": self.version,
@@ -534,3 +549,21 @@ class OpenAPISchemaGenerator:
                 "components": self.components,
                 "tags": self.tags,
             }
+
+            # Add webhooks if defined
+            if self.webhooks:
+                schema["webhooks"] = self.webhooks
+
+            # Add servers if defined in config
+            if config.servers:
+                schema["servers"] = config.servers
+
+            # Add external docs if defined in config
+            if config.external_docs:
+                schema["externalDocs"] = config.external_docs
+
+            # Add JSON Schema dialect if defined in config
+            if config.json_schema_dialect:
+                schema["jsonSchemaDialect"] = config.json_schema_dialect
+
+            return schema

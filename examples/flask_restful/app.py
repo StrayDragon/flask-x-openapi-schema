@@ -723,7 +723,23 @@ for resource, urls, _ in api.resources:
 def get_openapi_spec():
     """Generate and return the OpenAPI specification."""
     # Manually register models
+    from flask_x_openapi_schema.core.config import OpenAPIConfig, configure_openapi
     from flask_x_openapi_schema.core.utils import pydantic_to_openapi_schema
+
+    # Configure OpenAPI with 3.1.0 version and additional features
+    configure_openapi(
+        OpenAPIConfig(
+            title="Product API",
+            version="1.0.0",
+            description="API for managing products",
+            openapi_version="3.1.0",
+            servers=[
+                {"url": "http://localhost:5001", "description": "Development server"},
+                {"url": "https://api.example.com", "description": "Production server"},
+            ],
+            external_docs={"description": "Find more info here", "url": "https://example.com/docs"},
+        )
+    )
 
     # Generate the schema with output_format="json" to get a dictionary
     schema = api.generate_openapi_schema(
@@ -750,6 +766,20 @@ def get_openapi_spec():
         model_schema = pydantic_to_openapi_schema(model)
         schema["components"]["schemas"][model.__name__] = model_schema
 
+    # Add webhooks (OpenAPI 3.1 feature)
+    schema["webhooks"] = {
+        "newProduct": {
+            "post": {
+                "summary": "New product webhook",
+                "description": "Triggered when a new product is created",
+                "requestBody": {
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProductResponse"}}}
+                },
+                "responses": {"200": {"description": "Webhook received successfully"}},
+            }
+        }
+    }
+
     # Debug: Print the schema to console
     print("\nOpenAPI Schema:")
     print(f"openapi version: {schema.get('openapi', 'NOT FOUND')}")
@@ -760,6 +790,10 @@ def get_openapi_spec():
     print(f"components: {len(schema.get('components', {}).get('schemas', {}))} schemas")
     for schema_name in schema.get("components", {}).get("schemas", {}):
         print(f"  - {schema_name}")
+    if "webhooks" in schema:
+        print(f"webhooks: {len(schema.get('webhooks', {}))} webhooks")
+        for webhook_name in schema.get("webhooks", {}):
+            print(f"  - {webhook_name}")
 
     # Convert to YAML with proper settings
     yaml_content = yaml.dump(schema, sort_keys=False, default_flow_style=False, allow_unicode=True)
@@ -792,6 +826,7 @@ def index():
                     layout: "BaseLayout",
                     validatorUrl: null,
                     displayRequestDuration: true,
+                    supportedSubmitMethods: ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'],
                     syntaxHighlight: {
                         activated: true,
                         theme: "agate"

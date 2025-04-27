@@ -35,7 +35,9 @@ from flask_x_openapi_schema import (
     OpenAPIMetaResponseItem,
     set_current_language,
 )
+from flask_x_openapi_schema.core.config import OpenAPIConfig, configure_openapi
 from flask_x_openapi_schema.x.flask import OpenAPIMethodViewMixin, openapi_metadata
+from flask_x_openapi_schema.x.flask.views import MethodViewOpenAPISchemaGenerator
 
 # Create a Flask app
 app = Flask(__name__)
@@ -925,12 +927,41 @@ app.register_blueprint(blueprint)
 def get_openapi_spec():
     """Generate and return the OpenAPI specification."""
     # Create a schema generator for MethodView classes
-    from flask_x_openapi_schema.x.flask.views import MethodViewOpenAPISchemaGenerator
+
+    # Configure OpenAPI with 3.1.0 version and additional features
+    configure_openapi(
+        OpenAPIConfig(
+            title="Product API",
+            version="1.0.0",
+            description="API for managing products",
+            openapi_version="3.1.0",
+            servers=[
+                {"url": "http://localhost:5002", "description": "Development server"},
+                {"url": "https://api.example.com", "description": "Production server"},
+            ],
+            external_docs={"description": "Find more info here", "url": "https://example.com/docs"},
+        )
+    )
 
     generator = MethodViewOpenAPISchemaGenerator(
         title="Product API",
         version="1.0.0",
         description="API for managing products",
+    )
+
+    # Add a webhook example (OpenAPI 3.1 feature)
+    generator.add_webhook(
+        "newProduct",
+        {
+            "post": {
+                "summary": "New product webhook",
+                "description": "Triggered when a new product is created",
+                "requestBody": {
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProductResponse"}}}
+                },
+                "responses": {"200": {"description": "Webhook received successfully"}},
+            }
+        },
     )
 
     # Manually register response models and enums
@@ -960,6 +991,10 @@ def get_openapi_spec():
     print(f"components: {len(schema.get('components', {}).get('schemas', {}))} schemas")
     for schema_name in schema.get("components", {}).get("schemas", {}):
         print(f"  - {schema_name}")
+    if "webhooks" in schema:
+        print(f"webhooks: {len(schema.get('webhooks', {}))} webhooks")
+        for webhook_name in schema.get("webhooks", {}):
+            print(f"  - {webhook_name}")
 
     # Convert to YAML with proper settings
     yaml_content = yaml.dump(schema, sort_keys=False, default_flow_style=False, allow_unicode=True)
@@ -992,6 +1027,7 @@ def index():
                     layout: "BaseLayout",
                     validatorUrl: null,
                     displayRequestDuration: true,
+                    supportedSubmitMethods: ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'],
                     syntaxHighlight: {
                         activated: true,
                         theme: "agate"

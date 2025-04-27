@@ -81,6 +81,12 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
         The fixed schema
 
     """
+    # Get OpenAPI configuration to check version
+    from .config import get_openapi_config
+
+    config = get_openapi_config()
+    is_openapi_31 = config.openapi_version.startswith("3.1")
+
     # Handle non-dict inputs
     if not isinstance(schema, dict):
         return schema
@@ -91,17 +97,22 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
         return _REFERENCES_CACHE[schema_id]
 
     # Fast path for schemas without references or special handling
-    has_ref = "$ref" in schema and isinstance(schema["$ref"], str) and "#/$defs/" in schema["$ref"]
+    has_ref = (
+        "$ref" in schema
+        and isinstance(schema["$ref"], str)
+        and ("#/$defs/" in schema["$ref"] or "#/definitions/" in schema["$ref"])
+    )
     has_extra = "json_schema_extra" in schema
     has_file = "type" in schema and schema["type"] == "string" and "format" in schema and schema["format"] == "binary"
+    has_nullable = "nullable" in schema and is_openapi_31  # Need to convert nullable in OpenAPI 3.1
 
     # Check for nested structures only if needed
     has_nested = False
-    if not (has_ref or has_extra or has_file):
+    if not (has_ref or has_extra or has_file or has_nullable):
         has_nested = any(isinstance(v, (dict, list)) for v in schema.values())
 
     # If no special handling needed, return schema as is
-    if not (has_ref or has_extra or has_nested or has_file):
+    if not (has_ref or has_extra or has_nested or has_file or has_nullable):
         result = schema.copy()
         # Cache the result if cache isn't too large
         if len(_REFERENCES_CACHE) < MAX_REFERENCES_CACHE_SIZE:
@@ -111,8 +122,8 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
     # Process schema with special handling
     result = {}
     for key, value in schema.items():
-        if key == "$ref" and isinstance(value, str) and "#/$defs/" in value:
-            # Replace $defs with components/schemas
+        if key == "$ref" and isinstance(value, str) and ("#/$defs/" in value or "#/definitions/" in value):
+            # Replace $defs or definitions with components/schemas
             model_name = value.split("/")[-1]
             result[key] = f"#/components/schemas/{model_name}"
         elif key == "json_schema_extra" and isinstance(value, dict):
@@ -120,6 +131,17 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
             for extra_key, extra_value in value.items():
                 if extra_key != "multipart/form-data":  # Skip this key, it's handled elsewhere
                     result[extra_key] = extra_value
+        elif key == "nullable" and is_openapi_31:
+            # In OpenAPI 3.1, convert nullable to type array with null
+            if value is True and "type" in result:
+                if isinstance(result["type"], list):
+                    if "null" not in result["type"]:
+                        result["type"].append("null")
+                else:
+                    result["type"] = [result["type"], "null"]
+            else:
+                # Keep nullable for OpenAPI 3.0 compatibility
+                result[key] = value
         elif isinstance(value, dict):
             result[key] = _fix_references(value)
         elif isinstance(value, list) and any(isinstance(item, dict) for item in value):
@@ -133,6 +155,11 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
     if has_file:
         result["type"] = "string"
         result["format"] = "binary"
+
+    # Handle nullable for OpenAPI 3.1 if it wasn't already processed
+    if has_nullable and "nullable" in schema and schema["nullable"] is True and "type" not in result:
+        # If there's no type but there is nullable, add type: ["null"]
+        result["type"] = ["null"]
 
     # Cache the result if cache isn't too large
     if len(_REFERENCES_CACHE) < MAX_REFERENCES_CACHE_SIZE:
@@ -154,6 +181,12 @@ def python_type_to_openapi_type(python_type: Any) -> dict[str, Any]:  # noqa: PL
         The OpenAPI type definition
 
     """
+    # Get OpenAPI configuration to check version
+    from .config import get_openapi_config
+
+    config = get_openapi_config()
+    is_openapi_31 = config.openapi_version.startswith("3.1")
+
     # Fast lookup for common primitive types
     if python_type is str:
         return {"type": "string"}
@@ -164,7 +197,7 @@ def python_type_to_openapi_type(python_type: Any) -> dict[str, Any]:  # noqa: PL
     if python_type is bool:
         return {"type": "boolean"}
     if python_type is None or python_type is type(None):
-        return {"type": "null"}
+        return {"type": "null"} if is_openapi_31 else {"nullable": True}
 
     # Handle container types
     origin = getattr(python_type, "__origin__", None)
@@ -177,6 +210,11 @@ def python_type_to_openapi_type(python_type: Any) -> dict[str, Any]:  # noqa: PL
         return {"type": "array"}
     if python_type is dict or origin is dict:
         # Handle Dict[X, Y]
+        args = getattr(python_type, "__args__", [])
+        if len(args) == 2 and is_openapi_31 and args[0] is str:  # noqa: PLR2004
+            # In OpenAPI 3.1, we can specify additionalProperties more precisely
+            value_type = python_type_to_openapi_type(args[1])
+            return {"type": "object", "additionalProperties": value_type}
         return {"type": "object"}
 
     # Handle special types
@@ -198,13 +236,30 @@ def python_type_to_openapi_type(python_type: Any) -> dict[str, Any]:  # noqa: PL
             # Handle Pydantic models
             return {"$ref": f"#/components/schemas/{python_type.__name__}"}
 
-    # Handle Optional[X] types
+    # Handle Optional[X] types (Union[X, None])
     if origin is Union:
         args = getattr(python_type, "__args__", [])
         if len(args) == 2 and args[1] is type(None):  # noqa: PLR2004
             inner_type = python_type_to_openapi_type(args[0])
-            inner_type["nullable"] = True
+            if is_openapi_31:
+                # In OpenAPI 3.1, use type array with null
+                if "type" in inner_type:
+                    if isinstance(inner_type["type"], list):
+                        if "null" not in inner_type["type"]:
+                            inner_type["type"].append("null")
+                    else:
+                        inner_type["type"] = [inner_type["type"], "null"]
+                else:
+                    # For references, we need to use oneOf with null
+                    inner_type = {"oneOf": [inner_type, {"type": "null"}]}
+            else:
+                # In OpenAPI 3.0, use nullable: true
+                inner_type["nullable"] = True
             return inner_type
+
+        # Handle Union[X, Y, ...] for OpenAPI 3.1
+        if is_openapi_31 and len(args) > 1:
+            return {"oneOf": [python_type_to_openapi_type(arg) for arg in args]}
 
     # Default to string for unknown types
     return {"type": "string"}

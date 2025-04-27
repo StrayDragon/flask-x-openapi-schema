@@ -123,7 +123,7 @@ def test_generate_openapi_schema_yaml_with_real_view(blueprint):
 
     # Check that the schema is a string (YAML)
     assert isinstance(schema, str)
-    assert "openapi: 3.0.3" in schema
+    assert "openapi: 3.1.0" in schema  # Updated to 3.1.0
     assert "title: Test API" in schema
     assert "version: 1.0.0" in schema
     assert "description: Test API Description" in schema
@@ -262,7 +262,7 @@ def test_generate_openapi_schema_json_with_real_view(blueprint):
 
     # Check that the schema is a dictionary (JSON)
     assert isinstance(schema, dict)
-    assert schema["openapi"] == "3.0.3"
+    assert schema["openapi"] == "3.1.0"  # Updated to 3.1.0
     assert schema["info"]["title"] == "Test API"
     assert schema["info"]["version"] == "1.0.0"
     assert schema["info"]["description"] == "Test API Description"

@@ -18,6 +18,8 @@ Thread Safety:
     Any caching is handled through thread-safe cache implementations.
 """
 
+import json
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any, TypeVar
@@ -27,7 +29,74 @@ from pydantic import BaseModel
 
 from flask_x_openapi_schema.core.config import ConventionalPrefixConfig
 
-# Import preprocess_request_data function at runtime to avoid circular imports
+# Get logger for this module
+logger = logging.getLogger(__name__)
+
+
+def preprocess_request_data(data: dict[str, Any], model: type[Any]) -> dict[str, Any]:
+    """Preprocess request data before validation.
+
+    This function handles special cases like converting string representations of lists
+    to actual lists, which is common when receiving data from form submissions.
+
+    Args:
+        data: The request data to preprocess
+        model: The model class that will be used for validation
+
+    Returns:
+        The preprocessed data
+
+    """
+    # If the model is not a Pydantic model, return the data as is
+    if not isinstance(model, type) or not issubclass(model, BaseModel):
+        return data
+
+    # Create a copy of the data to avoid modifying the original
+    processed_data = data.copy()
+
+    # Get model fields if available
+    model_fields = getattr(model, "model_fields", {})
+
+    # Process each field in the data
+    for field_name, field_value in data.items():
+        # Skip if the field is not in the model
+        if field_name not in model_fields:
+            continue
+
+        # Get the field type
+        field_info = model_fields[field_name]
+        field_type = field_info.annotation
+
+        # Check if the field is a list type and the value is a string
+        if (
+            hasattr(field_type, "__origin__")
+            and field_type.__origin__ is list
+            and isinstance(field_value, str)
+            and field_value
+        ):
+            # Try to parse the string as JSON
+            try:
+                parsed_value = json.loads(field_value)
+                if isinstance(parsed_value, list):
+                    processed_data[field_name] = parsed_value
+                else:
+                    # If it's not a list, wrap it in a list
+                    processed_data[field_name] = [parsed_value]
+            except json.JSONDecodeError:
+                # If it's not valid JSON, treat it as a single item
+                processed_data[field_name] = [field_value]
+        # Check if the field is a list type and the value is a single non-list item
+        elif (
+            hasattr(field_type, "__origin__")
+            and field_type.__origin__ is list
+            and not isinstance(field_value, list)
+            and field_value is not None
+        ):
+            # Wrap the single item in a list
+            processed_data[field_name] = [field_value]
+
+    return processed_data
+
 
 # Type variable for framework-specific decorators
 T = TypeVar("T")

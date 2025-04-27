@@ -128,7 +128,7 @@ def test_generate_openapi_command_json_format(runner, app, mock_blueprint):
     """Test generate_openapi_command with JSON format."""
     # Set up the mock to return a dict for JSON format
     mock_blueprint.api.generate_openapi_schema.return_value = {
-        "openapi": "3.0.0",
+        "openapi": "3.1.0",
         "info": {
             "title": "Test API - test_api",
             "version": "1.0.0",
@@ -177,7 +177,7 @@ def test_generate_openapi_command_json_format(runner, app, mock_blueprint):
             # Check the file content
             with open(output_file) as f:
                 content = json.load(f)
-                assert content["openapi"] == "3.0.0"
+                assert content["openapi"] == "3.1.0"
                 assert content["info"]["title"] == "Test API - test_api"
 
 

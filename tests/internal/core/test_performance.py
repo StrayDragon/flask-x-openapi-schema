@@ -85,7 +85,7 @@ def test_schema_generator_performance():
     generation_time = time.time() - start_time
 
     # Check that the schema was generated correctly
-    assert schema["openapi"] == "3.0.3"
+    assert schema["openapi"] == "3.1.0"  # Updated to 3.1.0
     assert schema["info"]["title"] == "Test API"
     assert schema["info"]["version"] == "1.0.0"
     assert schema["info"]["description"] == "Test API Description"

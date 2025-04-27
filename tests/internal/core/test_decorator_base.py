@@ -18,8 +18,8 @@ from flask_x_openapi_schema.core.decorator_base import (
     _generate_openapi_metadata,
     _handle_response,
     _process_i18n_value,
-    preprocess_request_data,
 )
+from flask_x_openapi_schema.core.request_processing import preprocess_request_data
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr
 from flask_x_openapi_schema.models.base import BaseRespModel
 from flask_x_openapi_schema.models.file_models import FileField
