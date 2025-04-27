@@ -46,9 +46,6 @@ R = TypeVar("R")
 logger = logging.getLogger(__name__)
 
 
-# Import preprocess_request_data from request_processing module
-
-
 def _extract_parameters_from_prefixes(
     signature: inspect.Signature,
     type_hints: dict[str, Any],

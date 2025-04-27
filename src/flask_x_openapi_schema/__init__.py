@@ -1,5 +1,13 @@
 """Flask-X-OpenAPI-Schema: A Flask extension for generating OpenAPI schemas from Pydantic models."""
 
+from .core.cache import (
+    CacheEvictionPolicy,
+    ThreadSafeCache,
+    TTLCache,
+    clear_all_caches,
+    get_cache_stats,
+    warmup_cache,
+)
 from .core.config import (
     GLOBAL_CONFIG_HOLDER,
     ConventionalPrefixConfig,
@@ -27,6 +35,8 @@ __all__ = [
     "GLOBAL_CONFIG_HOLDER",
     # Models
     "BaseRespModel",
+    # Cache
+    "CacheEvictionPolicy",
     # Configuration
     "ConventionalPrefixConfig",
     "DocumentUploadModel",
@@ -40,13 +50,19 @@ __all__ = [
     "OpenAPIMetaResponseItem",
     # Schema Generator
     "OpenAPISchemaGenerator",
+    "TTLCache",
+    "ThreadSafeCache",
+    "clear_all_caches",
+    # Configuration functions
     "configure_prefixes",
     "create_response",
     "error_response",
+    "get_cache_stats",
     "get_current_language",
     "reset_prefixes",
     "set_current_language",
     "success_response",
+    "warmup_cache",
     # Decorators
     # ref to .x
 ]

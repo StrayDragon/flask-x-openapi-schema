@@ -1,83 +1,28 @@
-"""Caching mechanisms for OpenAPI schema generation.
+"""Standalone demonstration of cache implementations."""
 
-This module provides thread-safe caching utilities to improve performance
-when generating OpenAPI schemas. It implements various caching strategies
-to reduce computation overhead during schema generation.
-
-Cache Types:
-    - ThreadSafeCache: A generic, thread-safe cache with LRU eviction policy
-    - TTLCache: Thread-safe cache with time-to-live expiration
-    - LFUCache: Thread-safe cache with Least Frequently Used eviction policy
-    - WeakKeyDictionary: For function metadata to avoid memory leaks
-    - Regular dictionaries with size limits: For parameter detection, OpenAPI parameters, etc.
-    - LRU cache decorator: For frequently called functions with stable inputs
-
-Performance Considerations:
-    - All caches implement size limits to prevent unbounded memory growth
-    - Thread safety is ensured using RLock for all shared caches
-    - Cache keys are carefully designed to be both unique and hashable
-    - Weak references are used where appropriate to avoid memory leaks
-    - Cache clearing is provided to support testing and memory management
-    - TTL mechanism automatically removes expired entries
-    - Cache statistics provide insights into cache performance
-
-Thread Safety:
-    This module is designed to be thread-safe for use in multi-threaded web servers.
-    All cache operations use appropriate locking mechanisms to prevent race conditions.
-"""
-
+import enum
 import threading
 import time
-import weakref
 from collections import Counter, OrderedDict
-from enum import Enum
-from functools import lru_cache
 from typing import Any, Generic, TypeVar
 
-from pydantic import BaseModel
+from rich import print as rprint
+from rich.console import Console
+from rich.table import Table
 
-# Type variable for cache values
-T = TypeVar("T")
+# Create console for rich output
+console = Console()
+
+# Type variables for cache values
 K = TypeVar("K")
+T = TypeVar("T")
 
-# Maximum size for regular dictionary caches to prevent memory leaks
+# Default cache settings
 MAX_CACHE_SIZE = 1000
-
-# Default TTL for cache entries (in seconds)
 DEFAULT_TTL = 300  # 5 minutes
 
-# Cache for decorated functions to avoid recomputing metadata (weak references)
-FUNCTION_METADATA_CACHE = weakref.WeakKeyDictionary()
 
-# Cache for model instances to avoid recomputing and improve performance
-MODEL_INSTANCE_CACHE = {}
-
-# Cache for parameter detection results (using dict with size limit)
-PARAM_DETECTION_CACHE: dict[tuple, Any] = {}
-
-# Maximum size for PARAM_DETECTION_CACHE items
-MAX_PARAM_DETECTION_CACHE_SIZE = 1000
-
-# Cache for OpenAPI parameters extracted from models (using dict with size limit)
-OPENAPI_PARAMS_CACHE: dict[tuple, Any] = {}
-
-# Maximum size for OPENAPI_PARAMS_CACHE items
-MAX_OPENAPI_PARAMS_CACHE_SIZE = 1000
-
-# Cache for OpenAPI metadata generation (using dict with size limit)
-METADATA_CACHE: dict[tuple, Any] = {}
-
-# Maximum size for METADATA_CACHE items
-MAX_METADATA_CACHE_SIZE = 1000
-
-# Cache for RequestParser instances (using dict with size limit)
-REQPARSE_CACHE: dict[str, Any] = {}
-
-# Cache for i18n string processing
-_I18N_CACHE: dict[tuple, Any] = {}
-
-
-class CacheEvictionPolicy(Enum):
+class CacheEvictionPolicy(enum.Enum):
     """Enumeration of cache eviction policies."""
 
     LRU = "lru"  # Least Recently Used
@@ -93,7 +38,6 @@ class CacheBase(Generic[K, T]):
 
         Args:
             max_size: Maximum number of items to store in the cache
-
         """
         self._lock = threading.RLock()
         self._max_size = max_size
@@ -108,7 +52,6 @@ class CacheBase(Generic[K, T]):
 
         Returns:
             Cached value or None if not found
-
         """
         raise NotImplementedError
 
@@ -118,7 +61,6 @@ class CacheBase(Generic[K, T]):
         Args:
             key: Cache key
             value: Value to cache
-
         """
         raise NotImplementedError
 
@@ -130,7 +72,6 @@ class CacheBase(Generic[K, T]):
 
         Returns:
             True if key exists, False otherwise
-
         """
         raise NotImplementedError
 
@@ -146,7 +87,6 @@ class CacheBase(Generic[K, T]):
 
         Returns:
             True if key was removed, False if key was not in cache
-
         """
         raise NotImplementedError
 
@@ -155,7 +95,6 @@ class CacheBase(Generic[K, T]):
 
         Returns:
             Dictionary with cache statistics
-
         """
         with self._lock:
             total_accesses = self._hits + self._misses
@@ -173,7 +112,6 @@ class CacheBase(Generic[K, T]):
 
         Returns:
             Number of items in the cache
-
         """
         raise NotImplementedError
 
@@ -193,10 +131,9 @@ class ThreadSafeCache(CacheBase[K, T]):
         Args:
             max_size: Maximum number of items to store in the cache
             eviction_policy: Policy to use when evicting items from the cache
-
         """
         super().__init__(max_size)
-        self._cache: dict[str | tuple, T] = {}
+        self._cache: dict[K, T] = {}
         self._eviction_policy = eviction_policy
 
         # Data structures for different eviction policies
@@ -207,7 +144,7 @@ class ThreadSafeCache(CacheBase[K, T]):
         elif eviction_policy == CacheEvictionPolicy.FIFO:
             self._insertion_order = []  # Track insertion order
 
-    def get(self, key: str | tuple) -> T | None:
+    def get(self, key: K) -> T | None:
         """Get a value from the cache.
 
         Args:
@@ -215,7 +152,6 @@ class ThreadSafeCache(CacheBase[K, T]):
 
         Returns:
             Cached value or None if not found
-
         """
         with self._lock:
             if key in self._cache:
@@ -234,32 +170,16 @@ class ThreadSafeCache(CacheBase[K, T]):
             self._misses += 1
             return None
 
-    def set(self, key: str | tuple, value: T) -> None:
+    def set(self, key: K, value: T) -> None:
         """Set a value in the cache.
 
         Args:
             key: Cache key
             value: Value to cache
-
         """
         with self._lock:
-            # If key already exists, just update the value and tracking
-            if key in self._cache:
-                self._cache[key] = value
-
-                # Update tracking based on eviction policy
-                if self._eviction_policy == CacheEvictionPolicy.LRU:
-                    # Move to end (most recently used)
-                    self._access_order.move_to_end(key)
-                elif self._eviction_policy == CacheEvictionPolicy.LFU:
-                    # Reset access count for updated items
-                    self._access_count[key] = 1
-                # For FIFO, we don't change the insertion order when updating
-
-                return
-
-            # Check if we need to evict items for new keys
-            if len(self._cache) >= self._max_size:
+            # Check if we need to evict items
+            if len(self._cache) >= self._max_size and key not in self._cache:
                 # Force eviction when cache is full
                 self._evict_item()
 
@@ -269,8 +189,7 @@ class ThreadSafeCache(CacheBase[K, T]):
                     # remove any item to make space
                     # Remove first item we find
                     first_key = next(iter(self._cache))
-                    if first_key in self._cache:
-                        del self._cache[first_key]
+                    self._cache.pop(first_key, None)
 
                     # Also remove from tracking structures
                     if self._eviction_policy == CacheEvictionPolicy.LRU and first_key in self._access_order:
@@ -289,7 +208,6 @@ class ThreadSafeCache(CacheBase[K, T]):
             elif self._eviction_policy == CacheEvictionPolicy.LFU:
                 self._access_count[key] = 1  # Initialize access count
             elif self._eviction_policy == CacheEvictionPolicy.FIFO and key not in self._insertion_order:
-                # Only add to insertion order if not already there
                 self._insertion_order.append(key)
 
     def _evict_item(self) -> None:
@@ -300,15 +218,8 @@ class ThreadSafeCache(CacheBase[K, T]):
         if self._eviction_policy == CacheEvictionPolicy.LRU:
             # Remove least recently used item (first item in OrderedDict)
             if self._access_order:
-                try:
-                    # Get the first key (least recently used)
-                    oldest_key, _ = self._access_order.popitem(last=False)
-                    # Remove from cache
-                    if oldest_key in self._cache:
-                        del self._cache[oldest_key]
-                except KeyError:
-                    # Handle case where key might have been removed already
-                    pass
+                oldest_key, _ = self._access_order.popitem(last=False)
+                self._cache.pop(oldest_key, None)
 
         elif self._eviction_policy == CacheEvictionPolicy.LFU:
             # Remove least frequently used item
@@ -318,21 +229,15 @@ class ThreadSafeCache(CacheBase[K, T]):
                 if valid_keys:
                     # Find the key with minimum access count
                     least_used_key = min(valid_keys, key=lambda k: self._access_count[k])
-                    # Remove from cache
-                    if least_used_key in self._cache:
-                        del self._cache[least_used_key]
-                    # Remove from access count
-                    if least_used_key in self._access_count:
-                        del self._access_count[least_used_key]
+                    self._cache.pop(least_used_key, None)
+                    del self._access_count[least_used_key]
 
         elif self._eviction_policy == CacheEvictionPolicy.FIFO and self._insertion_order:
             # Remove oldest item (first in)
             oldest_key = self._insertion_order.pop(0)
-            # Remove from cache
-            if oldest_key in self._cache:
-                del self._cache[oldest_key]
+            self._cache.pop(oldest_key, None)
 
-    def contains(self, key: str | tuple) -> bool:
+    def contains(self, key: K) -> bool:
         """Check if a key exists in the cache.
 
         Args:
@@ -340,7 +245,6 @@ class ThreadSafeCache(CacheBase[K, T]):
 
         Returns:
             True if key exists, False otherwise
-
         """
         with self._lock:
             return key in self._cache
@@ -360,7 +264,7 @@ class ThreadSafeCache(CacheBase[K, T]):
             elif self._eviction_policy == CacheEvictionPolicy.FIFO:
                 self._insertion_order.clear()
 
-    def remove(self, key: str | tuple) -> bool:
+    def remove(self, key: K) -> bool:
         """Remove a key from the cache.
 
         Args:
@@ -368,7 +272,6 @@ class ThreadSafeCache(CacheBase[K, T]):
 
         Returns:
             True if key was removed, False if key was not in cache
-
         """
         with self._lock:
             if key in self._cache:
@@ -392,7 +295,6 @@ class ThreadSafeCache(CacheBase[K, T]):
 
         Returns:
             Number of items in the cache
-
         """
         with self._lock:
             return len(self._cache)
@@ -417,13 +319,12 @@ class TTLCache(ThreadSafeCache[K, T]):
             max_size: Maximum number of items to store in the cache
             ttl: Default time-to-live in seconds for cache entries
             eviction_policy: Policy to use when evicting items from the cache
-
         """
         super().__init__(max_size, eviction_policy)
         self._ttl = ttl
-        self._expiry_times: dict[str | tuple, float] = {}
+        self._expiry_times: dict[K, float] = {}
 
-    def get(self, key: str | tuple) -> T | None:
+    def get(self, key: K) -> T | None:
         """Get a value from the cache, checking for expiration.
 
         Args:
@@ -431,7 +332,6 @@ class TTLCache(ThreadSafeCache[K, T]):
 
         Returns:
             Cached value or None if not found or expired
-
         """
         with self._lock:
             # Check if key exists and hasn't expired
@@ -453,14 +353,13 @@ class TTLCache(ThreadSafeCache[K, T]):
             self._misses += 1
             return None
 
-    def set(self, key: str | tuple, value: T, ttl: int | None = None) -> None:
+    def set(self, key: K, value: T, ttl: int | None = None) -> None:
         """Set a value in the cache with a TTL.
 
         Args:
             key: Cache key
             value: Value to cache
             ttl: Time-to-live in seconds (uses default if None)
-
         """
         with self._lock:
             # Clean expired entries if cache is full
@@ -507,12 +406,11 @@ class TTLCache(ThreadSafeCache[K, T]):
             elif self._eviction_policy == CacheEvictionPolicy.FIFO and key not in self._insertion_order:
                 self._insertion_order.append(key)
 
-    def _remove_expired_entry(self, key: str | tuple) -> None:
+    def _remove_expired_entry(self, key: K) -> None:
         """Remove a single expired entry.
 
         Args:
             key: Cache key to remove
-
         """
         if key in self._cache:
             del self._cache[key]
@@ -535,7 +433,6 @@ class TTLCache(ThreadSafeCache[K, T]):
 
         Returns:
             Number of entries removed
-
         """
         now = time.time()
         expired_keys = [k for k, exp_time in self._expiry_times.items() if exp_time <= now]
@@ -551,7 +448,7 @@ class TTLCache(ThreadSafeCache[K, T]):
             super().clear()
             self._expiry_times.clear()
 
-    def remove(self, key: str | tuple) -> bool:
+    def remove(self, key: K) -> bool:
         """Remove a key from the cache.
 
         Args:
@@ -559,7 +456,6 @@ class TTLCache(ThreadSafeCache[K, T]):
 
         Returns:
             True if key was removed, False if key was not in cache
-
         """
         with self._lock:
             result = super().remove(key)
@@ -572,7 +468,6 @@ class TTLCache(ThreadSafeCache[K, T]):
 
         Returns:
             Dictionary with cache statistics
-
         """
         stats = super().get_stats()
         with self._lock:
@@ -591,287 +486,100 @@ class TTLCache(ThreadSafeCache[K, T]):
             return stats
 
 
-# Create singleton instances
-MODEL_SCHEMA_CACHE = ThreadSafeCache[str | tuple, dict[str, Any]]()
-MODEL_CACHE = ThreadSafeCache[str | tuple, Any]()
-
-# Create TTL cache instances for frequently changing data
-DYNAMIC_SCHEMA_CACHE = TTLCache[str | tuple, dict[str, Any]](max_size=500, ttl=60)  # 1 minute TTL
-REQUEST_DATA_CACHE = TTLCache[str | tuple, Any](max_size=200, ttl=30)  # 30 seconds TTL
-
-
-def get_parameter_prefixes(
-    config: Any | None = None,
-) -> tuple[str, str, str, str]:
-    """Get parameter prefixes from config or global defaults.
-
-    This function retrieves parameter prefixes from the provided config or global defaults.
-
-    Args:
-        config: Optional configuration object with custom prefixes
-
-    Returns:
-        Tuple of (body_prefix, query_prefix, path_prefix, file_prefix)
-
-    """
-    from .config import GLOBAL_CONFIG_HOLDER
-
-    # If config is None, use global config
-    prefix_config = GLOBAL_CONFIG_HOLDER.get() if config is None else config
-
-    # Extract the prefixes directly
-    return (
-        prefix_config.request_body_prefix,
-        prefix_config.request_query_prefix,
-        prefix_config.request_path_prefix,
-        prefix_config.request_file_prefix,
-    )
-
-
-@lru_cache(maxsize=256)
-def extract_param_types(
-    request_body_model: type[BaseModel] | None,
-    query_model: type[BaseModel] | None,
-) -> dict[str, Any]:
-    """Extract parameter types from Pydantic models for type annotations.
-
-    This function is cached to avoid recomputing for the same models.
-
-    Args:
-        request_body_model: Request body Pydantic model
-        query_model: Query parameters Pydantic model
-
-    Returns:
-        Dictionary of parameter types
-
-    """
-    param_types = {}
-
-    # Helper function to extract and cache model field types
-    def extract_model_types(model: type[BaseModel]) -> dict[str, Any]:
-        # Create a cache key based on the model's id
-        model_key = id(model)
-
-        # Check if we've already cached this model's types
-        cached_types = MODEL_CACHE.get(model_key)
-        if cached_types is not None:
-            return cached_types
-
-        # Get field types from the Pydantic model
-        model_types = {field_name: field.annotation for field_name, field in model.model_fields.items()}
-
-        # Cache the result
-        MODEL_CACHE.set(model_key, model_types)
-        return model_types
-
-    # Add types from request_body if it's a Pydantic model
-    if request_body_model and hasattr(request_body_model, "model_fields"):
-        param_types.update(extract_model_types(request_body_model))
-
-    # Add types from query_model if it's a Pydantic model
-    if query_model and hasattr(query_model, "model_fields"):
-        param_types.update(extract_model_types(query_model))
-
-    return param_types
-
-
-def clear_all_caches() -> None:
-    """Clear all caches to free memory or force regeneration.
-
-    This function clears all caches used by the library, including both
-    regular dictionary caches and ThreadSafeCache instances.
-    """
-    import gc
-    import logging
-
-    logger = logging.getLogger(__name__)
-    logger.debug("Clearing all caches")
-
-    # Clear regular dictionary caches
-    PARAM_DETECTION_CACHE.clear()
-    OPENAPI_PARAMS_CACHE.clear()
-    METADATA_CACHE.clear()
-    REQPARSE_CACHE.clear()
-    FUNCTION_METADATA_CACHE.clear()
-    _I18N_CACHE.clear()
-
-    # Clear ThreadSafeCache instances
-    # These need special handling to ensure thread safety
-    MODEL_SCHEMA_CACHE.clear()
-    MODEL_CACHE.clear()
-
-    # Clear TTLCache instances
-    DYNAMIC_SCHEMA_CACHE.clear()
-    REQUEST_DATA_CACHE.clear()
-
-    # Clear lru_cache decorated functions
-    extract_param_types.cache_clear()
-
-    # Force garbage collection to ensure all references are cleaned up
-    gc.collect()
-
-    # Log cache stats after clearing
-    logger.debug(f"Cache stats after clearing: {get_cache_stats()}")
-
-
-def get_cache_stats() -> dict[str, Any]:
-    """Get statistics about cache usage.
-
-    Returns:
-        Dictionary with detailed cache statistics including:
-        - Size of each cache
-        - Hit/miss rates for ThreadSafeCache instances
-        - TTL information for TTLCache instances
-        - Overall memory usage estimation
-
-    """
-    # Get sizes of regular dictionary caches
-    stats = {
-        "function_metadata": len(FUNCTION_METADATA_CACHE),
-        "param_detection": len(PARAM_DETECTION_CACHE),
-        "openapi_params": len(OPENAPI_PARAMS_CACHE),
-        "metadata": len(METADATA_CACHE),
-        "reqparse": len(REQPARSE_CACHE),
-        "i18n_cache": len(_I18N_CACHE),
-    }
-
-    # Add ThreadSafeCache and TTLCache statistics
-    # These provide more detailed information through their get_stats() method
-    stats["model_schema"] = MODEL_SCHEMA_CACHE.get_stats()
-    stats["model_cache"] = MODEL_CACHE.get_stats()
-    stats["dynamic_schema"] = DYNAMIC_SCHEMA_CACHE.get_stats()
-    stats["request_data"] = REQUEST_DATA_CACHE.get_stats()
-
-    # Calculate total entries across all caches
-    total_entries = (
-        stats["function_metadata"]
-        + stats["param_detection"]
-        + stats["openapi_params"]
-        + stats["metadata"]
-        + stats["reqparse"]
-        + stats["i18n_cache"]
-        + stats["model_schema"]["current_size"]
-        + stats["model_cache"]["current_size"]
-        + stats["dynamic_schema"]["current_size"]
-        + stats["request_data"]["current_size"]
-    )
-
-    stats["total_entries"] = total_entries
-
-    return stats
-
-
-def warmup_cache(models: list[type[BaseModel]] | None = None) -> dict[str, Any]:
-    """Preload common data into caches to improve initial performance.
-
-    This function preloads frequently used data into caches to avoid
-    cold-start performance issues. It can be called during application
-    initialization to prepare caches for use.
-
-    Args:
-        models: List of Pydantic models to preload into schema cache
-
-    Returns:
-        Dictionary with statistics about the warmup operation
-
-    """
-    import logging
-
-    logger = logging.getLogger(__name__)
-    logger.info("Warming up caches")
-
-    stats = {
-        "models_processed": 0,
-        "schemas_generated": 0,
-        "time_taken": 0,
-    }
-
-    if not models:
-        logger.info("No models provided for cache warmup")
-        return stats
-
-    import time
-
-    start_time = time.time()
-
-    # Process models to generate and cache schemas
-    for model in models:
-        if not hasattr(model, "model_fields"):
-            logger.warning(f"Skipping non-Pydantic model: {model}")
-            continue
-
-        # Generate and cache schema
-        from .schema_generator import pydantic_to_openapi_schema
-
-        schema = pydantic_to_openapi_schema(model)
-
-        # Store in cache
-        model_key = id(model)
-        MODEL_SCHEMA_CACHE.set(model_key, schema)
-
-        # Extract and cache field types
-        model_types = {field_name: field.annotation for field_name, field in model.model_fields.items()}
-        MODEL_CACHE.set(model_key, model_types)
-
-        stats["models_processed"] += 1
-        stats["schemas_generated"] += 1
-
-    # Calculate time taken
-    stats["time_taken"] = time.time() - start_time
-
-    logger.info(f"Cache warmup completed in {stats['time_taken']:.2f} seconds")
-    logger.info(f"Processed {stats['models_processed']} models")
-    logger.info(f"Generated {stats['schemas_generated']} schemas")
-
-    return stats
-
-
-def make_cache_key(*args: Any, **kwargs: Any) -> tuple:
-    """Create a consistent cache key from arguments.
-
-    This helper function creates a hashable cache key from a mix of
-    arguments, handling common unhashable types appropriately.
-
-    Args:
-        *args: Positional arguments to include in the key
-        **kwargs: Keyword arguments to include in the key
-
-    Returns:
-        A hashable tuple to use as a cache key
-
-    """
-    import logging
-
-    logger = logging.getLogger(__name__)
-    logger.debug(f"Creating cache key for args={args}, kwargs={kwargs}")
-
-    def make_hashable(obj):  # noqa: ANN001, ANN202
-        """Convert an object to a hashable representation."""
-        if isinstance(obj, dict):
-            # Convert dict to sorted tuple of items with hashable values
-            return tuple(sorted((k, make_hashable(v)) for k, v in obj.items()))
-        if isinstance(obj, (list, tuple)):
-            # Convert list/tuple to tuple with hashable values
-            return tuple(make_hashable(x) for x in obj)
-        if isinstance(obj, (str, int, float, bool, type(None))):
-            # These types are already hashable
-            return obj
-        if hasattr(obj, "__dict__"):
-            # Use object's id for objects
-            return f"obj:{id(obj)}"
-        # For any other type, use string representation and id
-        return f"{type(obj).__name__}:{id(obj)}"
-
-    # Process positional args
-    key_parts = [make_hashable(arg) for arg in args]
-
-    # Process keyword args (sorted by key)
-    if kwargs:
-        sorted_items = sorted(kwargs.items())
-        for k, v in sorted_items:
-            key_parts.append((k, make_hashable(v)))
-
-    result = tuple(key_parts)
-    logger.debug(f"Created cache key: {result}")
-
-    return result
+def demonstrate_thread_safe_cache():
+    """Demonstrate ThreadSafeCache with different eviction policies."""
+    console.rule("[bold green]ThreadSafeCache Demonstration")
+
+    # Create caches with different eviction policies
+    lru_cache = ThreadSafeCache[str, str](max_size=3, eviction_policy=CacheEvictionPolicy.LRU)
+    lfu_cache = ThreadSafeCache[str, str](max_size=3, eviction_policy=CacheEvictionPolicy.LFU)
+    fifo_cache = ThreadSafeCache[str, str](max_size=3, eviction_policy=CacheEvictionPolicy.FIFO)
+
+    # Populate caches
+    for cache in [lru_cache, lfu_cache, fifo_cache]:
+        cache.set("key1", "value1")
+        cache.set("key2", "value2")
+        cache.set("key3", "value3")
+
+    # Access patterns
+    lru_cache.get("key1")  # Make key1 most recently used
+
+    lfu_cache.get("key1")  # Increase frequency for key1
+    lfu_cache.get("key1")
+    lfu_cache.get("key2")  # Increase frequency for key2
+
+    # Add new item to each cache, forcing eviction
+    lru_cache.set("key4", "value4")  # Should evict key2 or key3 (least recently used)
+    lfu_cache.set("key4", "value4")  # Should evict key3 (least frequently used)
+    fifo_cache.set("key4", "value4")  # Should evict key1 (first in)
+
+    # Create table to display results
+    table = Table(title="Cache Eviction Policy Comparison")
+    table.add_column("Key", style="cyan")
+    table.add_column("LRU Cache", style="green")
+    table.add_column("LFU Cache", style="yellow")
+    table.add_column("FIFO Cache", style="red")
+
+    # Add rows for each key
+    for key in ["key1", "key2", "key3", "key4"]:
+        table.add_row(
+            key,
+            "✅" if lru_cache.get(key) else "❌",
+            "✅" if lfu_cache.get(key) else "❌",
+            "✅" if fifo_cache.get(key) else "❌",
+        )
+
+    console.print(table)
+
+    # Display cache statistics
+    console.print("[bold]Cache Statistics:[/bold]")
+    rprint(f"LRU Cache: {lru_cache.get_stats()}")
+    rprint(f"LFU Cache: {lfu_cache.get_stats()}")
+    rprint(f"FIFO Cache: {fifo_cache.get_stats()}")
+
+
+def demonstrate_ttl_cache():
+    """Demonstrate TTLCache with expiration."""
+    console.rule("[bold green]TTLCache Demonstration")
+
+    # Create TTL cache with short expiration
+    ttl_cache = TTLCache[str, str](max_size=10, ttl=2)  # 2 seconds TTL
+
+    # Add items with different TTLs
+    ttl_cache.set("short_ttl", "This will expire quickly")
+    ttl_cache.set("custom_ttl", "This will expire later", ttl=5)  # 5 seconds TTL
+
+    # Display initial state
+    console.print("[bold]Initial Cache State:[/bold]")
+    rprint(f"short_ttl: {ttl_cache.get('short_ttl')}")
+    rprint(f"custom_ttl: {ttl_cache.get('custom_ttl')}")
+    rprint(f"Cache Stats: {ttl_cache.get_stats()}")
+
+    # Wait for short TTL to expire
+    console.print("[bold yellow]Waiting for short TTL to expire (2 seconds)...[/bold yellow]")
+    time.sleep(2.1)
+
+    # Display state after short TTL expires
+    console.print("[bold]Cache State After Short TTL Expires:[/bold]")
+    rprint(f"short_ttl: {ttl_cache.get('short_ttl')}")
+    rprint(f"custom_ttl: {ttl_cache.get('custom_ttl')}")
+    rprint(f"Cache Stats: {ttl_cache.get_stats()}")
+
+    # Wait for custom TTL to expire
+    console.print("[bold yellow]Waiting for custom TTL to expire (3 more seconds)...[/bold yellow]")
+    time.sleep(3.1)
+
+    # Display state after all TTLs expire
+    console.print("[bold]Cache State After All TTLs Expire:[/bold]")
+    rprint(f"short_ttl: {ttl_cache.get('short_ttl')}")
+    rprint(f"custom_ttl: {ttl_cache.get('custom_ttl')}")
+    rprint(f"Cache Stats: {ttl_cache.get_stats()}")
+
+
+if __name__ == "__main__":
+    console.print("[bold blue]Cache Implementation Examples[/bold blue]")
+
+    demonstrate_thread_safe_cache()
+    demonstrate_ttl_cache()
+
+    console.print("[bold green]All examples completed successfully![/bold green]")
