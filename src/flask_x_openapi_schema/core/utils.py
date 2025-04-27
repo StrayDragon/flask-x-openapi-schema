@@ -13,7 +13,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from .cache import MODEL_SCHEMA_CACHE, make_cache_key
+from .cache import MODEL_SCHEMA_CACHE
 
 
 @lru_cache(maxsize=256)
@@ -63,10 +63,16 @@ def pydantic_to_openapi_schema(model: type[BaseModel]) -> dict[str, Any]:
     return schema
 
 
+# Cache for _fix_references function
+_REFERENCES_CACHE: dict[int, dict[str, Any]] = {}
+MAX_REFERENCES_CACHE_SIZE = 1000
+
+
 def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
     """Fix references in a schema to use components/schemas instead of $defs.
 
     Also applies any json_schema_extra attributes to the schema.
+    This function is cached based on the schema object's id to improve performance.
 
     Args:
         schema: The schema to fix
@@ -78,6 +84,11 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
     # Handle non-dict inputs
     if not isinstance(schema, dict):
         return schema
+
+    # Try to use cached result based on schema object id
+    schema_id = id(schema)
+    if schema_id in _REFERENCES_CACHE:
+        return _REFERENCES_CACHE[schema_id]
 
     # Fast path for schemas without references or special handling
     has_ref = "$ref" in schema and isinstance(schema["$ref"], str) and "#/$defs/" in schema["$ref"]
@@ -91,7 +102,11 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
 
     # If no special handling needed, return schema as is
     if not (has_ref or has_extra or has_nested or has_file):
-        return schema.copy()
+        result = schema.copy()
+        # Cache the result if cache isn't too large
+        if len(_REFERENCES_CACHE) < MAX_REFERENCES_CACHE_SIZE:
+            _REFERENCES_CACHE[schema_id] = result
+        return result
 
     # Process schema with special handling
     result = {}
@@ -104,7 +119,7 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
             # Apply json_schema_extra attributes directly to the schema
             for extra_key, extra_value in value.items():
                 if extra_key != "multipart/form-data":  # Skip this key, it's handled elsewhere
-                    result[extra_key] = extra_value  # noqa: PERF403
+                    result[extra_key] = extra_value
         elif isinstance(value, dict):
             result[key] = _fix_references(value)
         elif isinstance(value, list) and any(isinstance(item, dict) for item in value):
@@ -118,6 +133,10 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
     if has_file:
         result["type"] = "string"
         result["format"] = "binary"
+
+    # Cache the result if cache isn't too large
+    if len(_REFERENCES_CACHE) < MAX_REFERENCES_CACHE_SIZE:
+        _REFERENCES_CACHE[schema_id] = result
 
     return result
 
@@ -286,10 +305,12 @@ _I18N_CACHE: dict[tuple, Any] = {}
 MAX_I18N_CACHE_SIZE = 1000
 
 
+@lru_cache(maxsize=512)
 def process_i18n_value(value: Any, language: str) -> Any:
     """Process a value that might be an I18nString or contain I18nString values.
 
     Uses caching to improve performance for repeated conversions.
+    This function is cached using lru_cache for better performance.
 
     Args:
         value: The value to process
@@ -305,33 +326,20 @@ def process_i18n_value(value: Any, language: str) -> Any:
     if not isinstance(value, (I18nStr, dict, list)):
         return value
 
-    # Try to use cached result
-    cache_key = make_cache_key(id(value), language)
-    if cache_key in _I18N_CACHE:
-        return _I18N_CACHE[cache_key]
-
     # Process based on type
-    result = None
     if isinstance(value, I18nStr):
-        result = value.get(language)
-    elif isinstance(value, dict):
-        result = process_i18n_dict(value, language)
-    elif isinstance(value, list):
-        result = [process_i18n_value(item, language) for item in value]
-    else:
-        result = value
-
-    # Cache the result if cache isn't too large
-    if len(_I18N_CACHE) < MAX_I18N_CACHE_SIZE:
-        _I18N_CACHE[cache_key] = result
-
-    return result
+        return value.get(language)
+    if isinstance(value, dict):
+        return process_i18n_dict(value, language)
+    if isinstance(value, list):
+        return [process_i18n_value(item, language) for item in value]
+    return value
 
 
 def process_i18n_dict(data: dict[str, Any], language: str) -> dict[str, Any]:
     """Process a dictionary that might contain I18nString values.
 
-    Uses caching to improve performance for repeated conversions.
+    Recursively processes all I18nString values in a dictionary.
 
     Args:
         data: The dictionary to process
@@ -342,11 +350,6 @@ def process_i18n_dict(data: dict[str, Any], language: str) -> dict[str, Any]:
 
     """
     from flask_x_openapi_schema.i18n.i18n_string import I18nStr
-
-    # Try to use cached result
-    cache_key = make_cache_key(id(data), language)
-    if cache_key in _I18N_CACHE:
-        return _I18N_CACHE[cache_key]
 
     # Process dictionary
     result = {}
@@ -360,13 +363,14 @@ def process_i18n_dict(data: dict[str, Any], language: str) -> dict[str, Any]:
         else:
             result[key] = value
 
-    # Cache the result if cache isn't too large
-    if len(_I18N_CACHE) < MAX_I18N_CACHE_SIZE:
-        _I18N_CACHE[cache_key] = result
-
     return result
 
 
 def clear_i18n_cache() -> None:
     """Clear the i18n processing cache."""
     _I18N_CACHE.clear()
+
+
+def clear_references_cache() -> None:
+    """Clear the references processing cache."""
+    _REFERENCES_CACHE.clear()

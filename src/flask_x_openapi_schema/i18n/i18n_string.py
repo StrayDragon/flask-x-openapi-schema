@@ -82,6 +82,9 @@ class I18nStr:
 
     """
 
+    # Define __slots__ to reduce memory usage
+    __slots__ = ("default_language", "strings")
+
     @classmethod
     def __get_pydantic_core_schema__(cls, _source_type: Any, _handler: Any) -> CoreSchema:
         """Generate a pydantic core schema for I18nString."""
@@ -197,6 +200,18 @@ class I18nStr:
         if isinstance(other, str):
             return str(self) == other
         return False
+
+    def __hash__(self) -> int:
+        """Get a hash value for the I18nString.
+
+        This is needed for using I18nString as a dictionary key or in sets.
+
+        Returns:
+            A hash value for the I18nString
+
+        """
+        # Hash based on the strings dictionary and default language
+        return hash((frozenset(self.strings.items()), self.default_language))
 
     @classmethod
     def create(cls, **kwargs) -> "I18nStr":

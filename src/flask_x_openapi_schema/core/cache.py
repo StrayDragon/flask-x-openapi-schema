@@ -707,6 +707,13 @@ def clear_all_caches() -> None:
     # Clear lru_cache decorated functions
     extract_param_types.cache_clear()
 
+    # Clear utils module caches
+    from .utils import clear_i18n_cache, clear_references_cache, process_i18n_value
+
+    clear_references_cache()
+    clear_i18n_cache()
+    process_i18n_value.cache_clear()
+
     # Force garbage collection to ensure all references are cleaned up
     gc.collect()
 

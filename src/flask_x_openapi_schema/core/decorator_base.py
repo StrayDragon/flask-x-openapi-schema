@@ -344,9 +344,6 @@ def _detect_file_parameters(
     return file_params
 
 
-# This function has been moved to the framework-specific decorators
-
-
 class OpenAPIDecoratorBase:
     """Base class for OpenAPI metadata decorators."""
 
