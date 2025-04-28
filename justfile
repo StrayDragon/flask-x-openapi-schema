@@ -46,9 +46,6 @@ example-flask:
 example-flask-restful:
 	uv run python -m examples.flask_restful.app
 
-example-cache:
-	uv run python examples/standalone_cache_demo.py
-
 mkdocs-build:
 	uv run mkdocs build
 

@@ -264,7 +264,7 @@ class FlaskRestfulOpenAPIDecorator:
         from flask_x_openapi_schema.x.flask_restful.utils import create_reqparse_from_pydantic
 
         # Create new parser
-        return create_reqparse_from_pydantic(body_model=model, query_model=None)
+        return create_reqparse_from_pydantic(model=model)
 
     def _create_model_from_args(self, model: type[BaseModel], args: dict) -> BaseModel:
         """Create a model instance from parsed arguments.
@@ -396,7 +396,7 @@ class FlaskRestfulOpenAPIDecorator:
         from flask_x_openapi_schema.x.flask_restful.utils import create_reqparse_from_pydantic
 
         # Create new parser
-        return create_reqparse_from_pydantic(query_model=model, body_model=None)
+        return create_reqparse_from_pydantic(model=model, location="args")
 
     def process_additional_params(self, kwargs: dict[str, Any], param_names: list[str]) -> dict[str, Any]:
         """Process additional framework-specific parameters.

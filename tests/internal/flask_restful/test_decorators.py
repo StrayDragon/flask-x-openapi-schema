@@ -240,3 +240,69 @@ def test_openapi_metadata_with_i18n():
     assert metadata.get("description") == description
     # The language parameter might not be stored in the metadata
     # It's used during processing but might not be stored
+
+
+@pytest.mark.skipif(flask_restful is None, reason="flask-restful not installed")
+def test_get_or_create_parser():
+    """Test the _get_or_create_parser method."""
+    from flask_x_openapi_schema.x.flask_restful.decorators import FlaskRestfulOpenAPIDecorator
+
+    # Create a decorator
+    decorator = FlaskRestfulOpenAPIDecorator()
+
+    # Define a test model
+    class TestModel(BaseModel):
+        name: str = Field(..., description="The name")
+        age: int = Field(..., description="The age")
+
+    # Get a parser
+    parser = decorator._get_or_create_parser(TestModel)
+
+    # Check that the parser has the expected arguments
+    args = parser.args
+
+    # Check argument names
+    arg_names = [arg.name for arg in args]
+    assert "name" in arg_names
+    assert "age" in arg_names
+
+    # Check argument types
+    name_arg = next(arg for arg in args if arg.name == "name")
+    age_arg = next(arg for arg in args if arg.name == "age")
+
+    assert name_arg.type is str
+    assert age_arg.type is int
+    assert name_arg.location == "json"  # Default location
+
+
+@pytest.mark.skipif(flask_restful is None, reason="flask-restful not installed")
+def test_get_or_create_query_parser():
+    """Test the _get_or_create_query_parser method."""
+    from flask_x_openapi_schema.x.flask_restful.decorators import FlaskRestfulOpenAPIDecorator
+
+    # Create a decorator
+    decorator = FlaskRestfulOpenAPIDecorator()
+
+    # Define a test model
+    class QueryModel(BaseModel):
+        name: str = Field(..., description="The name")
+        age: int = Field(None, description="The age")
+
+    # Get a parser
+    parser = decorator._get_or_create_query_parser(QueryModel)
+
+    # Check that the parser has the expected arguments
+    args = parser.args
+
+    # Check argument names
+    arg_names = [arg.name for arg in args]
+    assert "name" in arg_names
+    assert "age" in arg_names
+
+    # Check argument types and location
+    name_arg = next(arg for arg in args if arg.name == "name")
+    age_arg = next(arg for arg in args if arg.name == "age")
+
+    assert name_arg.type is str
+    assert age_arg.type is int
+    assert name_arg.location == "args"  # Query parameters use 'args' location
