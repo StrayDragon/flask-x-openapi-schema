@@ -17,7 +17,6 @@ from flask_x_openapi_schema import (
     clear_all_caches,
     configure_cache,
     get_cache_config,
-    get_cache_stats,
 )
 from flask_x_openapi_schema.x.flask import OpenAPIMethodViewMixin, openapi_metadata
 from flask_x_openapi_schema.x.flask.views import generate_openapi_schema
@@ -105,14 +104,10 @@ def measure_schema_generation(iterations: int = 10) -> tuple[float, float]:
     console.print("[bold]Testing with caching enabled:[/bold]")
     clear_all_caches()  # Start with clean caches
 
-    # Configure cache with all caches enabled
+    # Configure cache with caching enabled
     configure_cache(
         CacheConfig(
             enabled=True,
-            schema_cache_enabled=True,
-            param_binding_cache_enabled=True,
-            model_cache_enabled=True,
-            metadata_cache_enabled=True,
         )
     )
 
@@ -125,9 +120,8 @@ def measure_schema_generation(iterations: int = 10) -> tuple[float, float]:
         generate_openapi_schema(blueprint)
     cached_time = time.time() - start_time
 
-    # Get cache stats
-    cache_stats = get_cache_stats()
-    console.print(f"Cache stats: {cache_stats}")
+    # Cache stats no longer available in simplified cache system
+    console.print("Cache stats no longer available in simplified cache system")
 
     # Now run with caching disabled
     console.print("\n[bold]Testing with caching disabled:[/bold]")
@@ -157,45 +151,21 @@ def demonstrate_cache_config() -> None:
     current_config = get_cache_config()
     console.print("[bold]Current Cache Configuration:[/bold]")
     console.print(f"Enabled: {current_config.enabled}")
-    console.print(f"Schema Cache Enabled: {current_config.schema_cache_enabled}")
-    console.print(f"Parameter Binding Cache Enabled: {current_config.param_binding_cache_enabled}")
-    console.print(f"Model Cache Enabled: {current_config.model_cache_enabled}")
-    console.print(f"Metadata Cache Enabled: {current_config.metadata_cache_enabled}")
-    console.print(f"Max Cache Size: {current_config.max_cache_size}")
-    console.print(f"TTL Cache Duration: {current_config.ttl_cache_duration} seconds")
 
     # Example 1: Disable all caching
     console.print("\n[bold]Example 1: Disable all caching[/bold]")
     configure_cache(CacheConfig(enabled=False))
     console.print(f"All caching disabled: {get_cache_config().enabled}")
 
-    # Example 2: Enable only schema caching
-    console.print("\n[bold]Example 2: Enable only schema caching[/bold]")
+    # Example 2: Enable caching
+    console.print("\n[bold]Example 2: Enable caching[/bold]")
     configure_cache(
         CacheConfig(
             enabled=True,
-            schema_cache_enabled=True,
-            param_binding_cache_enabled=False,
-            model_cache_enabled=False,
-            metadata_cache_enabled=False,
         )
     )
     config = get_cache_config()
-    console.print(f"Schema caching enabled: {config.schema_cache_enabled}")
-    console.print(f"Parameter binding caching disabled: {config.param_binding_cache_enabled}")
-
-    # Example 3: Custom cache sizes
-    console.print("\n[bold]Example 3: Custom cache sizes[/bold]")
-    configure_cache(
-        CacheConfig(
-            enabled=True,
-            max_cache_size=2000,
-            ttl_cache_duration=600,  # 10 minutes
-        )
-    )
-    config = get_cache_config()
-    console.print(f"Max cache size: {config.max_cache_size}")
-    console.print(f"TTL cache duration: {config.ttl_cache_duration} seconds")
+    console.print(f"Caching enabled: {config.enabled}")
 
     # Reset to default configuration
     configure_cache(CacheConfig())

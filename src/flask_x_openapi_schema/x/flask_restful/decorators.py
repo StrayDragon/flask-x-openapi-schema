@@ -4,11 +4,9 @@ import logging
 from collections.abc import Callable
 from typing import Any, TypeVar
 
-from flask import request
 from pydantic import BaseModel
 
 from flask_x_openapi_schema.core.config import ConventionalPrefixConfig
-from flask_x_openapi_schema.core.request_processing import preprocess_request_data
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr
 from flask_x_openapi_schema.models.responses import OpenAPIMetaResponse
 
@@ -129,41 +127,71 @@ class FlaskRestfulOpenAPIDecorator:
             Updated kwargs dictionary with the model instance
 
         """
-        from flask import request
+        from flask_x_openapi_schema.core.request_extractors import ModelFactory, request_processor, safe_operation
 
-        from flask_x_openapi_schema.core.cache import MODEL_CACHE, make_cache_key
+        logger = logging.getLogger(__name__)
+        logger.debug(f"Processing request body for {param_name} with model {model.__name__}")
 
         # Check if this is a file upload model
         has_file_fields = self._check_for_file_fields(model)
 
         # Handle file upload models
+        from flask import request
+
         if has_file_fields and request.files:
             model_instance = self._process_file_upload_model(model)
             kwargs[param_name] = model_instance
             return kwargs
 
-        # Standard handling for non-file models
+        # For Flask-RESTful, we need to handle reqparse integration
         # Get or create reqparse parser
         parser = self._get_or_create_parser(model)
 
         # Parse arguments
         self.parsed_args = parser.parse_args()
 
-        # Create cache key based on model and parsed arguments
-        cache_key = make_cache_key(id(model), self.parsed_args)
+        # First try to use the request processor for direct JSON handling
+        # This handles cases where the client sends JSON directly
+        from flask import request
 
-        # Check for cached model instance
-        cached_instance = MODEL_CACHE.get(cache_key)
-        if cached_instance is not None:
-            kwargs[param_name] = cached_instance
+        json_model_instance = request_processor.process_request_data(request, model, param_name)
+
+        if json_model_instance:
+            logger.debug(f"Successfully created model instance from JSON for {param_name}")
+            kwargs[param_name] = json_model_instance
+            self.parsed_args = None  # Clear parsed args since we're using JSON
             return kwargs
 
-        # Create model instance from parsed arguments
-        model_instance = self._create_model_from_args(model, self.parsed_args)
-        kwargs[param_name] = model_instance
+        # If JSON processing failed, use the parsed arguments from reqparse
+        if self.parsed_args:
+            # Process arguments using the core preprocess_request_data function
+            try:
+                from flask_x_openapi_schema.core.request_processing import preprocess_request_data
 
-        # Cache the model instance
-        MODEL_CACHE.set(cache_key, model_instance)
+                processed_data = preprocess_request_data(self.parsed_args, model)
+
+                # Try to create model instance
+                model_instance = safe_operation(
+                    lambda: ModelFactory.create_from_data(model, processed_data), fallback=None
+                )
+
+                if model_instance:
+                    logger.debug(f"Successfully created model instance from reqparse for {param_name}")
+                    kwargs[param_name] = model_instance
+                    return kwargs
+            except Exception:
+                logger.exception("Error processing reqparse data")
+
+        # If we get here, create a default instance
+        logger.warning(f"No valid request data found for {param_name}, creating default instance")
+
+        try:
+            model_instance = safe_operation(lambda: model(), fallback=None)
+            if model_instance:
+                logger.debug(f"Created empty model instance for {param_name}")
+                kwargs[param_name] = model_instance
+        except Exception:
+            logger.exception("Failed to create default model instance")
 
         return kwargs
 
@@ -224,7 +252,7 @@ class FlaskRestfulOpenAPIDecorator:
         return model(**model_data)
 
     def _get_or_create_parser(self, model: type[BaseModel]) -> Any:
-        """Get an existing parser or create a new one for the model.
+        """Create a parser for the model.
 
         Args:
             model: The model to create a parser for
@@ -233,22 +261,10 @@ class FlaskRestfulOpenAPIDecorator:
             A RequestParser instance for the model
 
         """
-        from flask_x_openapi_schema.core.cache import REQPARSE_CACHE
         from flask_x_openapi_schema.x.flask_restful.utils import create_reqparse_from_pydantic
 
-        # Use model's id as cache key
-        model_id = id(model)
-
-        # Check if we've already created a reqparse for this model
-        if model_id in REQPARSE_CACHE:
-            return REQPARSE_CACHE.get(model_id)
-
         # Create new parser
-        parser = create_reqparse_from_pydantic(body_model=model, query_model=None)
-
-        # Cache the parser
-        REQPARSE_CACHE[model_id] = parser
-        return parser
+        return create_reqparse_from_pydantic(body_model=model, query_model=None)
 
     def _create_model_from_args(self, model: type[BaseModel], args: dict) -> BaseModel:
         """Create a model instance from parsed arguments.
@@ -261,68 +277,63 @@ class FlaskRestfulOpenAPIDecorator:
             An instance of the model
 
         """
+        from flask_x_openapi_schema.core.request_extractors import ModelFactory, safe_operation
+        from flask_x_openapi_schema.core.request_processing import preprocess_request_data
+
         logger = logging.getLogger(__name__)
-
-        # First, try to use the raw JSON data if available
-        if request.is_json:
-            try:
-                raw_json = request.get_json(silent=True)
-                if raw_json and isinstance(raw_json, dict):
-                    logger.debug("Using raw JSON data from request")
-
-                    # Try to create model instance directly from raw JSON
-                    try:
-                        return model.model_validate(raw_json)
-                    except Exception as e:
-                        logger.warning(f"Failed to validate model from raw JSON: {e}")
-
-                        # If validation fails, try to create using constructor
-                        try:
-                            # Only use fields that exist in the model
-                            model_fields = model.model_fields
-                            filtered_json = {k: v for k, v in raw_json.items() if k in model_fields}
-                            return model(**filtered_json)
-                        except Exception as e2:
-                            logger.warning(f"Failed to create model from raw JSON: {e2}")
-                            # Continue with normal processing if this fails
-            except Exception as e:
-                logger.warning(f"Error accessing raw JSON data: {e}")
+        logger.debug(f"Creating model instance for {model.__name__} from args")
 
         # Process arguments using the core preprocess_request_data function
-        # This ensures consistent handling across Flask and Flask-RESTful
         processed_data = preprocess_request_data(args, model)
+        logger.debug("Processed data", extra={"processed_data": processed_data})
 
-        # Try to create model instance using model_validate first (better handling of complex types)
+        # Try to create model instance using ModelFactory
+        model_instance = safe_operation(lambda: ModelFactory.create_from_data(model, processed_data), fallback=None)
+
+        if model_instance:
+            logger.debug("Successfully created model instance")
+            return model_instance
+
+        # If model creation failed, try to create an empty instance
+        logger.warning("Failed to create model instance from args, creating empty instance")
+
         try:
-            logger.debug(f"Attempting to validate model {model.__name__} with processed data")
-            model_instance = model.model_validate(processed_data)
-            logger.debug("Model validation successful")
-        except Exception as e:
-            logger.warning("Validation error. Falling back to manual construction.", extra={"error": e})
+            model_instance = model()
+            logger.debug("Created empty model instance")
+        except Exception as empty_err:
+            logger.exception("Failed to create empty model instance")
+            # Continue to try with default values
+            # Create a minimal instance with default values for required fields
+            if hasattr(model, "model_json_schema"):
+                schema = model.model_json_schema()
+                required_fields = schema.get("required", [])
+                default_data = {}
 
-            # Filter data to only include fields in the model
-            try:
-                model_fields = model.model_fields
-                filtered_data = {k: v for k, v in processed_data.items() if k in model_fields}
-                logger.debug("Filtered data", extra={"filtered_data": filtered_data})
+                for field in required_fields:
+                    if field in model.model_fields:
+                        field_info = model.model_fields[field]
+                        if field_info.annotation is str:
+                            default_data[field] = ""
+                        elif field_info.annotation is int:
+                            default_data[field] = 0
+                        elif field_info.annotation is float:
+                            default_data[field] = 0.0
+                        elif field_info.annotation is bool:
+                            default_data[field] = False
+                        else:
+                            default_data[field] = None
 
-                # Create instance using constructor
-                model_instance = model(**filtered_data)
-                logger.debug("Created model instance using constructor")
-            except Exception as e2:
-                logger.exception("Failed to create model instance(e2)")
-
-                # Try to create an empty instance with default values as last resort
                 try:
-                    model_instance = model()
-                    logger.warning("Created empty model instance as fallback")
-                except Exception as e3:
-                    logger.exception("Failed to create empty model instance")
-                    raise e2 from e3  # Raise the original error
+                    model_instance = model.model_validate(default_data)
+                    logger.debug("Created model instance with default values")
+                except Exception:
+                    logger.exception("Failed to create model instance with default values")
                 else:
                     return model_instance
-            else:
-                return model_instance
+
+            # If all else fails, raise an error
+            error_msg = f"Failed to create instance of {model.__name__}"
+            raise ValueError(error_msg) from empty_err
         else:
             return model_instance
 
@@ -338,10 +349,15 @@ class FlaskRestfulOpenAPIDecorator:
             Updated kwargs dictionary with the model instance
 
         """
-        from flask_x_openapi_schema.core.cache import MODEL_CACHE, make_cache_key
+        # No imports needed here
 
-        # Skip if we already have parsed arguments
+        logger = logging.getLogger(__name__)
+
+        # Skip if we already have parsed arguments from request body processing
         if self.parsed_args:
+            # Create model instance from parsed arguments
+            model_instance = self._create_model_from_args(model, self.parsed_args)
+            kwargs[param_name] = model_instance
             return kwargs
 
         # Get or create reqparse parser for query parameters
@@ -350,26 +366,25 @@ class FlaskRestfulOpenAPIDecorator:
         # Parse arguments
         self.parsed_args = parser.parse_args()
 
-        # Create cache key based on model and parsed arguments
-        cache_key = make_cache_key(id(model), self.parsed_args)
-
-        # Check for cached model instance
-        cached_instance = MODEL_CACHE.get(cache_key)
-        if cached_instance is not None:
-            kwargs[param_name] = cached_instance
-            return kwargs
-
         # Create model instance from parsed arguments
-        model_instance = self._create_model_from_args(model, self.parsed_args)
-        kwargs[param_name] = model_instance
+        try:
+            model_instance = self._create_model_from_args(model, self.parsed_args)
+            kwargs[param_name] = model_instance
+        except Exception:
+            logger.exception(f"Failed to create model instance for {param_name}")
 
-        # Cache the model instance
-        MODEL_CACHE.set(cache_key, model_instance)
+            # Try to create a default instance
+            try:
+                model_instance = model()
+                logger.debug(f"Created empty model instance for {param_name}")
+                kwargs[param_name] = model_instance
+            except Exception:
+                logger.exception(f"Failed to create empty model instance for {param_name}")
 
         return kwargs
 
     def _get_or_create_query_parser(self, model: type[BaseModel]) -> Any:
-        """Get an existing query parser or create a new one for the model.
+        """Create a query parser for the model.
 
         Args:
             model: The model to create a parser for
@@ -378,22 +393,10 @@ class FlaskRestfulOpenAPIDecorator:
             A RequestParser instance for the model
 
         """
-        from flask_x_openapi_schema.core.cache import REQPARSE_CACHE
         from flask_x_openapi_schema.x.flask_restful.utils import create_reqparse_from_pydantic
 
-        # Create a unique key for query parsers
-        model_id = (id(model), "query")
-
-        # Check if we've already created a reqparse for this model
-        if model_id in REQPARSE_CACHE:
-            return REQPARSE_CACHE.get(model_id)
-
         # Create new parser
-        parser = create_reqparse_from_pydantic(query_model=model, body_model=None)
-
-        # Cache the parser
-        REQPARSE_CACHE[model_id] = parser
-        return parser
+        return create_reqparse_from_pydantic(query_model=model, body_model=None)
 
     def process_additional_params(self, kwargs: dict[str, Any], param_names: list[str]) -> dict[str, Any]:
         """Process additional framework-specific parameters.

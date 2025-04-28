@@ -12,15 +12,11 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from .cache import MODEL_SCHEMA_CACHE, conditional_cache
 
-
-@conditional_cache(cache_type="schema")
 def pydantic_to_openapi_schema(model: type[BaseModel]) -> dict[str, Any]:
     """Convert a Pydantic model to an OpenAPI schema.
 
-    This function is cached to improve performance for frequently used models.
-    Caching can be controlled via the cache configuration.
+    This function converts a Pydantic model to an OpenAPI schema.
 
     Args:
         model: The Pydantic model to convert
@@ -29,12 +25,6 @@ def pydantic_to_openapi_schema(model: type[BaseModel]) -> dict[str, Any]:
         The OpenAPI schema for the model
 
     """
-    # Check if schema is already in cache
-    model_key = f"{model.__module__}.{model.__name__}"
-    cached_schema = MODEL_SCHEMA_CACHE.get(model_key)
-    if cached_schema is not None:
-        return cached_schema
-
     # Initialize schema with default values
     schema: dict[str, Any] = {"type": "object", "properties": {}, "required": []}
 
@@ -57,22 +47,16 @@ def pydantic_to_openapi_schema(model: type[BaseModel]) -> dict[str, Any]:
     if model.__doc__:
         schema["description"] = model.__doc__.strip()
 
-    # Cache the schema
-    MODEL_SCHEMA_CACHE.set(model_key, schema)
-
     return schema
 
 
-# Cache for _fix_references function
-_REFERENCES_CACHE: dict[int, dict[str, Any]] = {}
-MAX_REFERENCES_CACHE_SIZE = 1000
+# Reference handling for OpenAPI schema generation
 
 
 def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
     """Fix references in a schema to use components/schemas instead of $defs.
 
     Also applies any json_schema_extra attributes to the schema.
-    This function is cached based on the schema object's id to improve performance.
 
     Args:
         schema: The schema to fix
@@ -91,11 +75,6 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(schema, dict):
         return schema
 
-    # Try to use cached result based on schema object id
-    schema_id = id(schema)
-    if schema_id in _REFERENCES_CACHE:
-        return _REFERENCES_CACHE[schema_id]
-
     # Fast path for schemas without references or special handling
     has_ref = (
         "$ref" in schema
@@ -113,11 +92,7 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
 
     # If no special handling needed, return schema as is
     if not (has_ref or has_extra or has_nested or has_file or has_nullable):
-        result = schema.copy()
-        # Cache the result if cache isn't too large
-        if len(_REFERENCES_CACHE) < MAX_REFERENCES_CACHE_SIZE:
-            _REFERENCES_CACHE[schema_id] = result
-        return result
+        return schema.copy()
 
     # Process schema with special handling
     result = {}
@@ -130,7 +105,7 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
             # Apply json_schema_extra attributes directly to the schema
             for extra_key, extra_value in value.items():
                 if extra_key != "multipart/form-data":  # Skip this key, it's handled elsewhere
-                    result[extra_key] = extra_value
+                    result[extra_key] = extra_value  # noqa: PERF403
         elif key == "nullable" and is_openapi_31:
             # In OpenAPI 3.1, convert nullable to type array with null
             if value is True and "type" in result:
@@ -161,19 +136,11 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
         # If there's no type but there is nullable, add type: ["null"]
         result["type"] = ["null"]
 
-    # Cache the result if cache isn't too large
-    if len(_REFERENCES_CACHE) < MAX_REFERENCES_CACHE_SIZE:
-        _REFERENCES_CACHE[schema_id] = result
-
     return result
 
 
-@conditional_cache(cache_type="schema")
 def python_type_to_openapi_type(python_type: Any) -> dict[str, Any]:  # noqa: PLR0911
     """Convert a Python type to an OpenAPI type.
-
-    This function is cached to improve performance for frequently used types.
-    Caching can be controlled via the cache configuration.
 
     Args:
         python_type: The Python type to convert
@@ -356,18 +323,11 @@ def responses_schema(
     return responses
 
 
-# Cache for i18n processing to avoid repeated conversions
-_I18N_CACHE: dict[tuple, Any] = {}
-MAX_I18N_CACHE_SIZE = 1000
+# I18n string processing for OpenAPI schema generation
 
 
-@conditional_cache(cache_type="schema")
 def process_i18n_value(value: Any, language: str) -> Any:
     """Process a value that might be an I18nString or contain I18nString values.
-
-    Uses caching to improve performance for repeated conversions.
-    This function is cached using conditional_cache for better performance.
-    Caching can be controlled via the cache configuration.
 
     Args:
         value: The value to process
@@ -425,9 +385,9 @@ def process_i18n_dict(data: dict[str, Any], language: str) -> dict[str, Any]:
 
 def clear_i18n_cache() -> None:
     """Clear the i18n processing cache."""
-    _I18N_CACHE.clear()
+    # No-op in simplified cache system
 
 
 def clear_references_cache() -> None:
     """Clear the references processing cache."""
-    _REFERENCES_CACHE.clear()
+    # No-op in simplified cache system

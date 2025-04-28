@@ -64,23 +64,11 @@ class CacheConfig:
     in the library.
 
     Attributes:
-        enabled: Global flag to enable/disable all caching (default: True)
-        schema_cache_enabled: Enable caching for OpenAPI schema generation (default: True)
-        param_binding_cache_enabled: Enable caching for parameter binding (default: True)
-        model_cache_enabled: Enable caching for Pydantic model schemas (default: True)
-        metadata_cache_enabled: Enable caching for OpenAPI metadata (default: True)
-        max_cache_size: Maximum size for regular dictionary caches (default: 1000)
-        ttl_cache_duration: Default TTL for cache entries in seconds (default: 300)
+        enabled: Global flag to enable/disable function metadata caching (default: True)
 
     """
 
     enabled: bool = True
-    schema_cache_enabled: bool = True
-    param_binding_cache_enabled: bool = True
-    model_cache_enabled: bool = True
-    metadata_cache_enabled: bool = True
-    max_cache_size: int = 1000
-    ttl_cache_duration: int = 300  # 5 minutes
 
 
 @dataclass(frozen=True)
@@ -124,7 +112,7 @@ class ThreadSafeConfig:
     def __init__(self) -> None:  # noqa: D107
         self._prefix_config = ConventionalPrefixConfig()
         self._openapi_config = OpenAPIConfig()
-        self._cache_config = CacheConfig()
+        self._cache_config = CacheConfig(enabled=True)
         self._lock = threading.RLock()
 
     def get(self) -> ConventionalPrefixConfig:
@@ -145,12 +133,6 @@ class ThreadSafeConfig:
             # Return a copy to prevent modification
             return CacheConfig(
                 enabled=self._cache_config.enabled,
-                schema_cache_enabled=self._cache_config.schema_cache_enabled,
-                param_binding_cache_enabled=self._cache_config.param_binding_cache_enabled,
-                model_cache_enabled=self._cache_config.model_cache_enabled,
-                metadata_cache_enabled=self._cache_config.metadata_cache_enabled,
-                max_cache_size=self._cache_config.max_cache_size,
-                ttl_cache_duration=self._cache_config.ttl_cache_duration,
             )
 
     def get_openapi_config(self) -> OpenAPIConfig:
@@ -210,12 +192,6 @@ class ThreadSafeConfig:
         with self._lock:
             self._cache_config = CacheConfig(
                 enabled=config.enabled,
-                schema_cache_enabled=config.schema_cache_enabled,
-                param_binding_cache_enabled=config.param_binding_cache_enabled,
-                model_cache_enabled=config.model_cache_enabled,
-                metadata_cache_enabled=config.metadata_cache_enabled,
-                max_cache_size=config.max_cache_size,
-                ttl_cache_duration=config.ttl_cache_duration,
             )
 
     def reset(self) -> None:
@@ -234,7 +210,7 @@ class ThreadSafeConfig:
         with self._lock:
             self.reset()
             self._openapi_config = OpenAPIConfig()
-            self._cache_config = CacheConfig()
+            self._cache_config = CacheConfig(enabled=True)
 
 
 # Create a singleton instance
@@ -327,7 +303,7 @@ def configure_cache(config: CacheConfig) -> None:
 
     Example:
         >>> from flask_x_openapi_schema import CacheConfig, configure_cache
-        >>> cache_config = CacheConfig(enabled=True, schema_cache_enabled=True)
+        >>> cache_config = CacheConfig(enabled=True)
         >>> configure_cache(cache_config)
 
     """

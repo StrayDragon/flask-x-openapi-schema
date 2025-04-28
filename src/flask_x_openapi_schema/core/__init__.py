@@ -4,7 +4,7 @@ This package contains the core functionality that is independent of any specific
 It provides configuration, schema generation, and utility functions for OpenAPI schema generation.
 """
 
-from .cache import clear_all_caches, get_cache_stats
+from .cache import clear_all_caches
 from .config import (
     GLOBAL_CONFIG_HOLDER,
     ConventionalPrefixConfig,
@@ -38,7 +38,6 @@ __all__ = [
     "configure_logging",
     "configure_openapi",
     "configure_prefixes",
-    "get_cache_stats",
     "get_logger",
     "get_openapi_config",
     # Utilities

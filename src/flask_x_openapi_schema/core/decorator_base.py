@@ -1,5 +1,6 @@
 """Base classes and utilities for OpenAPI metadata decorators."""
 
+import contextlib
 import inspect
 import logging
 from collections.abc import Callable
@@ -25,10 +26,6 @@ from flask_x_openapi_schema.models.responses import OpenAPIMetaResponse
 
 from .cache import (
     FUNCTION_METADATA_CACHE,
-    extract_param_types,
-    get_metadata_cache,
-    get_openapi_params_cache,
-    get_param_detection_cache,
     get_parameter_prefixes,
 )
 from .config import GLOBAL_CONFIG_HOLDER, ConventionalPrefixConfig
@@ -51,7 +48,6 @@ def _extract_parameters_from_prefixes(
     """Extract parameters based on prefix types from function signature.
 
     This function does not auto-detect parameters, but simply extracts them based on their prefixes.
-    Results are cached based on the function signature and type hints.
 
     Args:
         signature: Function signature
@@ -62,37 +58,21 @@ def _extract_parameters_from_prefixes(
         Tuple of (request_body, query_model, path_params)
 
     """
-    # Create a cache key based on signature, type hints, and config prefixes
-    # We use the signature's string representation and a frozenset of type hints items
-    # For config, we use the actual prefix values rather than the object identity
-    prefixes = get_parameter_prefixes(config)
-    cache_key = (
-        str(signature),
-        str(frozenset(type_hints.items())),
-        prefixes,  # Use the actual prefix values for caching
-    )
-
     # Debug information
     import logging
 
     logger = logging.getLogger(__name__)
+
+    # Get parameter prefixes
+    prefixes = get_parameter_prefixes(config)
     logger.debug(f"Extracting parameters with prefixes={prefixes}, signature={signature}, type_hints={type_hints}")
-
-    # Get the parameter detection cache strategy
-    param_detection_cache = get_param_detection_cache()
-
-    # Check if we've already cached this extraction
-    cached_result = param_detection_cache.get(cache_key)
-    if cached_result is not None:
-        logger.debug(f"Using cached result: {cached_result}")
-        return cached_result
 
     request_body = None
     query_model = None
     path_params = []
 
-    # Get parameter prefixes (cached)
-    body_prefix, query_prefix, path_prefix, _ = get_parameter_prefixes(config)
+    # Get parameter prefixes
+    body_prefix, query_prefix, path_prefix, _ = prefixes
 
     # Precompute path prefix length to avoid repeated calculations
     path_prefix_len = len(path_prefix) + 1  # +1 for the underscore
@@ -129,9 +109,6 @@ def _extract_parameters_from_prefixes(
             path_params.append(param_suffix)
 
     result = (request_body, query_model, path_params)
-
-    # Store the result in the cache
-    param_detection_cache.set(cache_key, result)
 
     # Debug information
     logger.debug(
@@ -437,6 +414,22 @@ class OpenAPIDecoratorBase:
         # Create a wrapper function that reuses the cached metadata
         @wraps(func)
         def cached_wrapper(*args, **kwargs):  # noqa: ANN202
+            # Initialize required parameters with empty model instances if needed
+            signature = cached_data["signature"]
+            param_names = cached_data["param_names"]
+
+            # Create empty model instances for required parameters that are missing
+            for param_name in param_names:
+                if param_name not in kwargs and param_name in signature.parameters:
+                    param = signature.parameters[param_name]
+                    if param.default is param.empty and param_name in cached_data["type_hints"]:
+                        param_type = cached_data["type_hints"][param_name]
+                        if isinstance(param_type, type) and issubclass(param_type, BaseModel):
+                            with contextlib.suppress(Exception):
+                                # Create an empty model instance with default values
+                                # If we can't create an empty instance, just continue
+                                kwargs[param_name] = param_type()
+
             return self._process_request(func, cached_data, *args, **kwargs)
 
         # Copy cached metadata and annotations
@@ -499,29 +492,21 @@ class OpenAPIDecoratorBase:
 
     def _get_or_generate_metadata(
         self,
-        cache_key: tuple,
+        _cache_key: tuple,  # Not used in simplified cache system
         actual_request_body: type[BaseModel] | dict[str, Any] | None,
     ) -> dict[str, Any]:
-        """Get metadata from cache or generate it.
+        """Generate OpenAPI metadata.
 
         Args:
-            cache_key: Cache key for metadata
+            _cache_key: Cache key for metadata (not used in simplified cache system)
             actual_request_body: Request body model or dict
 
         Returns:
             OpenAPI metadata dictionary
 
         """
-        # Get the metadata cache strategy
-        metadata_cache = get_metadata_cache()
-
-        # Check if we've already generated metadata for these parameters
-        cached_metadata = metadata_cache.get(cache_key)
-        if cached_metadata is not None:
-            return cached_metadata
-
         # Generate metadata
-        metadata = _generate_openapi_metadata(
+        return _generate_openapi_metadata(
             summary=self.summary,
             description=self.description,
             tags=self.tags,
@@ -533,11 +518,6 @@ class OpenAPIDecoratorBase:
             responses=self.responses,
             language=self.language,
         )
-
-        # Store the result in the cache
-        metadata_cache.set(cache_key, metadata)
-
-        return metadata
 
     def _generate_openapi_parameters(
         self,
@@ -583,10 +563,10 @@ class OpenAPIDecoratorBase:
         query_model: type[BaseModel] | None,
         path_params: list[str],
     ) -> list[dict[str, Any]]:
-        """Get or generate parameters from models and path parameters.
+        """Generate parameters from models and path parameters.
 
         This method is extracted from _generate_openapi_parameters to improve readability.
-        It handles caching and generation of parameters from query models and path parameters.
+        It generates parameters from query models and path parameters.
 
         Args:
             query_model: Query parameters model
@@ -596,20 +576,6 @@ class OpenAPIDecoratorBase:
             List of OpenAPI parameters
 
         """
-        # Create a cache key for parameters
-        cache_key = (
-            id(query_model),
-            tuple(sorted(path_params)) if path_params else None,
-        )
-
-        # Get the OpenAPI parameters cache strategy
-        openapi_params_cache = get_openapi_params_cache()
-
-        # Check if we've already generated parameters for these models
-        cached_params = openapi_params_cache.get(cache_key)
-        if cached_params is not None:
-            return cached_params
-
         # Create parameters for OpenAPI schema
         model_parameters = []
 
@@ -620,9 +586,6 @@ class OpenAPIDecoratorBase:
         # Add query parameters
         if query_model:
             model_parameters.extend(self._generate_query_parameters(query_model))
-
-        # Store the result in the cache
-        openapi_params_cache.set(cache_key, model_parameters)
 
         return model_parameters
 
@@ -770,13 +733,25 @@ class OpenAPIDecoratorBase:
         # Attach metadata to the function
         func._openapi_metadata = metadata  # noqa: SLF001
 
-        # Extract parameter types for type annotations (cached)
-        param_types = extract_param_types(
-            request_body_model=actual_request_body
-            if isinstance(actual_request_body, type) and issubclass(actual_request_body, BaseModel)
-            else None,
-            query_model=actual_query_model,
-        )
+        # Extract parameter types for type annotations
+        param_types = {}
+
+        # Add types from request_body if it's a Pydantic model
+        if (
+            actual_request_body
+            and isinstance(actual_request_body, type)
+            and issubclass(actual_request_body, BaseModel)
+            and hasattr(actual_request_body, "model_fields")
+        ):
+            param_types.update(
+                {field_name: field.annotation for field_name, field in actual_request_body.model_fields.items()}
+            )
+
+        # Add types from query_model if it's a Pydantic model
+        if actual_query_model and hasattr(actual_query_model, "model_fields"):
+            param_types.update(
+                {field_name: field.annotation for field_name, field in actual_query_model.model_fields.items()}
+            )
 
         # Get existing type hints and merge with new type hints from Pydantic models
         existing_hints = get_type_hints(func)
@@ -815,6 +790,17 @@ class OpenAPIDecoratorBase:
         """
         # Extract signature for filtering kwargs
         signature = cached_data["signature"]
+        param_names = cached_data.get("param_names", [])
+
+        # Create empty model instances for required parameters that are missing
+        for param_name in param_names:
+            if param_name not in kwargs and param_name in signature.parameters:
+                param = signature.parameters[param_name]
+                if param.default is param.empty and param_name in cached_data["type_hints"]:
+                    param_type = cached_data["type_hints"][param_name]
+                    if isinstance(param_type, type) and issubclass(param_type, BaseModel):
+                        with contextlib.suppress(Exception):
+                            kwargs[param_name] = param_type()
 
         # Use the parameter processor to handle parameter binding
         parameter_processor = ParameterProcessor(
@@ -828,6 +814,43 @@ class OpenAPIDecoratorBase:
         # Filter out any kwargs that are not in the function signature
         sig_params = signature.parameters
         valid_kwargs = {k: v for k, v in kwargs.items() if k in sig_params}
+
+        # Check if any required parameters are missing
+        for param_name, param in sig_params.items():
+            if param_name not in valid_kwargs and param.default is param.empty:
+                # Skip self and cls parameters
+                if param_name in {"self", "cls"}:
+                    continue
+
+                # Try to create a default instance for missing parameters
+                if param_name in cached_data["type_hints"]:
+                    param_type = cached_data["type_hints"][param_name]
+                    if isinstance(param_type, type) and issubclass(param_type, BaseModel):
+                        # For required models, we need to provide default values
+                        if hasattr(param_type, "model_json_schema"):
+                            schema = param_type.model_json_schema()
+                            required_fields = schema.get("required", [])
+                            default_data = {}
+                            for field in required_fields:
+                                # Provide sensible defaults based on field type
+                                if field in param_type.model_fields:
+                                    field_info = param_type.model_fields[field]
+                                    if field_info.annotation is str:
+                                        default_data[field] = ""
+                                    elif field_info.annotation is int:
+                                        default_data[field] = 0
+                                    elif field_info.annotation is float:
+                                        default_data[field] = 0.0
+                                    elif field_info.annotation is bool:
+                                        default_data[field] = False
+                                    else:
+                                        default_data[field] = None
+
+                            valid_kwargs[param_name] = param_type.model_validate(default_data)
+                        else:
+                            # Try to create an empty instance
+                            with contextlib.suppress(Exception):
+                                valid_kwargs[param_name] = param_type()
 
         # Call the original function with filtered kwargs
         result = func(*args, **valid_kwargs)
