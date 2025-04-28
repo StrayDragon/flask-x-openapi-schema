@@ -10,7 +10,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -21,7 +20,7 @@ classifiers = [
 
 license = { text = "MIT" }
 
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 dependencies = [
     "flask>=2.0.0",
@@ -102,7 +101,7 @@ exclude_lines = [
 [tool.ruff]
 line-length = 120
 indent-width = 4
-target-version = "py310" # use minimum version
+target-version = "py311" # use minimum version
 
 [tool.ruff.lint]
 select = ["ALL"]
