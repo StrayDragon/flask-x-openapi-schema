@@ -30,20 +30,23 @@ import threading
 import time
 import weakref
 from collections import Counter, OrderedDict
+from collections.abc import Callable
 from enum import Enum
-from functools import lru_cache
-from typing import Any, Generic, TypeVar
+from functools import lru_cache, wraps
+from typing import Any, Generic, TypeVar, cast
 
 from pydantic import BaseModel
+
+from .cache_factory import CACHE_FACTORY, CacheType
 
 # Type variable for cache values
 T = TypeVar("T")
 K = TypeVar("K")
+F = TypeVar("F", bound=Callable[..., Any])
 
-# Maximum size for regular dictionary caches to prevent memory leaks
+# These constants will be overridden by the cache config
+# but are kept here as fallbacks
 MAX_CACHE_SIZE = 1000
-
-# Default TTL for cache entries (in seconds)
 DEFAULT_TTL = 300  # 5 minutes
 
 # Cache for decorated functions to avoid recomputing metadata (weak references)
@@ -591,13 +594,136 @@ class TTLCache(ThreadSafeCache[K, T]):
             return stats
 
 
-# Create singleton instances
-MODEL_SCHEMA_CACHE = ThreadSafeCache[str | tuple, dict[str, Any]]()
-MODEL_CACHE = ThreadSafeCache[str | tuple, Any]()
+def initialize_cache_factory() -> None:
+    """Initialize the cache factory with settings from configuration.
 
-# Create TTL cache instances for frequently changing data
-DYNAMIC_SCHEMA_CACHE = TTLCache[str | tuple, dict[str, Any]](max_size=500, ttl=60)  # 1 minute TTL
-REQUEST_DATA_CACHE = TTLCache[str | tuple, Any](max_size=200, ttl=30)  # 30 seconds TTL
+    This function reads the cache configuration and updates the cache factory.
+    """
+    try:
+        from .config import get_cache_config
+
+        config = get_cache_config()
+        CACHE_FACTORY.update_config(
+            cache_enabled=config.enabled,
+            schema_cache_enabled=config.schema_cache_enabled,
+            param_binding_cache_enabled=config.param_binding_cache_enabled,
+            model_cache_enabled=config.model_cache_enabled,
+            metadata_cache_enabled=config.metadata_cache_enabled,
+            max_cache_size=config.max_cache_size,
+            ttl_cache_duration=config.ttl_cache_duration,
+        )
+    except (ImportError, AttributeError):
+        # Fallback to defaults if config is not available
+        CACHE_FACTORY.update_config(
+            cache_enabled=True,
+            schema_cache_enabled=True,
+            param_binding_cache_enabled=True,
+            model_cache_enabled=True,
+            metadata_cache_enabled=True,
+            max_cache_size=MAX_CACHE_SIZE,
+            ttl_cache_duration=DEFAULT_TTL,
+        )
+
+
+# Initialize the cache factory
+initialize_cache_factory()
+
+# Create backing dictionaries for caches
+_MODEL_SCHEMA_CACHE_DICT: dict[str | tuple, dict[str, Any]] = {}
+_MODEL_CACHE_DICT: dict[str | tuple, Any] = {}
+_DYNAMIC_SCHEMA_CACHE_DICT: dict[str | tuple, dict[str, Any]] = {}
+_REQUEST_DATA_CACHE_DICT: dict[str | tuple, Any] = {}
+_PARAM_DETECTION_CACHE_DICT: dict[tuple, Any] = {}
+_OPENAPI_PARAMS_CACHE_DICT: dict[tuple, Any] = {}
+_METADATA_CACHE_DICT: dict[tuple, Any] = {}
+
+
+# Create cache strategies using the factory
+def get_model_schema_cache() -> Any:
+    """Get the model schema cache strategy."""
+    return CACHE_FACTORY.get_cache_strategy(CacheType.SCHEMA, _MODEL_SCHEMA_CACHE_DICT, "model_schema", 1000)
+
+
+def get_model_cache() -> Any:
+    """Get the model cache strategy."""
+    return CACHE_FACTORY.get_cache_strategy(CacheType.MODEL, _MODEL_CACHE_DICT, "model", 1000)
+
+
+def get_dynamic_schema_cache() -> Any:
+    """Get the dynamic schema cache strategy."""
+    return CACHE_FACTORY.get_cache_strategy(CacheType.SCHEMA, _DYNAMIC_SCHEMA_CACHE_DICT, "dynamic_schema", 500)
+
+
+def get_request_data_cache() -> Any:
+    """Get the request data cache strategy."""
+    return CACHE_FACTORY.get_cache_strategy(CacheType.GENERAL, _REQUEST_DATA_CACHE_DICT, "request_data", 200)
+
+
+def get_param_detection_cache() -> Any:
+    """Get the parameter detection cache strategy."""
+    return CACHE_FACTORY.get_cache_strategy(
+        CacheType.PARAM_BINDING, _PARAM_DETECTION_CACHE_DICT, "param_detection", 1000
+    )
+
+
+def get_openapi_params_cache() -> Any:
+    """Get the OpenAPI parameters cache strategy."""
+    return CACHE_FACTORY.get_cache_strategy(CacheType.SCHEMA, _OPENAPI_PARAMS_CACHE_DICT, "openapi_params", 1000)
+
+
+def get_metadata_cache() -> Any:
+    """Get the metadata cache strategy."""
+    return CACHE_FACTORY.get_cache_strategy(CacheType.METADATA, _METADATA_CACHE_DICT, "metadata", 1000)
+
+
+# For backward compatibility, create cache objects that mimic the old API
+# but use the new strategy pattern internally
+class StrategyBasedCache(Generic[K, T]):
+    """Cache adapter that uses a strategy internally but presents the old API."""
+
+    def __init__(self, cache_type: CacheType, backing_dict: dict[K, T], name: str, max_size: int = 1000) -> None:
+        """Initialize with a strategy from the factory."""
+        self._strategy = CACHE_FACTORY.get_cache_strategy(cache_type, backing_dict, name, max_size)
+
+    def get(self, key: K) -> T | None:
+        """Get a value from the cache."""
+        return self._strategy.get(key)
+
+    def set(self, key: K, value: T) -> None:
+        """Set a value in the cache."""
+        self._strategy.set(key, value)
+
+    def contains(self, key: K) -> bool:
+        """Check if a key exists in the cache."""
+        return self._strategy.contains(key)
+
+    def clear(self) -> None:
+        """Clear the cache."""
+        self._strategy.clear()
+
+    def remove(self, key: K) -> bool:
+        """Remove a key from the cache."""
+        return self._strategy.remove(key)
+
+    def size(self) -> int:
+        """Get the current size of the cache."""
+        return self._strategy.size()
+
+    def get_stats(self) -> dict[str, Any]:
+        """Get cache statistics."""
+        return self._strategy.get_stats()
+
+
+# Create singleton instances with the adapter for backward compatibility
+MODEL_SCHEMA_CACHE = StrategyBasedCache(CacheType.SCHEMA, _MODEL_SCHEMA_CACHE_DICT, "model_schema", 1000)
+MODEL_CACHE = StrategyBasedCache(CacheType.MODEL, _MODEL_CACHE_DICT, "model", 1000)
+DYNAMIC_SCHEMA_CACHE = StrategyBasedCache(CacheType.SCHEMA, _DYNAMIC_SCHEMA_CACHE_DICT, "dynamic_schema", 500)
+REQUEST_DATA_CACHE = StrategyBasedCache(CacheType.GENERAL, _REQUEST_DATA_CACHE_DICT, "request_data", 200)
+
+# Create regular dictionary caches for backward compatibility
+PARAM_DETECTION_CACHE = _PARAM_DETECTION_CACHE_DICT
+OPENAPI_PARAMS_CACHE = _OPENAPI_PARAMS_CACHE_DICT
+METADATA_CACHE = _METADATA_CACHE_DICT
 
 
 def get_parameter_prefixes(
@@ -628,7 +754,55 @@ def get_parameter_prefixes(
     )
 
 
-@lru_cache(maxsize=256)
+def conditional_cache(cache_type: str = "param_binding"):  # noqa: ANN201
+    """Conditionally apply caching based on configuration.
+
+    This decorator checks the cache configuration and only applies caching
+    if it's enabled for the specified cache type. It uses the cache factory
+    to determine if caching should be enabled.
+
+    Args:
+        cache_type: Type of cache to check ("schema", "param_binding", "model", "metadata")
+
+    Returns:
+        Decorator function that conditionally applies caching
+
+    """
+    # Map string cache types to CacheType enum
+    cache_type_map = {
+        "schema": CacheType.SCHEMA,
+        "param_binding": CacheType.PARAM_BINDING,
+        "model": CacheType.MODEL,
+        "metadata": CacheType.METADATA,
+        "general": CacheType.GENERAL,
+    }
+
+    cache_type_enum = cache_type_map.get(cache_type, CacheType.GENERAL)
+
+    def decorator(func: F) -> F:
+        # Check if caching is enabled for this type using the factory
+        if not CACHE_FACTORY.is_cache_enabled(cache_type_enum):
+            return func
+
+        # Create a unique name for this function's cache
+        # func_name = f"{func.__module__}.{func.__qualname__}"  # noqa: ERA001
+
+        # Apply lru_cache with appropriate size from factory
+        max_size = CACHE_FACTORY._max_cache_size  # noqa: SLF001
+        cached_func = lru_cache(maxsize=max_size)(func)
+
+        # Add cache_clear method to the wrapped function
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            return cached_func(*args, **kwargs)
+
+        wrapper.cache_clear = cached_func.cache_clear
+        return cast("F", wrapper)
+
+    return decorator
+
+
+@conditional_cache(cache_type="param_binding")
 def extract_param_types(
     request_body_model: type[BaseModel] | None,
     query_model: type[BaseModel] | None,
@@ -652,8 +826,11 @@ def extract_param_types(
         # Create a cache key based on the model's id
         model_key = id(model)
 
+        # Get the model cache strategy
+        model_cache = get_model_cache()
+
         # Check if we've already cached this model's types
-        cached_types = MODEL_CACHE.get(model_key)
+        cached_types = model_cache.get(model_key)
         if cached_types is not None:
             return cached_types
 
@@ -661,7 +838,7 @@ def extract_param_types(
         model_types = {field_name: field.annotation for field_name, field in model.model_fields.items()}
 
         # Cache the result
-        MODEL_CACHE.set(model_key, model_types)
+        model_cache.set(model_key, model_types)
         return model_types
 
     # Add types from request_body if it's a Pydantic model
@@ -679,7 +856,7 @@ def clear_all_caches() -> None:
     """Clear all caches to free memory or force regeneration.
 
     This function clears all caches used by the library, including both
-    regular dictionary caches and ThreadSafeCache instances.
+    regular dictionary caches and strategy-based caches.
     """
     import gc
     import logging
@@ -687,32 +864,40 @@ def clear_all_caches() -> None:
     logger = logging.getLogger(__name__)
     logger.debug("Clearing all caches")
 
-    # Clear regular dictionary caches
-    PARAM_DETECTION_CACHE.clear()
-    OPENAPI_PARAMS_CACHE.clear()
-    METADATA_CACHE.clear()
+    # Use the cache factory to clear all caches
+    CACHE_FACTORY.clear_all_caches()
+
+    # Also clear the backing dictionaries directly for safety
+    _MODEL_SCHEMA_CACHE_DICT.clear()
+    _MODEL_CACHE_DICT.clear()
+    _DYNAMIC_SCHEMA_CACHE_DICT.clear()
+    _REQUEST_DATA_CACHE_DICT.clear()
+    _PARAM_DETECTION_CACHE_DICT.clear()
+    _OPENAPI_PARAMS_CACHE_DICT.clear()
+    _METADATA_CACHE_DICT.clear()
+
+    # Clear other caches that aren't managed by the factory
     REQPARSE_CACHE.clear()
     FUNCTION_METADATA_CACHE.clear()
     _I18N_CACHE.clear()
 
-    # Clear ThreadSafeCache instances
-    # These need special handling to ensure thread safety
-    MODEL_SCHEMA_CACHE.clear()
-    MODEL_CACHE.clear()
-
-    # Clear TTLCache instances
-    DYNAMIC_SCHEMA_CACHE.clear()
-    REQUEST_DATA_CACHE.clear()
-
     # Clear lru_cache decorated functions
-    extract_param_types.cache_clear()
+    import contextlib
+
+    # Use contextlib.suppress to ignore AttributeError
+    with contextlib.suppress(AttributeError):
+        # If caching is disabled, cache_clear won't exist
+        extract_param_types.cache_clear()  # type: ignore[attr-defined]
 
     # Clear utils module caches
     from .utils import clear_i18n_cache, clear_references_cache, process_i18n_value
 
     clear_references_cache()
     clear_i18n_cache()
-    process_i18n_value.cache_clear()
+    # Use contextlib.suppress to ignore AttributeError
+    with contextlib.suppress(AttributeError):
+        # If caching is disabled, cache_clear won't exist
+        process_i18n_value.cache_clear()  # type: ignore[attr-defined]
 
     # Force garbage collection to ensure all references are cleaned up
     gc.collect()
@@ -727,43 +912,55 @@ def get_cache_stats() -> dict[str, Any]:
     Returns:
         Dictionary with detailed cache statistics including:
         - Size of each cache
-        - Hit/miss rates for ThreadSafeCache instances
-        - TTL information for TTLCache instances
+        - Hit/miss rates for cache strategies
         - Overall memory usage estimation
 
     """
-    # Get sizes of regular dictionary caches
+    # Get statistics from the cache factory
+    factory_stats = CACHE_FACTORY.get_cache_stats()
+
+    # Get sizes of regular dictionary caches not managed by the factory
     stats = {
         "function_metadata": len(FUNCTION_METADATA_CACHE),
-        "param_detection": len(PARAM_DETECTION_CACHE),
-        "openapi_params": len(OPENAPI_PARAMS_CACHE),
-        "metadata": len(METADATA_CACHE),
         "reqparse": len(REQPARSE_CACHE),
         "i18n_cache": len(_I18N_CACHE),
     }
 
-    # Add ThreadSafeCache and TTLCache statistics
-    # These provide more detailed information through their get_stats() method
-    stats["model_schema"] = MODEL_SCHEMA_CACHE.get_stats()
-    stats["model_cache"] = MODEL_CACHE.get_stats()
-    stats["dynamic_schema"] = DYNAMIC_SCHEMA_CACHE.get_stats()
-    stats["request_data"] = REQUEST_DATA_CACHE.get_stats()
+    # Add factory statistics
+    stats.update(factory_stats)
 
     # Calculate total entries across all caches
-    total_entries = (
-        stats["function_metadata"]
-        + stats["param_detection"]
-        + stats["openapi_params"]
-        + stats["metadata"]
-        + stats["reqparse"]
-        + stats["i18n_cache"]
-        + stats["model_schema"]["current_size"]
-        + stats["model_cache"]["current_size"]
-        + stats["dynamic_schema"]["current_size"]
-        + stats["request_data"]["current_size"]
-    )
+    total_entries = stats["function_metadata"] + stats["reqparse"] + stats["i18n_cache"]
+
+    # Add sizes from factory-managed caches
+    for cache_name, cache_stats in stats.items():
+        # Skip non-dictionary entries and entries without current_size
+        if not isinstance(cache_stats, dict) or "current_size" not in cache_stats:
+            continue
+
+        # Skip known non-factory caches
+        if cache_name in ["function_metadata", "reqparse", "i18n_cache"]:
+            continue
+
+        total_entries += cache_stats["current_size"]
 
     stats["total_entries"] = total_entries
+
+    # Get configuration from the factory
+    # We use a helper function to avoid accessing private members directly
+    from .config import CacheConfig, get_cache_config
+
+    # Get the current cache configuration
+    config: CacheConfig = get_cache_config()
+    stats["config"] = {
+        "enabled": config.enabled,
+        "schema_cache_enabled": config.schema_cache_enabled,
+        "param_binding_cache_enabled": config.param_binding_cache_enabled,
+        "model_cache_enabled": config.model_cache_enabled,
+        "metadata_cache_enabled": config.metadata_cache_enabled,
+        "max_cache_size": config.max_cache_size,
+        "ttl_cache_duration": config.ttl_cache_duration,
+    }
 
     return stats
 
@@ -801,6 +998,10 @@ def warmup_cache(models: list[type[BaseModel]] | None = None) -> dict[str, Any]:
 
     start_time = time.time()
 
+    # Get cache strategies
+    model_schema_cache = get_model_schema_cache()
+    model_cache = get_model_cache()
+
     # Process models to generate and cache schemas
     for model in models:
         if not hasattr(model, "model_fields"):
@@ -814,11 +1015,11 @@ def warmup_cache(models: list[type[BaseModel]] | None = None) -> dict[str, Any]:
 
         # Store in cache
         model_key = id(model)
-        MODEL_SCHEMA_CACHE.set(model_key, schema)
+        model_schema_cache.set(model_key, schema)
 
         # Extract and cache field types
         model_types = {field_name: field.annotation for field_name, field in model.model_fields.items()}
-        MODEL_CACHE.set(model_key, model_types)
+        model_cache.set(model_key, model_types)
 
         stats["models_processed"] += 1
         stats["schemas_generated"] += 1

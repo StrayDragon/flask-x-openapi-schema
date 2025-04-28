@@ -25,13 +25,10 @@ from flask_x_openapi_schema.models.responses import OpenAPIMetaResponse
 
 from .cache import (
     FUNCTION_METADATA_CACHE,
-    MAX_METADATA_CACHE_SIZE,
-    MAX_OPENAPI_PARAMS_CACHE_SIZE,
-    MAX_PARAM_DETECTION_CACHE_SIZE,
-    METADATA_CACHE,
-    OPENAPI_PARAMS_CACHE,
-    PARAM_DETECTION_CACHE,
     extract_param_types,
+    get_metadata_cache,
+    get_openapi_params_cache,
+    get_param_detection_cache,
     get_parameter_prefixes,
 )
 from .config import GLOBAL_CONFIG_HOLDER, ConventionalPrefixConfig
@@ -81,9 +78,12 @@ def _extract_parameters_from_prefixes(
     logger = logging.getLogger(__name__)
     logger.debug(f"Extracting parameters with prefixes={prefixes}, signature={signature}, type_hints={type_hints}")
 
+    # Get the parameter detection cache strategy
+    param_detection_cache = get_param_detection_cache()
+
     # Check if we've already cached this extraction
-    if cache_key in PARAM_DETECTION_CACHE:
-        cached_result = PARAM_DETECTION_CACHE[cache_key]
+    cached_result = param_detection_cache.get(cache_key)
+    if cached_result is not None:
         logger.debug(f"Using cached result: {cached_result}")
         return cached_result
 
@@ -128,12 +128,10 @@ def _extract_parameters_from_prefixes(
             # Use the full suffix as the parameter name
             path_params.append(param_suffix)
 
-    # Cache the result (limit cache size to prevent memory issues)
-    if len(PARAM_DETECTION_CACHE) > MAX_PARAM_DETECTION_CACHE_SIZE:  # Limit cache size
-        PARAM_DETECTION_CACHE.clear()
-
     result = (request_body, query_model, path_params)
-    PARAM_DETECTION_CACHE[cache_key] = result
+
+    # Store the result in the cache
+    param_detection_cache.set(cache_key, result)
 
     # Debug information
     logger.debug(
@@ -514,9 +512,13 @@ class OpenAPIDecoratorBase:
             OpenAPI metadata dictionary
 
         """
+        # Get the metadata cache strategy
+        metadata_cache = get_metadata_cache()
+
         # Check if we've already generated metadata for these parameters
-        if cache_key in METADATA_CACHE:
-            return METADATA_CACHE[cache_key]
+        cached_metadata = metadata_cache.get(cache_key)
+        if cached_metadata is not None:
+            return cached_metadata
 
         # Generate metadata
         metadata = _generate_openapi_metadata(
@@ -532,10 +534,8 @@ class OpenAPIDecoratorBase:
             language=self.language,
         )
 
-        # Cache the result (limit cache size to prevent memory issues)
-        if len(METADATA_CACHE) > MAX_METADATA_CACHE_SIZE:
-            METADATA_CACHE.clear()
-        METADATA_CACHE[cache_key] = metadata
+        # Store the result in the cache
+        metadata_cache.set(cache_key, metadata)
 
         return metadata
 
@@ -602,9 +602,13 @@ class OpenAPIDecoratorBase:
             tuple(sorted(path_params)) if path_params else None,
         )
 
+        # Get the OpenAPI parameters cache strategy
+        openapi_params_cache = get_openapi_params_cache()
+
         # Check if we've already generated parameters for these models
-        if cache_key in OPENAPI_PARAMS_CACHE:
-            return OPENAPI_PARAMS_CACHE[cache_key]
+        cached_params = openapi_params_cache.get(cache_key)
+        if cached_params is not None:
+            return cached_params
 
         # Create parameters for OpenAPI schema
         model_parameters = []
@@ -617,10 +621,8 @@ class OpenAPIDecoratorBase:
         if query_model:
             model_parameters.extend(self._generate_query_parameters(query_model))
 
-        # Cache the parameters (limit cache size to prevent memory issues)
-        if len(OPENAPI_PARAMS_CACHE) > MAX_OPENAPI_PARAMS_CACHE_SIZE:
-            OPENAPI_PARAMS_CACHE.clear()
-        OPENAPI_PARAMS_CACHE[cache_key] = model_parameters
+        # Store the result in the cache
+        openapi_params_cache.set(cache_key, model_parameters)
 
         return model_parameters
 

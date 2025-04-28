@@ -7,20 +7,20 @@ handling references, and processing internationalized strings.
 import inspect
 from datetime import date, datetime, time
 from enum import Enum
-from functools import lru_cache
 from typing import Any, Union
 from uuid import UUID
 
 from pydantic import BaseModel
 
-from .cache import MODEL_SCHEMA_CACHE
+from .cache import MODEL_SCHEMA_CACHE, conditional_cache
 
 
-@lru_cache(maxsize=256)
+@conditional_cache(cache_type="schema")
 def pydantic_to_openapi_schema(model: type[BaseModel]) -> dict[str, Any]:
     """Convert a Pydantic model to an OpenAPI schema.
 
     This function is cached to improve performance for frequently used models.
+    Caching can be controlled via the cache configuration.
 
     Args:
         model: The Pydantic model to convert
@@ -168,11 +168,12 @@ def _fix_references(schema: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-@lru_cache(maxsize=256)
+@conditional_cache(cache_type="schema")
 def python_type_to_openapi_type(python_type: Any) -> dict[str, Any]:  # noqa: PLR0911
     """Convert a Python type to an OpenAPI type.
 
     This function is cached to improve performance for frequently used types.
+    Caching can be controlled via the cache configuration.
 
     Args:
         python_type: The Python type to convert
@@ -360,12 +361,13 @@ _I18N_CACHE: dict[tuple, Any] = {}
 MAX_I18N_CACHE_SIZE = 1000
 
 
-@lru_cache(maxsize=512)
+@conditional_cache(cache_type="schema")
 def process_i18n_value(value: Any, language: str) -> Any:
     """Process a value that might be an I18nString or contain I18nString values.
 
     Uses caching to improve performance for repeated conversions.
-    This function is cached using lru_cache for better performance.
+    This function is cached using conditional_cache for better performance.
+    Caching can be controlled via the cache configuration.
 
     Args:
         value: The value to process

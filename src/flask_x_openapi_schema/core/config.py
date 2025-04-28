@@ -57,6 +57,33 @@ class ConventionalPrefixConfig:
 
 
 @dataclass(frozen=True)
+class CacheConfig:
+    """Configuration class for caching behavior.
+
+    This class holds configuration settings for controlling cache behavior
+    in the library.
+
+    Attributes:
+        enabled: Global flag to enable/disable all caching (default: True)
+        schema_cache_enabled: Enable caching for OpenAPI schema generation (default: True)
+        param_binding_cache_enabled: Enable caching for parameter binding (default: True)
+        model_cache_enabled: Enable caching for Pydantic model schemas (default: True)
+        metadata_cache_enabled: Enable caching for OpenAPI metadata (default: True)
+        max_cache_size: Maximum size for regular dictionary caches (default: 1000)
+        ttl_cache_duration: Default TTL for cache entries in seconds (default: 300)
+
+    """
+
+    enabled: bool = True
+    schema_cache_enabled: bool = True
+    param_binding_cache_enabled: bool = True
+    model_cache_enabled: bool = True
+    metadata_cache_enabled: bool = True
+    max_cache_size: int = 1000
+    ttl_cache_duration: int = 300  # 5 minutes
+
+
+@dataclass(frozen=True)
 class OpenAPIConfig:
     """Configuration class for OpenAPI schema generation.
 
@@ -73,6 +100,7 @@ class OpenAPIConfig:
         external_docs: External documentation
         webhooks: Webhook definitions
         jsonSchemaDialect: JSON Schema dialect
+        cache_config: Configuration for caching behavior
 
     """
 
@@ -86,6 +114,7 @@ class OpenAPIConfig:
     external_docs: dict[str, Any] | None = None
     webhooks: dict[str, dict[str, Any]] = field(default_factory=dict)
     json_schema_dialect: str | None = None
+    cache_config: CacheConfig = field(default_factory=CacheConfig)
 
 
 # Global configuration instance with thread safety
@@ -95,6 +124,7 @@ class ThreadSafeConfig:
     def __init__(self) -> None:  # noqa: D107
         self._prefix_config = ConventionalPrefixConfig()
         self._openapi_config = OpenAPIConfig()
+        self._cache_config = CacheConfig()
         self._lock = threading.RLock()
 
     def get(self) -> ConventionalPrefixConfig:
@@ -107,6 +137,20 @@ class ThreadSafeConfig:
                 request_path_prefix=self._prefix_config.request_path_prefix,
                 request_file_prefix=self._prefix_config.request_file_prefix,
                 extra_options=dict(self._prefix_config.extra_options),
+            )
+
+    def get_cache_config(self) -> CacheConfig:
+        """Get the current cache configuration."""
+        with self._lock:
+            # Return a copy to prevent modification
+            return CacheConfig(
+                enabled=self._cache_config.enabled,
+                schema_cache_enabled=self._cache_config.schema_cache_enabled,
+                param_binding_cache_enabled=self._cache_config.param_binding_cache_enabled,
+                model_cache_enabled=self._cache_config.model_cache_enabled,
+                metadata_cache_enabled=self._cache_config.metadata_cache_enabled,
+                max_cache_size=self._cache_config.max_cache_size,
+                ttl_cache_duration=self._cache_config.ttl_cache_duration,
             )
 
     def get_openapi_config(self) -> OpenAPIConfig:
@@ -126,6 +170,7 @@ class ThreadSafeConfig:
                 external_docs=dict(self._openapi_config.external_docs) if self._openapi_config.external_docs else None,
                 webhooks=dict(self._openapi_config.webhooks) if self._openapi_config.webhooks else {},
                 json_schema_dialect=self._openapi_config.json_schema_dialect,
+                cache_config=self.get_cache_config(),
             )
 
     def set(self, config: ConventionalPrefixConfig) -> None:
@@ -153,9 +198,25 @@ class ThreadSafeConfig:
                 external_docs=dict(config.external_docs) if config.external_docs else None,
                 webhooks=dict(config.webhooks) if config.webhooks else {},
                 json_schema_dialect=config.json_schema_dialect,
+                cache_config=config.cache_config,
             )
             # Also update prefix config
             self.set(config.prefix_config)
+            # Also update cache config
+            self.set_cache_config(config.cache_config)
+
+    def set_cache_config(self, config: CacheConfig) -> None:
+        """Set a new cache configuration."""
+        with self._lock:
+            self._cache_config = CacheConfig(
+                enabled=config.enabled,
+                schema_cache_enabled=config.schema_cache_enabled,
+                param_binding_cache_enabled=config.param_binding_cache_enabled,
+                model_cache_enabled=config.model_cache_enabled,
+                metadata_cache_enabled=config.metadata_cache_enabled,
+                max_cache_size=config.max_cache_size,
+                ttl_cache_duration=config.ttl_cache_duration,
+            )
 
     def reset(self) -> None:
         """Reset to default prefix configuration."""
@@ -173,6 +234,7 @@ class ThreadSafeConfig:
         with self._lock:
             self.reset()
             self._openapi_config = OpenAPIConfig()
+            self._cache_config = CacheConfig()
 
 
 # Create a singleton instance
@@ -245,3 +307,29 @@ def get_openapi_config() -> OpenAPIConfig:
 
     """
     return GLOBAL_CONFIG_HOLDER.get_openapi_config()
+
+
+def get_cache_config() -> CacheConfig:
+    """Get the current cache configuration.
+
+    Returns:
+        Current cache configuration
+
+    """
+    return GLOBAL_CONFIG_HOLDER.get_cache_config()
+
+
+def configure_cache(config: CacheConfig) -> None:
+    """Configure global cache settings.
+
+    Args:
+        config: Configuration object with cache settings
+
+    Example:
+        >>> from flask_x_openapi_schema import CacheConfig, configure_cache
+        >>> cache_config = CacheConfig(enabled=True, schema_cache_enabled=True)
+        >>> configure_cache(cache_config)
+
+    """
+    # Update the configuration in a thread-safe manner
+    GLOBAL_CONFIG_HOLDER.set_cache_config(config)

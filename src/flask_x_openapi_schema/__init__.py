@@ -10,8 +10,11 @@ from .core.cache import (
 )
 from .core.config import (
     GLOBAL_CONFIG_HOLDER,
+    CacheConfig,
     ConventionalPrefixConfig,
+    configure_cache,
     configure_prefixes,
+    get_cache_config,
     reset_prefixes,
 )
 from .core.schema_generator import OpenAPISchemaGenerator
@@ -36,6 +39,7 @@ __all__ = [
     # Models
     "BaseRespModel",
     # Cache
+    "CacheConfig",
     "CacheEvictionPolicy",
     # Configuration
     "ConventionalPrefixConfig",
@@ -54,9 +58,11 @@ __all__ = [
     "ThreadSafeCache",
     "clear_all_caches",
     # Configuration functions
+    "configure_cache",
     "configure_prefixes",
     "create_response",
     "error_response",
+    "get_cache_config",
     "get_cache_stats",
     "get_current_language",
     "reset_prefixes",
