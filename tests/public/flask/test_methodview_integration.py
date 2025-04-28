@@ -233,13 +233,18 @@ class UserAvatarView(OpenAPIMethodViewMixin, MethodView):
             return ErrorResponse(error="User not found", code=404).model_dump(), 404
 
         # Check if file was provided
-        if not _x_file or not _x_file.file:
+        if not _x_file:
+            return ErrorResponse(error="No file provided", code=400).model_dump(), 400
+
+        # Get the FileStorage object
+        file_storage = _x_file.file
+        if not file_storage:
             return ErrorResponse(error="No file provided", code=400).model_dump(), 400
 
         # Return success response
         return {
             "message": "Avatar uploaded successfully",
-            "filename": _x_file.file.filename,
+            "filename": file_storage.filename,
             "user_id": user_id,
         }, 200
 
