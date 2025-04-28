@@ -859,9 +859,10 @@ def clear_all_caches() -> None:
     regular dictionary caches and strategy-based caches.
     """
     import gc
-    import logging
 
-    logger = logging.getLogger(__name__)
+    from flask_x_openapi_schema.core.logger import get_logger
+
+    logger = get_logger(__name__)
     logger.debug("Clearing all caches")
 
     # Use the cache factory to clear all caches
@@ -979,9 +980,9 @@ def warmup_cache(models: list[type[BaseModel]] | None = None) -> dict[str, Any]:
         Dictionary with statistics about the warmup operation
 
     """
-    import logging
+    from flask_x_openapi_schema.core.logger import get_logger
 
-    logger = logging.getLogger(__name__)
+    logger = get_logger(__name__)
     logger.info("Warming up caches")
 
     stats = {
@@ -1048,9 +1049,9 @@ def make_cache_key(*args: Any, **kwargs: Any) -> tuple:
         A hashable tuple to use as a cache key
 
     """
-    import logging
+    from flask_x_openapi_schema.core.logger import get_logger
 
-    logger = logging.getLogger(__name__)
+    logger = get_logger(__name__)
     logger.debug(f"Creating cache key for args={args}, kwargs={kwargs}")
 
     def make_hashable(obj):  # noqa: ANN001, ANN202

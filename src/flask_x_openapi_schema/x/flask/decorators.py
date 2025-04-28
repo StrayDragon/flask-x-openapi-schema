@@ -6,6 +6,7 @@ from typing import Any, TypeVar
 from flask import request
 from pydantic import BaseModel
 
+from flask_x_openapi_schema import get_logger
 from flask_x_openapi_schema.core.cache import make_cache_key
 from flask_x_openapi_schema.core.config import ConventionalPrefixConfig
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr
@@ -118,12 +119,10 @@ class FlaskOpenAPIDecorator:
             Updated kwargs dictionary with the model instance
 
         """
-        import logging
-
         from flask_x_openapi_schema.core.cache import MODEL_CACHE
         from flask_x_openapi_schema.core.request_processing import preprocess_request_data
 
-        logger = logging.getLogger(__name__)
+        logger = get_logger(__name__)
         logger.debug(f"Processing request body for {param_name} with model {model.__name__}")
         logger.debug(f"Request content type: {request.content_type}")
         logger.debug(f"Request is_json: {request.is_json}")
@@ -276,9 +275,8 @@ class FlaskOpenAPIDecorator:
         """
         # No additional processing needed for Flask
         # Just log the parameters for debugging
-        import logging
 
-        logger = logging.getLogger(__name__)
+        logger = get_logger(__name__)
         logger.debug(f"Processing additional parameters with kwargs keys: {list(kwargs.keys())}")
         logger.debug(f"Processed parameter names: {param_names}")
         return kwargs
