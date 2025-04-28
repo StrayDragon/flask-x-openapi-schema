@@ -66,16 +66,14 @@ def test_flask_restful_imports():
         assert hasattr(reqparse, "RequestParser")
     else:
         # If Flask-RESTful is not installed, these should be placeholder classes
-        with pytest.raises(MissingDependencyError) as excinfo:
-            Api()
-        assert "Flask-RESTful integration" in str(excinfo.value)
-        assert "flask-restful" in str(excinfo.value)
+        # Test all placeholder classes in a more concise way
+        for cls in [Api, Resource]:
+            with pytest.raises(MissingDependencyError) as excinfo:
+                cls()
+            assert "Flask-RESTful integration" in str(excinfo.value)
+            assert "flask-restful" in str(excinfo.value)
 
-        with pytest.raises(MissingDependencyError) as excinfo:
-            Resource()
-        assert "Flask-RESTful integration" in str(excinfo.value)
-        assert "flask-restful" in str(excinfo.value)
-
+        # Test reqparse module
         with pytest.raises(MissingDependencyError) as excinfo:
             reqparse.RequestParser()
         assert "Flask-RESTful integration" in str(excinfo.value)

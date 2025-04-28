@@ -48,12 +48,12 @@ def test_schema_generator_basic():
     assert "schemas" in schema["components"]
 
 
-def test_schema_generator_register_model():
+def test_schema_generator_register_models():
     """Test registering models with OpenAPISchemaGenerator."""
     # Create a schema generator
     generator = OpenAPISchemaGenerator(title="Test API", version="1.0.0", description="Test API Description")
 
-    # Register models
+    # Test 1: Register models explicitly
     generator._register_model(SimpleModel)
     generator._register_model(ComplexModel)
 
@@ -91,40 +91,27 @@ def test_schema_generator_register_model():
     assert "name" in complex_schema["required"]
     assert "description" not in complex_schema["required"]
 
+    # Test 2: Check that registering the same model twice doesn't cause issues
+    # Create a new generator
+    generator2 = OpenAPISchemaGenerator(title="Test API", version="1.0.0", description="Test API Description")
+    generator2._register_model(SimpleModel)
+    generator2._register_model(SimpleModel)  # Register twice
+    schema2 = generator2.generate_schema()
+    assert "SimpleModel" in schema2["components"]["schemas"]
 
-def test_schema_generator_register_model_twice():
-    """Test registering the same model twice."""
-    # Create a schema generator
-    generator = OpenAPISchemaGenerator(title="Test API", version="1.0.0", description="Test API Description")
-
-    # Register the same model twice
-    generator._register_model(SimpleModel)
-    generator._register_model(SimpleModel)
-
-    # Generate schema
-    schema = generator.generate_schema()
-
-    # Check that the model was registered correctly
-    assert "SimpleModel" in schema["components"]["schemas"]
-
-
-def test_schema_generator_register_model_with_reference():
-    """Test registering models with references to other models."""
-    # Create a schema generator
-    generator = OpenAPISchemaGenerator(title="Test API", version="1.0.0", description="Test API Description")
-
-    # Register ComplexModel (which references SimpleModel)
-    generator._register_model(ComplexModel)
-
-    # Generate schema
-    schema = generator.generate_schema()
+    # Test 3: Check that nested models are automatically registered
+    # Create a new generator
+    generator3 = OpenAPISchemaGenerator(title="Test API", version="1.0.0", description="Test API Description")
+    # Register only ComplexModel (which references SimpleModel)
+    generator3._register_model(ComplexModel)
+    schema3 = generator3.generate_schema()
 
     # Check that both models were registered correctly
-    assert "SimpleModel" in schema["components"]["schemas"]
-    assert "ComplexModel" in schema["components"]["schemas"]
+    assert "SimpleModel" in schema3["components"]["schemas"]
+    assert "ComplexModel" in schema3["components"]["schemas"]
 
     # Check that the reference is correct
-    complex_schema = schema["components"]["schemas"]["ComplexModel"]
+    complex_schema = schema3["components"]["schemas"]["ComplexModel"]
     items_schema = complex_schema["properties"]["items"]
     assert items_schema["type"] == "array"
     assert "items" in items_schema

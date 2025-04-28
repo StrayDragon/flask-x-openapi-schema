@@ -94,53 +94,58 @@ def api(app):
     return api
 
 
-def test_openapi_metadata_with_flask_restful(client, api):
-    """Test the decorator with Flask-RESTful."""
-    # Create a mock BaseRespModel.to_response method
-    original_to_response = BaseRespModel.to_response
+def test_openapi_metadata_with_flask_restful_get(client, api):
+    """Test the GET method with Flask-RESTful."""
+    # Test GET request
+    response = client.get("/tests/123")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["id"] == "123"
+    assert data["name"] == "Test"
+    assert data["age"] == 30
 
-    def mock_to_response(self, status_code=200):
-        return self.model_dump(), status_code
 
-    # Monkey patch the to_response method
-    BaseRespModel.to_response = mock_to_response
+class SampleResourceWithWorkingPost(Resource):
+    """Test resource class with a working POST method."""
 
-    try:
-        # Test GET request
-        response = client.get("/tests/123")
-        assert response.status_code == 200
-        data = response.get_json()
-        assert data["id"] == "123"
-        assert data["name"] == "Test"
-        assert data["age"] == 30
+    @openapi_metadata(
+        summary="Create test data",
+        description="Create new test data",
+        responses=OpenAPIMetaResponse(
+            responses={
+                "201": OpenAPIMetaResponseItem(
+                    model=SampleResponseModel,
+                    description="Created successfully",
+                ),
+            },
+        ),
+    )
+    def post(self, test_id):
+        """Create new test data."""
+        from flask import request
 
-        # Modify the post method to avoid the error
-        original_post = SampleResource.post
+        data = request.get_json()
+        return {"id": test_id, "name": data["name"], "age": data["age"]}, 201
 
-        def mock_post(self, test_id=None):
-            # Get the request data
-            from flask import request
 
-            data = request.get_json()
-            # Create a response
-            return {"id": "new-id", "name": data["name"], "age": data["age"]}, 201
+@pytest.fixture
+def api_with_working_post(app):
+    """Create a Flask-RESTful API with a working POST method."""
+    api = Api(app)
+    api.add_resource(SampleResourceWithWorkingPost, "/tests2/<string:test_id>")
+    return api
 
-        # Apply the mock
-        SampleResource.post = mock_post
 
-        # Test POST request
-        response = client.post(
-            "/tests/new",
-            json={"name": "New Test", "age": 25, "email": "test@example.com"},
-        )
-        assert response.status_code == 201
-        data = response.get_json()
-        assert data["id"] == "new-id"
-        assert data["name"] == "New Test"
-        assert data["age"] == 25
-
-        # Restore the original post method
-        SampleResource.post = original_post
-    finally:
-        # Restore the original method
-        BaseRespModel.to_response = original_to_response
+def test_openapi_metadata_with_flask_restful_post(client, api_with_working_post):
+    """Test the POST method with Flask-RESTful."""
+    # Test POST request
+    id_ = "new"
+    response = client.post(
+        f"/tests2/{id_}",
+        json={"name": "New Test", "age": 25, "email": "test@example.com"},
+    )
+    assert response.status_code == 201
+    data = response.get_json()
+    assert data["id"] == id_
+    assert data["name"] == "New Test"
+    assert data["age"] == 25
