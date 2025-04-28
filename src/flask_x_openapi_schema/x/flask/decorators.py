@@ -129,12 +129,25 @@ class FlaskOpenAPIDecorator:
         model_instance = request_processor.process_request_data(request, model, param_name)
 
         if model_instance:
-            logger.debug(f"Successfully created model instance for {param_name}")
             kwargs[param_name] = model_instance
             return kwargs
 
         # If we get here, we need to create a default instance
         logger.warning(f"No valid request data found for {param_name}, creating default instance")
+
+        # Try to directly get JSON data from request
+        json_data = request.get_json(silent=True)
+
+        if json_data:
+            try:
+                # Try to create model instance directly from JSON data
+                model_instance = model.model_validate(json_data)
+                kwargs[param_name] = model_instance
+            except Exception:  # noqa: S110
+                # Fall back to default values
+                pass
+            else:
+                return kwargs
 
         # Create default instance with sensible values
         try:
@@ -163,14 +176,12 @@ class FlaskOpenAPIDecorator:
                     lambda: ModelFactory.create_from_data(model, default_data), fallback=None
                 )
                 if model_instance:
-                    logger.debug(f"Created default model instance for {param_name}")
                     kwargs[param_name] = model_instance
                     return kwargs
 
             # Try to create an empty instance
             model_instance = safe_operation(lambda: model(), fallback=None)
             if model_instance:
-                logger.debug(f"Created empty model instance for {param_name}")
                 kwargs[param_name] = model_instance
         except Exception:
             logger.exception("Failed to create default model instance")
@@ -219,18 +230,9 @@ class FlaskOpenAPIDecorator:
         """
         # No additional processing needed for Flask
         # Just log the parameters for debugging
-
         logger = get_logger(__name__)
         logger.debug(f"Processing additional parameters with kwargs keys: {list(kwargs.keys())}")
         logger.debug(f"Processed parameter names: {param_names}")
-
-        # Debug the content of _x_body if it exists
-        if "_x_body" in kwargs:
-            logger.debug(f"_x_body content: {kwargs['_x_body']}")
-            logger.debug(f"_x_body type: {type(kwargs['_x_body'])}")
-            if hasattr(kwargs["_x_body"], "__dict__"):
-                logger.debug(f"_x_body attributes: {kwargs['_x_body'].__dict__}")
-
         return kwargs
 
 

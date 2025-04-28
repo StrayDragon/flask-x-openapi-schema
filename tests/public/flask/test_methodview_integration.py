@@ -245,7 +245,7 @@ class UserAvatarView(OpenAPIMethodViewMixin, MethodView):
 
 
 @pytest.fixture
-def app():
+def methodview_test_app():
     """Create a Flask app for testing."""
     app = Flask(__name__)
 
@@ -308,9 +308,15 @@ def app():
     return app
 
 
-def test_list_users(client):
+@pytest.fixture
+def methodview_test_client(methodview_test_app):
+    with methodview_test_app.test_client() as client:
+        yield client
+
+
+def test_list_users(methodview_test_client):
     """Test listing users."""
-    response = client.get("/api/users")
+    response = methodview_test_client.get("/api/users")
     assert response.status_code == 200
     data = json.loads(response.data)
     assert isinstance(data, list)
@@ -320,22 +326,22 @@ def test_list_users(client):
     assert data[2]["username"] == "user3"
 
 
-def test_list_users_with_query_params(client):
+def test_list_users_with_query_params(methodview_test_client):
     """Test listing users with query parameters."""
-    response = client.get("/api/users?sort=age&order=desc&limit=2")
+    response = methodview_test_client.get("/api/users?sort=age&order=desc&limit=2")
     assert response.status_code == 200
     data = json.loads(response.data)
     assert isinstance(data, list)
 
 
-def test_create_user(client):
+def test_create_user(methodview_test_client):
     """Test creating a user."""
     user_data = {
         "username": "newuser",
         "email": "newuser@example.com",
         "age": 28,
     }
-    response = client.post("/api/users", json=user_data)
+    response = methodview_test_client.post("/api/users", json=user_data)
     assert response.status_code == 201
     data = json.loads(response.data)
     assert data["username"] == "newuser"
@@ -344,9 +350,9 @@ def test_create_user(client):
     assert "id" in data
 
 
-def test_get_user(client):
+def test_get_user(methodview_test_client):
     """Test getting a user by ID."""
-    response = client.get("/api/users/2")
+    response = methodview_test_client.get("/api/users/2")
     assert response.status_code == 200
     data = json.loads(response.data)
     assert data["id"] == "2"
@@ -355,9 +361,9 @@ def test_get_user(client):
     assert data["age"] == 35
 
 
-def test_get_user_not_found(client):
+def test_get_user_not_found(methodview_test_client):
     """Test getting a non-existent user."""
-    response = client.get("/api/users/999")
+    response = methodview_test_client.get("/api/users/999")
     assert response.status_code == 404
     data = json.loads(response.data)
     assert "error" in data
@@ -365,7 +371,7 @@ def test_get_user_not_found(client):
     assert data["code"] == 404
 
 
-def test_upload_avatar(client):
+def test_upload_avatar(methodview_test_client):
     """Test uploading a user avatar."""
     from io import BytesIO
 
@@ -380,7 +386,7 @@ def test_upload_avatar(client):
 
     # Upload the file
     data = {"file": test_file}
-    response = client.post("/api/users/1/avatar", data=data, content_type="multipart/form-data")
+    response = methodview_test_client.post("/api/users/1/avatar", data=data, content_type="multipart/form-data")
     assert response.status_code == 200
     data = json.loads(response.data)
     assert data["message"] == "Avatar uploaded successfully"
@@ -388,16 +394,16 @@ def test_upload_avatar(client):
     assert data["user_id"] == "1"
 
 
-def test_upload_avatar_no_file(client):
+def test_upload_avatar_no_file(methodview_test_client):
     """Test uploading without a file."""
-    response = client.post("/api/users/1/avatar")
+    response = methodview_test_client.post("/api/users/1/avatar")
     assert response.status_code == 400
     data = json.loads(response.data)
     assert data["error"] == "No file provided"
     assert data["code"] == 400
 
 
-def test_upload_avatar_user_not_found(client):
+def test_upload_avatar_user_not_found(methodview_test_client):
     """Test uploading to a non-existent user."""
     from io import BytesIO
 
@@ -412,16 +418,16 @@ def test_upload_avatar_user_not_found(client):
 
     # Upload the file
     data = {"file": test_file}
-    response = client.post("/api/users/999/avatar", data=data, content_type="multipart/form-data")
+    response = methodview_test_client.post("/api/users/999/avatar", data=data, content_type="multipart/form-data")
     assert response.status_code == 404
     data = json.loads(response.data)
     assert data["error"] == "User not found"
     assert data["code"] == 404
 
 
-def test_openapi_schema_generation(client):
+def test_openapi_schema_generation(methodview_test_client):
     """Test OpenAPI schema generation."""
-    response = client.get("/api/openapi.json")
+    response = methodview_test_client.get("/api/openapi.json")
     assert response.status_code == 200
     schema = json.loads(response.data)
 

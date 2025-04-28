@@ -425,10 +425,7 @@ class OpenAPIDecoratorBase:
                     if param.default is param.empty and param_name in cached_data["type_hints"]:
                         param_type = cached_data["type_hints"][param_name]
                         if isinstance(param_type, type) and issubclass(param_type, BaseModel):
-                            with contextlib.suppress(Exception):
-                                # Create an empty model instance with default values
-                                # If we can't create an empty instance, just continue
-                                kwargs[param_name] = param_type()
+                            kwargs[param_name] = param_type()
 
             return self._process_request(func, cached_data, *args, **kwargs)
 
@@ -773,7 +770,7 @@ class OpenAPIDecoratorBase:
         # Create and return the wrapper function
         return self._create_function_wrapper(func, cached_data, metadata, merged_hints)
 
-    def _process_request(self, func: Callable[P, R], cached_data: dict[str, Any], *args, **kwargs) -> Any:
+    def _process_request(self, func: Callable[P, R], cached_data: dict[str, Any], *args, **kwargs) -> Any:  # noqa: PLR0915
         """Process a request using cached metadata.
 
         This method uses the ParameterProcessor to handle parameter binding using the Strategy pattern.
@@ -792,6 +789,28 @@ class OpenAPIDecoratorBase:
         signature = cached_data["signature"]
         param_names = cached_data.get("param_names", [])
 
+        # Check if we're in a request context
+        from flask import request
+
+        has_request_context = False
+        with contextlib.suppress(RuntimeError):
+            has_request_context = bool(request)
+
+        # If in request context and it's a POST request, try to create model directly from JSON data
+        if has_request_context and request.method == "POST" and request.is_json:
+            json_data = request.get_json(silent=True)
+
+            if json_data:
+                # Find request body parameters
+                for param_name in param_names:
+                    if param_name in signature.parameters and param_name.startswith("_x_body"):
+                        param_type = cached_data["type_hints"].get(param_name)
+                        if param_type and isinstance(param_type, type) and issubclass(param_type, BaseModel):
+                            with contextlib.suppress(Exception):
+                                # Create model instance directly from JSON data
+                                model_instance = param_type.model_validate(json_data)
+                                kwargs[param_name] = model_instance
+
         # Create empty model instances for required parameters that are missing
         for param_name in param_names:
             if param_name not in kwargs and param_name in signature.parameters:
@@ -799,6 +818,15 @@ class OpenAPIDecoratorBase:
                 if param.default is param.empty and param_name in cached_data["type_hints"]:
                     param_type = cached_data["type_hints"][param_name]
                     if isinstance(param_type, type) and issubclass(param_type, BaseModel):
+                        # If it's a request body parameter and we have JSON data, try to create model instance
+                        if has_request_context and param_name.startswith("_x_body") and request.is_json:
+                            json_data = request.get_json(silent=True)
+                            if json_data:
+                                with contextlib.suppress(Exception):
+                                    kwargs[param_name] = param_type.model_validate(json_data)
+                                    continue
+
+                        # Otherwise create empty instance
                         with contextlib.suppress(Exception):
                             kwargs[param_name] = param_type()
 
@@ -826,6 +854,14 @@ class OpenAPIDecoratorBase:
                 if param_name in cached_data["type_hints"]:
                     param_type = cached_data["type_hints"][param_name]
                     if isinstance(param_type, type) and issubclass(param_type, BaseModel):
+                        # If it's a request body parameter and we have JSON data, try to create model instance
+                        if has_request_context and param_name.startswith("_x_body") and request.is_json:
+                            json_data = request.get_json(silent=True)
+                            if json_data:
+                                with contextlib.suppress(Exception):
+                                    valid_kwargs[param_name] = param_type.model_validate(json_data)
+                                    continue
+
                         # For required models, we need to provide default values
                         if hasattr(param_type, "model_json_schema"):
                             schema = param_type.model_json_schema()
@@ -846,9 +882,9 @@ class OpenAPIDecoratorBase:
                                     else:
                                         default_data[field] = None
 
-                            valid_kwargs[param_name] = param_type.model_validate(default_data)
+                            with contextlib.suppress(Exception):
+                                valid_kwargs[param_name] = param_type.model_validate(default_data)
                         else:
-                            # Try to create an empty instance
                             with contextlib.suppress(Exception):
                                 valid_kwargs[param_name] = param_type()
 

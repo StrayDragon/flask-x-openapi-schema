@@ -18,6 +18,7 @@ Thread Safety:
     Any caching is handled through thread-safe cache implementations.
 """
 
+import contextlib
 import json
 import logging
 from abc import ABC, abstractmethod
@@ -470,10 +471,6 @@ class ParameterProcessor:
 
         # Check if we're in a request context
         has_request_context = False
-        import contextlib
-
-        from flask import request
-
         with contextlib.suppress(RuntimeError):  # Not in a request context, skip request-dependent processing
             has_request_context = bool(request)
 

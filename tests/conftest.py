@@ -54,18 +54,6 @@ def clear_caches():
     reload(cache)
 
 
-@pytest.fixture
-def app():
-    """Create a Flask app for testing."""
-    return Flask(__name__)
-
-
-@pytest.fixture
-def client(app):
-    """Create a test client for the app."""
-    return app.test_client()
-
-
 @pytest.fixture(autouse=True)
 def add_imports(doctest_namespace):
     """Add imports to the doctest namespace."""

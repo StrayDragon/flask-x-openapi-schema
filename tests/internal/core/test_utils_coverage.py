@@ -2,6 +2,7 @@
 
 from datetime import date, datetime, time
 from enum import Enum
+from typing import Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -85,7 +86,7 @@ class TestPythonTypeToOpenAPIType:
 
     def test_optional_types(self):
         """Test conversion of Optional types."""
-        optional_str = python_type_to_openapi_type(str | None)
+        optional_str = python_type_to_openapi_type(Optional[str])  # noqa: UP007
 
         # Result depends on OpenAPI version
         assert "type" in optional_str or "oneOf" in optional_str
@@ -105,7 +106,7 @@ class TestPythonTypeToOpenAPIType:
 
     def test_union_types(self):
         """Test conversion of Union types."""
-        union_type = python_type_to_openapi_type(str | int)
+        union_type = python_type_to_openapi_type(Union[str, int])  # noqa: UP007
 
         # Result depends on OpenAPI version and Pydantic version
         if "oneOf" in union_type:
