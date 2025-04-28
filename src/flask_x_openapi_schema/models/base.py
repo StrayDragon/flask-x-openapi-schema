@@ -1,9 +1,8 @@
 """Base models for OpenAPI schema generation."""
 
-from typing import Any, TypeVar
+from typing import Any, Self, TypeVar
 
 from pydantic import BaseModel, ConfigDict
-from typing_extensions import Self
 
 T = TypeVar("T", bound="BaseRespModel")
 
