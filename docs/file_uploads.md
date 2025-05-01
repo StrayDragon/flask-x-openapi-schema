@@ -34,10 +34,10 @@ from pydantic import Field
 class CustomFileUpload(FileUploadModel):
     description: str = Field(..., description="File description")
     category: str = Field(..., description="File category")
-    
+
     # Customize allowed content types
     allowed_content_types = ["application/pdf", "application/msword"]
-    
+
     # Customize maximum file size (in bytes)
     max_size = 10 * 1024 * 1024  # 10 MB
 ```
@@ -73,14 +73,14 @@ class FileUploadView(OpenAPIMethodViewMixin, MethodView):
     def post(self, _x_file: ImageUploadModel):
         # The file is automatically injected into _x_file.file
         file = _x_file.file
-        
+
         # Access file properties
         filename = file.filename
         content_type = file.content_type
-        
+
         # Save the file
         file.save(f"uploads/{filename}")
-        
+
         # Return response
         return {
             "filename": filename,
@@ -121,14 +121,14 @@ class DocumentUploadResource(Resource):
     def post(self, _x_file: DocumentUploadModel):
         # The file is automatically injected into _x_file.file
         file = _x_file.file
-        
+
         # Access file properties
         filename = file.filename
         content_type = file.content_type
-        
+
         # Save the file
         file.save(f"uploads/{filename}")
-        
+
         # Return response
         return {
             "filename": filename,
@@ -176,7 +176,7 @@ def post(
     image = _x_file_image.file
     document = _x_file_document.file
     video = _x_file_video.file
-    
+
     # Process files
     # ...
 ```
@@ -191,22 +191,22 @@ from pydantic import Field, validator
 
 class StrictPDFUpload(FileUploadModel):
     title: str = Field(..., description="Document title")
-    
+
     # Define allowed content types
     allowed_content_types = ["application/pdf"]
-    
+
     # Define maximum file size (5 MB)
     max_size = 5 * 1024 * 1024
-    
+
     # Custom validation
     @validator("file")
     def validate_file(cls, file):
         if not file or not hasattr(file, "filename"):
             raise ValueError("File is required")
-        
+
         if not file.filename.lower().endswith(".pdf"):
             raise ValueError("Only PDF files are allowed")
-        
+
         return file
 ```
 
@@ -222,23 +222,23 @@ import io
 class ResizedImageUpload(ImageUploadModel):
     width: int = Field(..., description="Target width")
     height: int = Field(..., description="Target height")
-    
+
     def process_image(self):
         """Resize the uploaded image to the specified dimensions."""
         if not self.file:
             return None
-        
+
         # Read the image
         img = Image.open(self.file)
-        
+
         # Resize the image
         resized_img = img.resize((self.width, self.height))
-        
+
         # Save to a buffer
         buffer = io.BytesIO()
         resized_img.save(buffer, format=img.format)
         buffer.seek(0)
-        
+
         return buffer
 ```
 
@@ -352,7 +352,7 @@ class ProductImageView(OpenAPIMethodViewMixin, MethodView):
     def post(self, product_id: str, _x_file_image: ProductImageUpload):
         # The file is automatically injected into _x_file_image.file
         file = _x_file_image.file
-        
+
         # Check if product exists (in a real app, you would query a database)
         if product_id not in ["123", "456", "789"]:
             error = ErrorResponse(
@@ -360,23 +360,23 @@ class ProductImageView(OpenAPIMethodViewMixin, MethodView):
                 message=f"Product with ID {product_id} not found",
             )
             return error.to_response(404)
-        
+
         # Save the file
         file_id = str(uuid.uuid4())
         filename = file.filename
         content_type = file.content_type or "application/octet-stream"
-        
+
         # Create product-specific directory
         product_dir = uploads_dir / product_id
         product_dir.mkdir(exist_ok=True)
-        
+
         # Save file to disk
         file_path = product_dir / f"{file_id}_{filename}"
         file.save(file_path)
-        
+
         # Get file size
         size = os.path.getsize(file_path)
-        
+
         # Create response
         response = FileResponse(
             id=file_id,
@@ -386,8 +386,33 @@ class ProductImageView(OpenAPIMethodViewMixin, MethodView):
             upload_date=datetime.now(),
             url=url_for("api.download_file", file_id=file_id, _external=True),
         )
-        
+
         return response.to_response(201)
+```
+
+## Working Examples
+
+For complete working examples of file uploads, check out the example applications in the repository:
+
+- [Flask MethodView File Upload Example](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask/app.py#L461-L520): Demonstrates image, document, audio, and video uploads using Flask.MethodView
+- [Flask-RESTful File Upload Example](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask_restful/app.py#L534-L593): Demonstrates image, document, audio, and video uploads using Flask-RESTful
+
+These examples show how to:
+
+- Define file upload models for different file types
+- Handle file uploads with validation
+- Save uploaded files to disk
+- Return appropriate responses
+- Generate OpenAPI schema for file upload endpoints
+
+You can run the examples using the provided justfile commands:
+
+```bash
+# Run the Flask MethodView example
+just run-example-flask
+
+# Run the Flask-RESTful example
+just run-example-flask-restful
 ```
 
 ## Conclusion

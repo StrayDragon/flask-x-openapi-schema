@@ -397,6 +397,31 @@ def set_language():
     set_current_language(preferred_language)
 ```
 
+## Working Examples
+
+For complete working examples of internationalization, check out the example applications in the repository:
+
+- [Common Models with I18n Support](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/common/models.py#L243-L250): Demonstrates defining multilingual strings for product categories and descriptions
+- [Flask MethodView I18n Example](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask/app.py#L126-L146): Demonstrates using I18nStr in OpenAPI metadata
+- [Flask-RESTful I18n Example](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask_restful/app.py#L126-L146): Demonstrates using I18nStr in OpenAPI metadata
+
+These examples show how to:
+
+- Define multilingual strings using I18nStr
+- Use multilingual strings in OpenAPI metadata
+- Switch languages at runtime
+- Generate OpenAPI schema in different languages
+
+You can run the examples using the provided justfile commands:
+
+```bash
+# Run the Flask MethodView example
+just run-example-flask
+
+# Run the Flask-RESTful example
+just run-example-flask-restful
+```
+
 ## Conclusion
 
 Flask-X-OpenAPI-Schema provides comprehensive support for internationalization in API documentation. By using `I18nString` and `I18nBaseModel`, you can create multilingual API documentation that is accessible to users around the world. The thread-local storage for the current language allows different parts of your application to use different languages simultaneously, making it easy to support multiple languages in a single application.

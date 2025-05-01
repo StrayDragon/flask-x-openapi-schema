@@ -117,22 +117,22 @@ app.register_blueprint(blueprint)
 def get_openapi_spec():
     from flask_x_openapi_schema.x.flask.views import MethodViewOpenAPISchemaGenerator
     import yaml
-    
+
     generator = MethodViewOpenAPISchemaGenerator(
         title="My API",
         version="1.0.0",
         description="API for managing items",
     )
-    
+
     # Process MethodView resources
     generator.process_methodview_resources(blueprint)
-    
+
     # Generate the schema
     schema = generator.generate_schema()
-    
+
     # Convert to YAML
     yaml_content = yaml.dump(schema, sort_keys=False, default_flow_style=False)
-    
+
     return yaml_content, 200, {"Content-Type": "text/yaml"}
 
 # Serve Swagger UI
@@ -274,7 +274,7 @@ class ItemResource(Resource):
         # Implementation...
         if item_id not in ["1", "2"]:
             return {"error": "Item not found"}, 404
-        
+
         item = {
             "id": item_id,
             "name": f"Item {item_id}",
@@ -291,17 +291,17 @@ api.add_resource(ItemResource, "/api/items/<string:item_id>")
 @app.route("/openapi.yaml")
 def get_openapi_spec():
     import yaml
-    
+
     schema = api.generate_openapi_schema(
         title="My API",
         version="1.0.0",
         description="API for managing items",
         output_format="json",
     )
-    
+
     # Convert to YAML
     yaml_content = yaml.dump(schema, sort_keys=False, default_flow_style=False)
-    
+
     return yaml_content, 200, {"Content-Type": "text/yaml"}
 
 # Serve Swagger UI
@@ -379,17 +379,17 @@ class ItemQueryParams(BaseModel):
 def get(self, _x_query: ItemQueryParams = None):
     # _x_query is automatically populated from the query parameters
     items = [...]
-    
+
     if _x_query:
         if _x_query.category:
             items = [item for item in items if item["category"] == _x_query.category]
-        
+
         if _x_query.min_price is not None:
             items = [item for item in items if item["price"] >= _x_query.min_price]
-        
+
         if _x_query.max_price is not None:
             items = [item for item in items if item["price"] <= _x_query.max_price]
-    
+
     return items, 200
 ```
 
@@ -406,7 +406,7 @@ def get(self, item_id: str):
     # item_id is automatically populated from the path parameter
     if item_id not in ["1", "2"]:
         return {"error": "Item not found"}, 404
-    
+
     item = {
         "id": item_id,
         "name": f"Item {item_id}",
@@ -430,10 +430,10 @@ from flask_x_openapi_schema import ImageUploadModel
 def post(self, item_id: str, _x_file: ImageUploadModel):
     # _x_file.file is automatically populated from the uploaded file
     file = _x_file.file
-    
+
     # Save the file
     file.save(f"uploads/{item_id}_{file.filename}")
-    
+
     return {"message": "File uploaded successfully"}, 201
 ```
 
@@ -463,9 +463,36 @@ def get(self, item_id: str):
         description=f"Item {item_id} description",
         price=float(item_id) * 10.99,
     )
-    
+
     # Convert to Flask response
     return response.to_response(200)
+```
+
+## Complete Examples
+
+For complete working examples, check out the example applications in the repository:
+
+- [Flask MethodView Example](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask/app.py): A complete example using Flask.MethodView
+- [Flask-RESTful Example](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask_restful/app.py): A complete example using Flask-RESTful
+- [Response Example (Flask)](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask/response_example.py): Example demonstrating structured responses with OpenAPIMetaResponse
+- [Response Example (Flask-RESTful)](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask_restful/response_example.py): Example demonstrating structured responses with OpenAPIMetaResponse
+
+These examples demonstrate all the features of the library, including:
+
+- Parameter binding (path, query, body)
+- File uploads (images, documents, audio, video)
+- Internationalization
+- Response models
+- OpenAPI schema generation
+
+You can run the examples using the provided justfile commands:
+
+```bash
+# Run the basic Flask MethodView example
+just run-example-flask
+
+# Run the basic Flask-RESTful example
+just run-example-flask-restful
 ```
 
 ## Next Steps

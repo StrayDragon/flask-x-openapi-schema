@@ -55,10 +55,10 @@ The `BaseRespModel` class provides a `to_response` method that converts the mode
 def get(self, user_id: str):
     # Get user from database
     user = get_user_from_db(user_id)
-    
+
     if not user:
         return {"error": "User not found"}, 404
-    
+
     # Create response model
     response = UserResponse(
         id=user.id,
@@ -67,7 +67,7 @@ def get(self, user_id: str):
         full_name=user.full_name,
         created_at=user.created_at.isoformat(),
     )
-    
+
     # Convert to Flask response
     return response.to_response(200)
 ```
@@ -199,7 +199,7 @@ You can return basic responses using Flask's standard response format:
 def get(self):
     # Get users from database
     users = get_users_from_db()
-    
+
     # Convert to response format
     response = [
         {
@@ -211,7 +211,7 @@ def get(self):
         }
         for user in users
     ]
-    
+
     return response, 200
 ```
 
@@ -227,14 +227,14 @@ For more advanced response handling, you can use the `BaseRespModel` class:
 def get(self, user_id: str):
     # Get user from database
     user = get_user_from_db(user_id)
-    
+
     if not user:
         error = ErrorResponse(
             error_code="USER_NOT_FOUND",
             message=f"User with ID {user_id} not found",
         )
         return error.to_response(404)
-    
+
     # Create response model
     response = UserResponse(
         id=user.id,
@@ -243,7 +243,7 @@ def get(self, user_id: str):
         full_name=user.full_name,
         created_at=user.created_at.isoformat(),
     )
-    
+
     # Convert to Flask response
     return response.to_response(200)
 ```
@@ -260,7 +260,7 @@ For list responses, you can use a list of response models:
 def get(self):
     # Get users from database
     users = get_users_from_db()
-    
+
     # Convert to response models
     response = [
         UserResponse(
@@ -272,7 +272,7 @@ def get(self):
         )
         for user in users
     ]
-    
+
     # Convert to Flask response
     return [r.model_dump() for r in response], 200
 ```
@@ -305,13 +305,13 @@ def get(self, _x_query: PaginationParams = None):
     # Get pagination parameters
     page = _x_query.page if _x_query else 1
     per_page = _x_query.per_page if _x_query else 10
-    
+
     # Get users from database with pagination
     users, total = get_users_from_db_paginated(page, per_page)
-    
+
     # Calculate total pages
     pages = (total + per_page - 1) // per_page
-    
+
     # Convert to response models
     user_responses = [
         UserResponse(
@@ -323,7 +323,7 @@ def get(self, _x_query: PaginationParams = None):
         )
         for user in users
     ]
-    
+
     # Create paginated response
     response = PaginatedResponse(
         items=user_responses,
@@ -332,7 +332,7 @@ def get(self, _x_query: PaginationParams = None):
         per_page=per_page,
         pages=pages,
     )
-    
+
     # Convert to Flask response
     return response.to_response(200)
 ```
@@ -364,7 +364,7 @@ def post(self, _x_body: UserCreateRequest):
             details={"username": _x_body.username},
         )
         return error.to_response(409)
-    
+
     # Check if email already exists
     if email_exists(_x_body.email):
         error = ErrorResponse(
@@ -373,7 +373,7 @@ def post(self, _x_body: UserCreateRequest):
             details={"email": _x_body.email},
         )
         return error.to_response(409)
-    
+
     # Create user
     # ...
 ```
@@ -390,14 +390,14 @@ You can add custom headers to your responses:
 def get(self, user_id: str):
     # Get user from database
     user = get_user_from_db(user_id)
-    
+
     if not user:
         error = ErrorResponse(
             error_code="USER_NOT_FOUND",
             message=f"User with ID {user_id} not found",
         )
         return error.to_response(404)
-    
+
     # Create response model
     response = UserResponse(
         id=user.id,
@@ -406,7 +406,7 @@ def get(self, user_id: str):
         full_name=user.full_name,
         created_at=user.created_at.isoformat(),
     )
-    
+
     # Convert to Flask response with custom headers
     return response.to_response(
         200,
@@ -416,6 +416,32 @@ def get(self, user_id: str):
             "X-RateLimit-Reset": "1619789983",
         },
     )
+```
+
+## Working Examples
+
+For complete working examples of response handling, check out the example applications in the repository:
+
+- [Flask MethodView Response Example](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask/response_example.py): Demonstrates structured responses with OpenAPIMetaResponse
+- [Flask-RESTful Response Example](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask_restful/response_example.py): Demonstrates structured responses with OpenAPIMetaResponse
+- [Error Response Example](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask/app.py#L126-L146): Demonstrates error response handling
+
+These examples show how to:
+
+- Define response models using Pydantic
+- Document responses using OpenAPIMetaResponse
+- Return responses with appropriate status codes
+- Handle error responses
+- Use BaseRespModel for automatic response conversion
+
+You can run the examples using the provided justfile commands:
+
+```bash
+# Run the Flask MethodView response example
+just run-response-example-flask
+
+# Run the Flask-RESTful response example
+just run-response-example-flask-restful
 ```
 
 ## Conclusion

@@ -33,13 +33,13 @@ def get_openapi_spec():
         version="1.0.0",
         description="API for managing resources",
     )
-    
+
     # Process MethodView resources
     generator.process_methodview_resources(blueprint)
-    
+
     # Generate the schema
     schema = generator.generate_schema()
-    
+
     # Convert to YAML
     yaml_content = yaml.dump(
         schema,
@@ -47,7 +47,7 @@ def get_openapi_spec():
         default_flow_style=False,
         allow_unicode=True,
     )
-    
+
     return yaml_content, 200, {"Content-Type": "text/yaml"}
 ```
 
@@ -80,7 +80,7 @@ def get_openapi_spec():
         description="API for managing resources",
         output_format="json",
     )
-    
+
     # Convert to YAML
     yaml_content = yaml.dump(
         schema,
@@ -88,7 +88,7 @@ def get_openapi_spec():
         default_flow_style=False,
         allow_unicode=True,
     )
-    
+
     return yaml_content, 200, {"Content-Type": "text/yaml"}
 ```
 
@@ -335,7 +335,7 @@ schema = api.generate_openapi_schema(
 def get_openapi_yaml():
     # Generate the schema
     # ...
-    
+
     # Convert to YAML
     yaml_content = yaml.dump(
         schema,
@@ -343,7 +343,7 @@ def get_openapi_yaml():
         default_flow_style=False,
         allow_unicode=True,
     )
-    
+
     return yaml_content, 200, {"Content-Type": "text/yaml"}
 ```
 
@@ -354,11 +354,11 @@ def get_openapi_yaml():
 def get_openapi_json():
     # Generate the schema
     # ...
-    
+
     # Convert to JSON
     import json
     json_content = json.dumps(schema, ensure_ascii=False)
-    
+
     return json_content, 200, {"Content-Type": "application/json"}
 ```
 
@@ -456,25 +456,25 @@ class CustomSchemaGenerator(MethodViewOpenAPISchemaGenerator):
     def process_methodview_resources(self, blueprint):
         # Custom processing logic
         super().process_methodview_resources(blueprint)
-    
+
     def generate_schema(self):
         # Custom schema generation logic
         schema = super().generate_schema()
-        
+
         # Add custom components
         if "components" not in schema:
             schema["components"] = {}
-        
+
         # Add custom security schemes
         if "securitySchemes" not in schema["components"]:
             schema["components"]["securitySchemes"] = {}
-        
+
         schema["components"]["securitySchemes"]["customAuth"] = {
             "type": "apiKey",
             "in": "header",
             "name": "X-Custom-Auth",
         }
-        
+
         return schema
 
 # Use the custom generator
@@ -516,6 +516,31 @@ def get_openapi_yaml():
 @app.route("/admin/openapi.yaml")
 def get_admin_openapi_yaml():
     return yaml.dump(admin_schema, sort_keys=False, default_flow_style=False), 200, {"Content-Type": "text/yaml"}
+```
+
+## Working Examples
+
+For complete working examples of schema generation, check out the example applications in the repository:
+
+- [Flask MethodView Schema Generation](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask/app.py#L972-L1000): Demonstrates generating OpenAPI schema from Flask.MethodView classes
+- [Flask-RESTful Schema Generation](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask_restful/app.py#L746-L774): Demonstrates generating OpenAPI schema from Flask-RESTful resources
+- [Swagger UI Integration](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask/app.py#L1003-L1030): Demonstrates integrating Swagger UI for API documentation
+
+These examples show how to:
+
+- Generate OpenAPI schema from Flask.MethodView classes and Flask-RESTful resources
+- Customize schema information (title, version, description)
+- Serve the schema as YAML or JSON
+- Integrate Swagger UI for interactive API documentation
+
+You can run the examples using the provided justfile commands:
+
+```bash
+# Run the Flask MethodView example
+just run-example-flask
+
+# Run the Flask-RESTful example
+just run-example-flask-restful
 ```
 
 ## Conclusion

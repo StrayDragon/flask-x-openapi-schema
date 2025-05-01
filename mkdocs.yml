@@ -79,6 +79,17 @@ plugins:
   - search
   - mermaid2:
       javascript: https://cdn.jsdelivr.net/npm/mermaid@11.6.0/dist/mermaid.min.js
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_docstring_examples: true
+            heading_level: 4
+            show_if_no_docstring: false
+
   - llmstxt:
       markdown_description: "A powerful utility for automatically generating OpenAPI schemas from Flask-RESTful resources, Flask.MethodView classes, and Pydantic models to simplify API documentation with minimal effort."
       sections:
@@ -96,11 +107,12 @@ plugins:
           - file_uploads.md
           - internationalization.md
         "API Reference":
-          - api/core.md
-          - api/flask.md
-          - api/flask_restful.md
-          - api/models.md
-          - api/i18n.md
+          - api/index.md
+          - api/core/index.md
+          - api/flask/index.md
+          - api/flask_restful/index.md
+          - api/models/index.md
+          - api/i18n/index.md
 
 nav:
   - Home: index.md
@@ -116,11 +128,12 @@ nav:
     - File Uploads: file_uploads.md
     - Internationalization: internationalization.md
   - API Reference:
-    - Core: api/core.md
-    - Flask: api/flask.md
-    - Flask-RESTful: api/flask_restful.md
-    - Models: api/models.md
-    - I18n: api/i18n.md
+    - Overview: api/index.md
+    - Core Modules: api/core/index.md
+    - Flask Integration: api/flask/index.md
+    - Flask-RESTful Integration: api/flask_restful/index.md
+    - Models: api/models/index.md
+    - Internationalization: api/i18n/index.md
 
 extra:
   social:

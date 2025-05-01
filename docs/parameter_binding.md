@@ -93,23 +93,23 @@ class UserFilterParams(BaseModel):
 def get(self, _x_query: UserFilterParams = None):
     # _x_query is automatically populated from the query parameters
     users = [...]
-    
+
     if _x_query:
         if _x_query.username:
             users = [user for user in users if _x_query.username in user["username"]]
-        
+
         if _x_query.email:
             users = [user for user in users if _x_query.email in user["email"]]
-        
+
         if _x_query.role:
             users = [user for user in users if user["role"] == _x_query.role]
-        
+
         if _x_query.active is not None:
             users = [user for user in users if user["active"] == _x_query.active]
-        
+
         # Apply pagination
         users = users[_x_query.offset:_x_query.offset + _x_query.limit]
-    
+
     return users, 200
 ```
 
@@ -177,7 +177,7 @@ def get(self, user_id: str):
     # user_id is automatically populated from the path parameter
     if user_id not in ["123", "456"]:
         return {"error": "User not found"}, 404
-    
+
     user = {
         "id": user_id,
         "username": f"user{user_id}",
@@ -226,10 +226,10 @@ from flask_x_openapi_schema import ImageUploadModel
 def post(self, user_id: str, _x_file: ImageUploadModel):
     # _x_file.file is automatically populated from the uploaded file
     file = _x_file.file
-    
+
     # Save the file
     file.save(f"uploads/{user_id}_profile.jpg")
-    
+
     return {"message": "Profile picture uploaded successfully"}, 201
 ```
 
@@ -282,10 +282,10 @@ def post(
     profile_pic = _x_file_profile.file
     cover_pic = _x_file_cover.file
     update_data = _x_body
-    
+
     # Process files and data
     # ...
-    
+
     return {"message": "Files uploaded and user updated successfully"}, 200
 ```
 
@@ -391,19 +391,19 @@ def get(
 ):
     # _x_query is populated from query parameters
     # _x_body is populated from the request body
-    
+
     # Combine search criteria
     search_criteria = {}
-    
+
     if _x_query:
         search_criteria.update(_x_query.model_dump(exclude_none=True))
-    
+
     if _x_body:
         search_criteria.update(_x_body.model_dump(exclude_none=True))
-    
+
     # Perform search
     # ...
-    
+
     return results, 200
 ```
 
@@ -421,10 +421,10 @@ def get(self, _x_query: UserFilterParams = None):
     if _x_query is None:
         # Return all users
         return all_users, 200
-    
+
     # Filter users based on query parameters
     # ...
-    
+
     return filtered_users, 200
 ```
 
@@ -458,11 +458,37 @@ class UserCreateRequest(BaseModel):
 def post(self, _x_body: UserCreateRequest):
     # _x_body is automatically populated from the request JSON
     # You can access nested fields like _x_body.addresses[0].city
-    
+
     # Process the request
     # ...
-    
+
     return user, 201
+```
+
+## Working Examples
+
+For complete working examples of parameter binding, check out the example applications in the repository:
+
+- [Flask MethodView Parameter Binding Example](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask/app.py#L126-L146): Demonstrates binding path, query, and body parameters
+- [Flask-RESTful Parameter Binding Example](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask_restful/app.py#L126-L146): Demonstrates binding path, query, and body parameters
+- [Custom Prefix Configuration Example](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples/flask/app.py#L35-L45): Demonstrates customizing parameter prefixes
+
+These examples show how to:
+
+- Bind request body parameters using `_x_body`
+- Bind query parameters using `_x_query`
+- Bind path parameters automatically
+- Customize parameter prefixes
+- Validate parameters using Pydantic models
+
+You can run the examples using the provided justfile commands:
+
+```bash
+# Run the Flask MethodView example
+just run-example-flask
+
+# Run the Flask-RESTful example
+just run-example-flask-restful
 ```
 
 ## Conclusion

@@ -12,7 +12,17 @@ A powerful utility for automatically generating OpenAPI schemas support Flask(Me
 
 ## 📚 Documentation
 
-Full documentation is available in the [docs](./docs) directory.
+Full documentation is available in the [docs](./docs) directory and online at [https://straydragon.github.io/flask-x-openapi-schema/](https://straydragon.github.io/flask-x-openapi-schema/).
+
+## 📝 Examples
+
+Complete examples are available in the [examples/](https://github.com/StrayDragon/flask-x-openapi-schema/tree/main/examples) directory. These examples demonstrate all the features of the library, including:
+
+- Parameter binding (path, query, body)
+- File uploads (images, documents, audio, video)
+- Internationalization
+- Response models
+- OpenAPI schema generation
 
 ## 🚀 Quick Start
 
@@ -176,6 +186,8 @@ just test-parallel '' 4
 
 # View HTML coverage report
 # Open htmlcov/index.html in your browser
+
+See [Testing Guide](./docs/testing.md) for more details on testing.
 ```
 
 ## 📊 Benchmarking

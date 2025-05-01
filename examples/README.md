@@ -82,6 +82,10 @@ All examples implement the same API endpoints:
 - `GET /products/<product_id>` or `GET /api/products/<product_id>`: Get a product by ID
 - `PUT /products/<product_id>` or `PUT /api/products/<product_id>`: Update a product (basic examples only)
 - `DELETE /products/<product_id>` or `DELETE /api/products/<product_id>`: Delete a product
+- `POST /products/<product_id>/images` or `POST /api/products/<product_id>/images`: Upload product images
+- `POST /products/<product_id>/documents` or `POST /api/products/<product_id>/documents`: Upload product documents
+- `POST /products/<product_id>/audio` or `POST /api/products/<product_id>/audio`: Upload product audio files
+- `POST /products/<product_id>/video` or `POST /api/products/<product_id>/video`: Upload product video files
 
 ## OpenAPI Documentation
 
@@ -124,11 +128,23 @@ examples/
    - Response serialization
    - Schema generation
 
-4. **Rich Console Output**:
+4. **File Uploads**:
+   - Image uploads with validation
+   - Document uploads (PDF, DOC, etc.)
+   - Audio file uploads (MP3, WAV, etc.)
+   - Video file uploads (MP4, AVI, etc.)
+   - File size and type validation
+
+5. **Internationalization**:
+   - Multilingual API documentation
+   - Language switching
+   - Localized error messages
+
+6. **Rich Console Output**:
    - Visualizing requests and responses
    - Formatted tables and JSON
 
-5. **Structured Responses**:
+7. **Structured Responses**:
    - Using OpenAPIMetaResponse for defining response schemas
    - Defining success and error responses
    - Associating response models with status codes
@@ -164,4 +180,24 @@ curl http://localhost:5000/products/<product_id>
 
 # Delete a product (replace <product_id> with an actual ID)
 curl -X DELETE http://localhost:5000/products/<product_id>
+
+# Upload a product image (replace <product_id> with an actual ID)
+curl -X POST http://localhost:5000/products/<product_id>/images \
+  -F "image=@/path/to/image.jpg"
+
+# Upload a product document (replace <product_id> with an actual ID)
+curl -X POST http://localhost:5000/products/<product_id>/documents \
+  -F "document=@/path/to/document.pdf"
+
+# Upload a product audio file (replace <product_id> with an actual ID)
+curl -X POST http://localhost:5000/products/<product_id>/audio \
+  -F "audio=@/path/to/audio.mp3"
+
+# Upload a product video file (replace <product_id> with an actual ID)
+curl -X POST http://localhost:5000/products/<product_id>/video \
+  -F "video=@/path/to/video.mp4"
 ```
+
+## Documentation
+
+For more detailed information about the library and its features, please refer to the [online documentation](https://straydragon.github.io/flask-x-openapi-schema/) or the [Examples Guide](https://straydragon.github.io/flask-x-openapi-schema/examples/).
