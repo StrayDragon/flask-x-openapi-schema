@@ -77,7 +77,7 @@ class OpenAPIIntegrationMixin(Api):
 
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the mixin.
 
         Args:
@@ -284,7 +284,7 @@ class OpenAPIBlueprintMixin:
             )
             configure_prefixes(new_config)
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the mixin.
 
         Args:

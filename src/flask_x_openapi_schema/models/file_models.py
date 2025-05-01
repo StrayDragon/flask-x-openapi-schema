@@ -37,7 +37,7 @@ class FileField(str):
     __slots__ = ()
 
     @classmethod
-    def __get_pydantic_core_schema__(cls, _source_type, _handler):  # noqa: ANN001, ANN206
+    def __get_pydantic_core_schema__(cls, _source_type: Any, _handler: Any) -> core_schema.PlainValidatorFunctionSchema:
         """Define the Pydantic core schema for this type.
 
         This is the recommended way to define custom types in Pydantic v2.
@@ -76,7 +76,7 @@ class FileField(str):
         return v
 
     @classmethod
-    def __get_pydantic_json_schema__(cls, _schema_generator, _field_schema):  # noqa: ANN001, ANN206
+    def __get_pydantic_json_schema__(cls, _schema_generator: Any, _field_schema: Any) -> dict[str, str]:
         """Define the JSON schema for OpenAPI.
 
         Args:
@@ -89,7 +89,7 @@ class FileField(str):
         """
         return {"type": "string", "format": "binary"}
 
-    def __new__(cls, *args, **kwargs):  # noqa: ANN204, ARG004
+    def __new__(cls, *args: Any, **kwargs: Any) -> Any:  # noqa: ARG004
         """Create a new instance of the class.
 
         If a file object is provided, return it directly.

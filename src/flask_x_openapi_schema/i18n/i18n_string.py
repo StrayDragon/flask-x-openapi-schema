@@ -209,7 +209,7 @@ class I18nStr:
         return hash((frozenset(self.strings.items()), self.default_language))
 
     @classmethod
-    def create(cls, **kwargs) -> "I18nStr":
+    def create(cls, **kwargs: Any) -> "I18nStr":
         """Create an I18nString from keyword arguments.
 
         This is a convenience method for creating an I18nString with named language parameters.
