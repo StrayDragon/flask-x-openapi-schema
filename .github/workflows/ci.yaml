@@ -54,8 +54,8 @@ jobs:
         run: |
           just sync-all-deps
 
-      - name: Test with pytest
-        run: just test
+      - name: Test with pytest in parallel
+        run: just test-parallel '' auto
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

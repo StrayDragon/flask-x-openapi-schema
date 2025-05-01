@@ -18,6 +18,7 @@ from flask_x_openapi_schema._opt_deps._flask_restful import (
 )
 
 
+@pytest.mark.serial
 def test_import_optional_dependency():
     """Test import_optional_dependency function."""
     # Test importing an existing module
@@ -35,6 +36,7 @@ def test_import_optional_dependency():
     assert "non_existent_module" in str(excinfo.value)
 
 
+@pytest.mark.serial
 def test_create_placeholder_class():
     """Test create_placeholder_class function."""
     TestClass = create_placeholder_class("TestClass", "test-dep", "testing")
@@ -57,6 +59,7 @@ def test_create_placeholder_class():
     assert "test-dep" in str(excinfo.value)
 
 
+@pytest.mark.serial
 def test_flask_restful_imports():
     """Test Flask-RESTful imports."""
     if HAS_FLASK_RESTFUL:

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import time
 
+import pytest
 from pydantic import BaseModel, Field
 
 from flask_x_openapi_schema.core.schema_generator import OpenAPISchemaGenerator
@@ -33,6 +34,7 @@ class ComplexModel(BaseModel):
     metadata: dict = Field(default_factory=dict, description="Metadata")
 
 
+@pytest.mark.serial
 def test_pydantic_to_openapi_schema_performance():
     """Test the performance of pydantic_to_openapi_schema."""
     # Simple model
@@ -69,6 +71,7 @@ def test_pydantic_to_openapi_schema_performance():
     print(f"Complex model: {complex_time:.6f} seconds for 1000 iterations")
 
 
+@pytest.mark.serial
 def test_schema_generator_performance():
     """Test the performance of OpenAPISchemaGenerator."""
     # Create a schema generator
@@ -98,6 +101,7 @@ def test_schema_generator_performance():
     print(f"Schema generation: {generation_time:.6f} seconds for 100 iterations")
 
 
+@pytest.mark.serial
 def test_i18n_processing_performance():
     """Test the performance of I18nStr processing functions."""
     from flask_x_openapi_schema.core.utils import process_i18n_value
@@ -129,6 +133,7 @@ def test_i18n_processing_performance():
     assert process_i18n_value(i18n_str, "zh-Hans") == "你好"
 
 
+@pytest.mark.serial
 def test_references_cache_performance():
     """Test the performance of _fix_references function with caching."""
     from flask_x_openapi_schema.core.utils import _fix_references, clear_references_cache

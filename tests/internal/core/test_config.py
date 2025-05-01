@@ -5,6 +5,7 @@ This module tests the configurable parameter prefixes.
 
 from __future__ import annotations
 
+import pytest
 from pydantic import BaseModel, Field
 
 from flask_x_openapi_schema.core.config import (
@@ -39,6 +40,7 @@ class ConfigTestQueryModel(BaseModel):
     limit: int | None = Field(None, description="Limit results")
 
 
+@pytest.mark.serial
 def test_openapi_config_defaults():
     """Test the default values of ConventionalPrefixConfig."""
     # Test the default global config
@@ -56,6 +58,7 @@ def test_openapi_config_defaults():
     assert config.request_file_prefix == "_x_file"
 
 
+@pytest.mark.serial
 def test_openapi_config_configure():
     """Test configuring global prefix configuration."""
     # Create a new configuration
@@ -73,6 +76,7 @@ def test_openapi_config_configure():
     assert new_config.request_file_prefix == "file"
 
 
+@pytest.mark.serial
 def test_openapi_metadata_with_custom_prefixes():
     """Test openapi_metadata decorator with custom parameter prefixes."""
     # Save original global config
@@ -257,6 +261,7 @@ def test_openapi_blueprint_mixin_configure():
     blueprint.configure_openapi(request_body_prefix="bp_body2", request_query_prefix="bp_query2")
 
 
+@pytest.mark.serial
 def test_reset_config_functions():
     """Test the reset_prefixes and reset_all_config functions."""
     # Save original global config

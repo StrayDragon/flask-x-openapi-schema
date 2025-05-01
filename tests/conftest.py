@@ -1,6 +1,7 @@
 """Shared fixtures and test helpers for flask-x-openapi-schema tests."""
 
 import pytest
+from _pytest.config import Config
 from flask import Blueprint, Flask
 from flask.views import MethodView
 from flask_restful import Api, Resource
@@ -32,6 +33,47 @@ from flask_x_openapi_schema.x.flask_restful import (
 )
 
 HAS_FLASK_RESTFUL = True
+
+
+def pytest_configure(config: Config) -> None:
+    """Configure pytest for parallel testing.
+
+    This function is called once at the beginning of a test run.
+    """
+    # Register a custom marker for tests that cannot run in parallel
+    config.addinivalue_line("markers", "serial: mark test to run serially (not in parallel with other tests)")
+
+
+def pytest_configure_node(node) -> None:
+    """Configure pytest-xdist for parallel testing.
+
+    This function is called once for each worker at the beginning of a test run.
+    """
+    # Each worker gets its own random seed
+    import random
+    import time
+
+    random.seed(int(time.time()) + ord(node.gateway.id[-1]))
+
+
+def pytest_collection_modifyitems(config: Config, items: list) -> None:
+    """Modify test items before execution.
+
+    This function is called after test collection and before test execution.
+    """
+    if config.getoption("-n", default="1") != "1":
+        # Running in parallel mode
+        serial_items = []
+        parallel_items = []
+
+        for item in items:
+            if item.get_closest_marker("serial"):
+                serial_items.append(item)
+            else:
+                parallel_items.append(item)
+
+        # Put serial tests at the beginning to run them first
+        items[:] = serial_items + parallel_items
 
 
 @pytest.fixture(autouse=True)

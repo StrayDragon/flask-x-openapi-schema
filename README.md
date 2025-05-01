@@ -168,6 +168,12 @@ This project uses `pytest` for testing and `pytest-cov` for coverage reporting:
 # Run tests with coverage report
 just test
 
+# Run tests in parallel for faster execution
+just test-parallel
+
+# Run tests in parallel with specific number of workers
+just test-parallel '' 4
+
 # View HTML coverage report
 # Open htmlcov/index.html in your browser
 ```

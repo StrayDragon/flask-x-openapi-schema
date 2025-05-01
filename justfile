@@ -13,6 +13,14 @@ test *pattern='':
         uv run pytest {{pattern}}
     fi
 
+test-parallel pattern='' workers='auto':
+    #!/usr/bin/env bash
+    if [ -z "{{pattern}}" ]; then
+        uv run pytest -n {{workers}}
+    else
+        uv run pytest -n {{workers}} {{pattern}}
+    fi
+
 benchmark-report:
 	uv run python benchmarks/generate_report.py
 
