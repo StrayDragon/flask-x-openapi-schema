@@ -1,3 +1,4 @@
+# fmt: off
 """CLI commands for generating OpenAPI documentation.
 
 This module provides command-line interface tools for generating OpenAPI schema
@@ -22,6 +23,8 @@ Examples:
     ```
 
 """
+
+# fmt: on
 
 import json
 import os
