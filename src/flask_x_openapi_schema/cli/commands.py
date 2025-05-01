@@ -1,4 +1,27 @@
-"""Commands for generating OpenAPI documentation."""
+"""CLI commands for generating OpenAPI documentation.
+
+This module provides command-line interface tools for generating OpenAPI schema
+documentation from Flask applications with registered blueprints that use the
+OpenAPIIntegrationMixin.
+
+Examples:
+    To generate OpenAPI documentation for a Flask application:
+
+    ```python
+    from flask import Flask
+    from flask_x_openapi_schema.cli.commands import register_commands
+
+    app = Flask(__name__)
+    register_commands(app)
+    ```
+
+    Then run the command:
+
+    ```bash
+    flask generate-openapi --output openapi.yaml
+    ```
+
+"""
 
 import json
 import os
@@ -65,10 +88,38 @@ def generate_openapi_command(
     format_: Literal["yaml", "json"],
     language: list[str],
 ) -> None:
-    """Generate OpenAPI schema and documentation."""
+    """Generate OpenAPI schema and documentation for Flask blueprints.
+
+    This command generates OpenAPI schema documentation for Flask blueprints
+    that have an OpenAPIIntegrationMixin API instance. The generated schema
+    can be output in either YAML or JSON format.
+
+    Args:
+        output: Path to the output file for the OpenAPI schema
+        blueprint: Name of the blueprint to generate schema for (default: service_api)
+            If None, generates for all blueprints with resources
+        title: Title for the API documentation
+        version: Version string for the API documentation
+        description: Description text for the API documentation
+        format_: Output format, either "yaml" or "json"
+        language: List of language codes to generate documentation for
+
+    Examples:
+        To generate OpenAPI schema for a specific blueprint:
+
+        ```bash
+        flask generate-openapi --blueprint=api --output=openapi.yaml
+        ```
+
+        To generate schema with multiple languages:
+
+        ```bash
+        flask generate-openapi --language=en --language=zh --output=openapi.yaml
+        ```
+
+    """
     from flask import current_app
 
-    # Get all blueprints
     blueprints = []
     for name, bp in current_app.blueprints.items():
         if hasattr(bp, "resources") and (blueprint is None or name == blueprint):
@@ -78,10 +129,8 @@ def generate_openapi_command(
         click.echo(f"No blueprints found{' with name ' + blueprint if blueprint else ''}.")
         return
 
-    # Create internationalized description
     i18n_description = I18nStr(dict.fromkeys(language, description))
 
-    # Generate schema for each blueprint
     for name, bp in blueprints:
         if not hasattr(bp, "api") or not isinstance(bp.api, OpenAPIIntegrationMixin):
             click.echo(f"Blueprint {name} does not have an OpenAPIExternalApi instance.")
@@ -89,11 +138,9 @@ def generate_openapi_command(
 
         api = bp.api
 
-        # Set default language for initial schema generation
         default_lang = language[0] if language else "en"
         set_current_language(default_lang)
 
-        # Generate schema with internationalized strings
         schema = api.generate_openapi_schema(
             title=I18nStr(dict.fromkeys(language, f"{title} - {name}")),
             version=version,
@@ -102,7 +149,6 @@ def generate_openapi_command(
             language=default_lang,
         )
 
-        # Save schema to file
         blueprint_output = output
         if len(blueprints) > 1:
             base, ext = os.path.splitext(output)  # noqa: PTH122
@@ -123,8 +169,21 @@ def generate_openapi_command(
 def register_commands(app: Flask) -> None:
     """Register OpenAPI commands with the Flask application.
 
+    This function adds the generate-openapi command to the Flask application's
+    CLI command group, making it available through the flask command-line tool.
+
     Args:
-        app: The Flask application
+        app: The Flask application instance to register commands with
+
+    Examples:
+        ```python
+        from flask import Flask
+        from flask_x_openapi_schema.cli.commands import register_commands
+
+        app = Flask(__name__)
+        register_commands(app)
+        # Now 'flask generate-openapi' is available
+        ```
 
     """
     app.cli.add_command(generate_openapi_command)

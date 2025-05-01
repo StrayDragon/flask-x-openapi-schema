@@ -1,6 +1,8 @@
 """Response models for OpenAPI schema generation.
 
 This module provides models for defining OpenAPI responses in a structured way.
+It includes classes and helper functions to create and manage response definitions
+for OpenAPI schema generation.
 """
 
 from typing import Any
@@ -14,21 +16,16 @@ class OpenAPIMetaResponseItem(BaseModel):
     This class allows defining a response with either a Pydantic model or a simple message.
     It is used to define the response for a specific status code in the OpenAPI schema.
 
-    :param model: Pydantic model for the response
-    :type model: Optional[Type[BaseModel]]
-    :param description: Response description
-    :type description: str
-    :param content_type: Response content type
-    :type content_type: str
-    :param headers: Response headers
-    :type headers: Optional[Dict[str, Any]]
-    :param examples: Response examples
-    :type examples: Optional[Dict[str, Any]]
-    :param msg: Simple message for responses without a model
-    :type msg: Optional[str]
+    Attributes:
+        model: Pydantic model for the response.
+        description: Response description.
+        content_type: Response content type.
+        headers: Response headers.
+        examples: Response examples.
+        msg: Simple message for responses without a model.
 
-    Example:
-        >>> from flask_x_openapi_schema import OpenAPIMetaResponseItem
+    Examples:
+        >>> from flask_x_openapi_schema.models.responses import OpenAPIMetaResponseItem
         >>> from pydantic import BaseModel
         >>>
         >>> class UserResponse(BaseModel):
@@ -51,22 +48,19 @@ class OpenAPIMetaResponseItem(BaseModel):
         """Convert the response item to an OpenAPI response object.
 
         Returns:
-            An OpenAPI response object
+            dict: An OpenAPI response object dictionary.
 
         """
         response = {"description": self.description}
 
-        # Add content if model is provided
         if self.model:
             response["content"] = {
                 self.content_type: {"schema": {"$ref": f"#/components/schemas/{self.model.__name__}"}},
             }
 
-            # Add examples if provided
             if self.examples:
                 response["content"][self.content_type]["examples"] = self.examples
 
-        # Add headers if provided
         if self.headers:
             response["headers"] = self.headers
 
@@ -79,11 +73,11 @@ class OpenAPIMetaResponse(BaseModel):
     This class allows defining multiple responses for different status codes.
     It is used to define all possible responses for an API endpoint in the OpenAPI schema.
 
-    :param responses: Map of status codes to response definitions
-    :type responses: Dict[str, OpenAPIMetaResponseItem]
+    Attributes:
+        responses: Map of status codes to response definitions.
 
-    Example:
-        >>> from flask_x_openapi_schema import OpenAPIMetaResponse, OpenAPIMetaResponseItem
+    Examples:
+        >>> from flask_x_openapi_schema.models.responses import OpenAPIMetaResponse, OpenAPIMetaResponseItem
         >>> from pydantic import BaseModel
         >>>
         >>> class UserResponse(BaseModel):
@@ -112,7 +106,7 @@ class OpenAPIMetaResponse(BaseModel):
         """Convert the response container to an OpenAPI responses object.
 
         Returns:
-            An OpenAPI responses object
+            dict: An OpenAPI responses object dictionary.
 
         """
         result = {}
@@ -135,37 +129,30 @@ def create_response(
     This is a helper function to create a response definition for a specific status code.
     It returns a dictionary that can be used to build an OpenAPIMetaResponse object.
 
-    :param model: Pydantic model for the response
-    :type model: Optional[Type[BaseModel]]
-    :param description: Response description
-    :type description: str
-    :param status_code: HTTP status code
-    :type status_code: Union[int, str]
-    :param content_type: Response content type
-    :type content_type: str
-    :param headers: Response headers
-    :type headers: Optional[Dict[str, Any]]
-    :param examples: Response examples
-    :type examples: Optional[Dict[str, Any]]
-    :param msg: Simple message for responses without a model
-    :type msg: Optional[str]
-    :return: A dictionary with the status code as key and response item as value
-    :rtype: Dict[str, OpenAPIMetaResponseItem]
+    Args:
+        model: Pydantic model for the response.
+        description: Response description.
+        status_code: HTTP status code.
+        content_type: Response content type.
+        headers: Response headers.
+        examples: Response examples.
+        msg: Simple message for responses without a model.
 
-    Example:
-        >>> from flask_x_openapi_schema import create_response, OpenAPIMetaResponse
+    Returns:
+        dict: A dictionary with the status code as key and response item as value.
+
+    Examples:
+        >>> from flask_x_openapi_schema.models.responses import create_response, OpenAPIMetaResponse
         >>> from pydantic import BaseModel
         >>>
         >>> class UserResponse(BaseModel):
         ...     id: str
         ...     name: str
-        >>> # Create a response for status code 200
+        >>>
         >>> user_response = create_response(model=UserResponse, description="User details", status_code=200)
         >>>
-        >>> # Create a response for status code 404
         >>> not_found_response = create_response(msg="User not found", description="User not found", status_code=404)
         >>>
-        >>> # Combine responses
         >>> responses = OpenAPIMetaResponse(responses={**user_response, **not_found_response})
 
     """
@@ -191,16 +178,18 @@ def success_response(
 ) -> dict[str, OpenAPIMetaResponseItem]:
     """Create a success response definition for use with OpenAPIMetaResponse.
 
+    This is a convenience function to create a success response with a model.
+
     Args:
-        model: Pydantic model for the response
-        description: Response description
-        status_code: HTTP status code
-        content_type: Response content type
-        headers: Response headers
-        examples: Response examples
+        model: Pydantic model for the response.
+        description: Response description.
+        status_code: HTTP status code.
+        content_type: Response content type.
+        headers: Response headers.
+        examples: Response examples.
 
     Returns:
-        A dictionary with the status code as key and response item as value
+        dict: A dictionary with the status code as key and response item as value.
 
     """
     return create_response(
@@ -224,17 +213,19 @@ def error_response(
 ) -> dict[str, OpenAPIMetaResponseItem]:
     """Create an error response definition for use with OpenAPIMetaResponse.
 
+    This is a convenience function to create an error response with a description.
+
     Args:
-        description: Response description
-        status_code: HTTP status code
-        model: Optional Pydantic model for the response
-        content_type: Response content type
-        headers: Response headers
-        examples: Response examples
-        msg: Simple message for responses without a model
+        description: Response description.
+        status_code: HTTP status code.
+        model: Optional Pydantic model for the response.
+        content_type: Response content type.
+        headers: Response headers.
+        examples: Response examples.
+        msg: Simple message for responses without a model.
 
     Returns:
-        A dictionary with the status code as key and response item as value
+        dict: A dictionary with the status code as key and response item as value.
 
     """
     return create_response(

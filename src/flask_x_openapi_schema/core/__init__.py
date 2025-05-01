@@ -25,22 +25,17 @@ from .utils import (
 
 __all__ = [
     "GLOBAL_CONFIG_HOLDER",
-    # Configuration
     "ConventionalPrefixConfig",
     "LogFormat",
     "OpenAPIConfig",
-    # Schema Generator
     "OpenAPISchemaGenerator",
-    # Cache Management
     "clear_all_caches",
     "clear_i18n_cache",
-    # Logging
     "configure_logging",
     "configure_openapi",
     "configure_prefixes",
     "get_logger",
     "get_openapi_config",
-    # Utilities
     "pydantic_to_openapi_schema",
     "python_type_to_openapi_type",
     "reset_all_config",

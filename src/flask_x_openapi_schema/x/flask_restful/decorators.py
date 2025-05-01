@@ -1,4 +1,29 @@
-"""Decorators for adding OpenAPI metadata to Flask-RESTful Resource endpoints."""
+"""Decorators for adding OpenAPI metadata to Flask-RESTful Resource endpoints.
+
+This module provides decorators and utilities for adding OpenAPI metadata to Flask-RESTful
+Resource class methods. It enables automatic parameter binding, request validation, and
+OpenAPI schema generation for Flask-RESTful APIs.
+
+The main decorator `openapi_metadata` can be applied to Resource methods to add OpenAPI
+metadata and enable automatic parameter binding based on type annotations.
+
+Examples:
+    Basic usage with Flask-RESTful Resource:
+
+    >>> from flask_restful import Resource
+    >>> from flask_x_openapi_schema.x.flask_restful import openapi_metadata
+    >>> from pydantic import BaseModel, Field
+    >>>
+    >>> class UserModel(BaseModel):
+    ...     name: str = Field(..., description="User name")
+    ...     age: int = Field(..., description="User age")
+    >>>
+    >>> class UserResource(Resource):
+    ...     @openapi_metadata(summary="Create user", tags=["users"])
+    ...     def post(self, _x_body: UserModel):
+    ...         return {"name": _x_body.name, "age": _x_body.age}, 201
+
+"""
 
 import logging
 from collections.abc import Callable
@@ -10,12 +35,30 @@ from flask_x_openapi_schema.core.config import ConventionalPrefixConfig
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr
 from flask_x_openapi_schema.models.responses import OpenAPIMetaResponse
 
-# These caches have been moved to core.cache module
-# and are now using ThreadSafeCache implementation
-
 
 class FlaskRestfulOpenAPIDecorator:
-    """OpenAPI metadata decorator for Flask-RESTful Resource."""
+    """OpenAPI metadata decorator for Flask-RESTful Resource.
+
+    This class implements the decorator functionality for adding OpenAPI metadata
+    to Flask-RESTful Resource methods. It handles parameter binding, request processing,
+    and OpenAPI schema generation.
+
+    Attributes:
+        summary (str | I18nStr | None): A short summary of what the operation does.
+        description (str | I18nStr | None): A verbose explanation of the operation behavior.
+        tags (list[str] | None): A list of tags for API documentation control.
+        operation_id (str | None): Unique string used to identify the operation.
+        responses (OpenAPIMetaResponse | None): The responses the API can return.
+        deprecated (bool): Declares this operation to be deprecated.
+        security (list[dict[str, list[str]]] | None): Security mechanisms for this operation.
+        external_docs (dict[str, str] | None): Additional external documentation.
+        language (str | None): Language code to use for I18nString values.
+        prefix_config (ConventionalPrefixConfig | None): Configuration for parameter prefixes.
+        framework (str): The framework being used ('flask_restful').
+        base_decorator (OpenAPIDecoratorBase | None): The base decorator instance.
+        parsed_args (Any | None): Parsed arguments from request parser.
+
+    """
 
     def __init__(
         self,
@@ -30,8 +73,21 @@ class FlaskRestfulOpenAPIDecorator:
         language: str | None = None,
         prefix_config: ConventionalPrefixConfig | None = None,
     ) -> None:
-        """Initialize the decorator with OpenAPI metadata parameters."""
-        # Store parameters for later use
+        """Initialize the decorator with OpenAPI metadata parameters.
+
+        Args:
+            summary: A short summary of what the operation does.
+            description: A verbose explanation of the operation behavior.
+            tags: A list of tags for API documentation control.
+            operation_id: Unique string used to identify the operation.
+            responses: The responses the API can return.
+            deprecated: Declares this operation to be deprecated.
+            security: A declaration of which security mechanisms can be used for this operation.
+            external_docs: Additional external documentation.
+            language: Language code to use for I18nString values.
+            prefix_config: Configuration object for parameter prefixes.
+
+        """
         self.summary = summary
         self.description = description
         self.tags = tags
@@ -44,15 +100,20 @@ class FlaskRestfulOpenAPIDecorator:
         self.prefix_config = prefix_config
         self.framework = "flask_restful"
 
-        # We'll initialize the base decorator when needed
         self.base_decorator = None
         self.parsed_args = None
 
-    def __call__(self, func):  # noqa: ANN001, ANN204
-        """Apply the decorator to the function."""
-        # Initialize the base decorator if needed
+    def __call__(self, func: Callable[..., Any]) -> Callable[..., Any]:
+        """Apply the decorator to the function.
+
+        Args:
+            func: The function to decorate.
+
+        Returns:
+            The decorated function.
+
+        """
         if self.base_decorator is None:
-            # Import here to avoid circular imports
             from flask_x_openapi_schema.core.decorator_base import OpenAPIDecoratorBase
 
             self.base_decorator = OpenAPIDecoratorBase(
@@ -75,11 +136,20 @@ class FlaskRestfulOpenAPIDecorator:
         query_model: type[BaseModel] | None,
         path_params: list[str] | None,
     ) -> list[dict[str, Any]]:
-        """Extract OpenAPI parameters from models."""
-        # Create parameters for OpenAPI schema
+        """Extract OpenAPI parameters from models.
+
+        Converts Pydantic models and path parameters into OpenAPI parameter objects.
+
+        Args:
+            query_model: Pydantic model for query parameters.
+            path_params: List of path parameter names.
+
+        Returns:
+            List of OpenAPI parameter objects.
+
+        """
         parameters = []
 
-        # Add path parameters
         if path_params:
             parameters.extend(
                 [
@@ -93,7 +163,6 @@ class FlaskRestfulOpenAPIDecorator:
                 ],
             )
 
-        # Add query parameters
         if query_model:
             schema = query_model.model_json_schema()
             properties = schema.get("properties", {})
@@ -107,7 +176,6 @@ class FlaskRestfulOpenAPIDecorator:
                     "schema": field_schema,
                 }
 
-                # Add description if available
                 if "description" in field_schema:
                     param["description"] = field_schema["description"]
 
@@ -132,10 +200,8 @@ class FlaskRestfulOpenAPIDecorator:
         logger = logging.getLogger(__name__)
         logger.debug(f"Processing request body for {param_name} with model {model.__name__}")
 
-        # Check if this is a file upload model
         has_file_fields = self._check_for_file_fields(model)
 
-        # Handle file upload models
         from flask import request
 
         if has_file_fields and request.files:
@@ -143,15 +209,10 @@ class FlaskRestfulOpenAPIDecorator:
             kwargs[param_name] = model_instance
             return kwargs
 
-        # For Flask-RESTful, we need to handle reqparse integration
-        # Get or create reqparse parser
         parser = self._get_or_create_parser(model)
 
-        # Parse arguments
         self.parsed_args = parser.parse_args()
 
-        # First try to use the request processor for direct JSON handling
-        # This handles cases where the client sends JSON directly
         from flask import request
 
         json_model_instance = request_processor.process_request_data(request, model, param_name)
@@ -159,18 +220,15 @@ class FlaskRestfulOpenAPIDecorator:
         if json_model_instance:
             logger.debug(f"Successfully created model instance from JSON for {param_name}")
             kwargs[param_name] = json_model_instance
-            self.parsed_args = None  # Clear parsed args since we're using JSON
+            self.parsed_args = None
             return kwargs
 
-        # If JSON processing failed, use the parsed arguments from reqparse
         if self.parsed_args:
-            # Process arguments using the core preprocess_request_data function
             try:
                 from flask_x_openapi_schema.core.request_processing import preprocess_request_data
 
                 processed_data = preprocess_request_data(self.parsed_args, model)
 
-                # Try to create model instance
                 model_instance = safe_operation(
                     lambda: ModelFactory.create_from_data(model, processed_data), fallback=None
                 )
@@ -182,7 +240,6 @@ class FlaskRestfulOpenAPIDecorator:
             except Exception:
                 logger.exception("Error processing reqparse data")
 
-        # If we get here, create a default instance
         logger.warning(f"No valid request data found for {param_name}, creating default instance")
 
         try:
@@ -235,20 +292,16 @@ class FlaskRestfulOpenAPIDecorator:
 
         from flask_x_openapi_schema.models.file_models import FileField
 
-        # Create model data from form and files
         model_data = dict(request.form.items())
 
-        # Add file data
         for field_name, field_info in model.model_fields.items():
             field_type = field_info.annotation
             if inspect.isclass(field_type) and issubclass(field_type, FileField):
-                # Check if file exists in request
                 if field_name in request.files:
                     model_data[field_name] = request.files[field_name]
                 elif "file" in request.files and field_name == "file":
                     model_data[field_name] = request.files["file"]
 
-        # Create and return model instance
         return model(**model_data)
 
     def _get_or_create_parser(self, model: type[BaseModel]) -> Any:
@@ -263,7 +316,6 @@ class FlaskRestfulOpenAPIDecorator:
         """
         from flask_x_openapi_schema.x.flask_restful.utils import create_reqparse_from_pydantic
 
-        # Create new parser
         return create_reqparse_from_pydantic(model=model)
 
     def _create_model_from_args(self, model: type[BaseModel], args: dict) -> BaseModel:
@@ -283,18 +335,15 @@ class FlaskRestfulOpenAPIDecorator:
         logger = logging.getLogger(__name__)
         logger.debug(f"Creating model instance for {model.__name__} from args")
 
-        # Process arguments using the core preprocess_request_data function
         processed_data = preprocess_request_data(args, model)
         logger.debug("Processed data", extra={"processed_data": processed_data})
 
-        # Try to create model instance using ModelFactory
         model_instance = safe_operation(lambda: ModelFactory.create_from_data(model, processed_data), fallback=None)
 
         if model_instance:
             logger.debug("Successfully created model instance")
             return model_instance
 
-        # If model creation failed, try to create an empty instance
         logger.warning("Failed to create model instance from args, creating empty instance")
 
         try:
@@ -302,8 +351,7 @@ class FlaskRestfulOpenAPIDecorator:
             logger.debug("Created empty model instance")
         except Exception as empty_err:
             logger.exception("Failed to create empty model instance")
-            # Continue to try with default values
-            # Create a minimal instance with default values for required fields
+
             if hasattr(model, "model_json_schema"):
                 schema = model.model_json_schema()
                 required_fields = schema.get("required", [])
@@ -331,7 +379,6 @@ class FlaskRestfulOpenAPIDecorator:
                 else:
                     return model_instance
 
-            # If all else fails, raise an error
             error_msg = f"Failed to create instance of {model.__name__}"
             raise ValueError(error_msg) from empty_err
         else:
@@ -341,39 +388,31 @@ class FlaskRestfulOpenAPIDecorator:
         """Process query parameters for Flask-RESTful.
 
         Args:
-            param_name: The parameter name to bind the model instance to
-            model: The Pydantic model class to use for validation
-            kwargs: The keyword arguments to update
+            param_name: The parameter name to bind the model instance to.
+            model: The Pydantic model class to use for validation.
+            kwargs: The keyword arguments to update.
 
         Returns:
-            Updated kwargs dictionary with the model instance
+            Updated kwargs dictionary with the model instance.
 
         """
-        # No imports needed here
-
         logger = logging.getLogger(__name__)
 
-        # Skip if we already have parsed arguments from request body processing
         if self.parsed_args:
-            # Create model instance from parsed arguments
             model_instance = self._create_model_from_args(model, self.parsed_args)
             kwargs[param_name] = model_instance
             return kwargs
 
-        # Get or create reqparse parser for query parameters
         parser = self._get_or_create_query_parser(model)
 
-        # Parse arguments
         self.parsed_args = parser.parse_args()
 
-        # Create model instance from parsed arguments
         try:
             model_instance = self._create_model_from_args(model, self.parsed_args)
             kwargs[param_name] = model_instance
         except Exception:
             logger.exception(f"Failed to create model instance for {param_name}")
 
-            # Try to create a default instance
             try:
                 model_instance = model()
                 logger.debug(f"Created empty model instance for {param_name}")
@@ -395,32 +434,26 @@ class FlaskRestfulOpenAPIDecorator:
         """
         from flask_x_openapi_schema.x.flask_restful.utils import create_reqparse_from_pydantic
 
-        # Create new parser
         return create_reqparse_from_pydantic(model=model, location="args")
 
     def process_additional_params(self, kwargs: dict[str, Any], param_names: list[str]) -> dict[str, Any]:
         """Process additional framework-specific parameters.
 
         Args:
-            kwargs: The keyword arguments to update
-            param_names: List of parameter names that have been processed
+            kwargs: The keyword arguments to update.
+            param_names: List of parameter names that have been processed.
 
         Returns:
-            Updated kwargs dictionary
+            Updated kwargs dictionary.
 
         """
-        # Add all parsed arguments to kwargs for regular parameters
-        # This allows Flask-RESTful to access parameters directly without
-        # requiring the use of the model instance
         if self.parsed_args:
-            # Only add arguments that haven't been processed yet
             for arg_name, arg_value in self.parsed_args.items():
                 if arg_name not in kwargs and arg_name not in param_names:
                     kwargs[arg_name] = arg_value
         return kwargs
 
 
-# Define a type variable for the function
 F = TypeVar("F", bound=Callable[..., Any])
 
 
@@ -444,30 +477,22 @@ def openapi_metadata(
     path parameters, and file uploads to function parameters based on their type annotations
     and parameter name prefixes.
 
-    :param summary: A short summary of what the operation does
-    :type summary: Optional[Union[str, I18nStr]]
-    :param description: A verbose explanation of the operation behavior
-    :type description: Optional[Union[str, I18nStr]]
-    :param tags: A list of tags for API documentation control
-    :type tags: Optional[List[str]]
-    :param operation_id: Unique string used to identify the operation
-    :type operation_id: Optional[str]
-    :param deprecated: Declares this operation to be deprecated
-    :type deprecated: bool
-    :param responses: The responses the API can return
-    :type responses: Optional[OpenAPIMetaResponse]
-    :param security: A declaration of which security mechanisms can be used for this operation
-    :type security: Optional[List[Dict[str, List[str]]]]
-    :param external_docs: Additional external documentation
-    :type external_docs: Optional[Dict[str, str]]
-    :param language: Language code to use for I18nString values (default: current language)
-    :type language: Optional[str]
-    :param prefix_config: Configuration object for parameter prefixes
-    :type prefix_config: Optional[ConventionalPrefixConfig]
-    :return: The decorated function with OpenAPI metadata attached
-    :rtype: Union[Callable[[F], F], F]
+    Args:
+        summary: A short summary of what the operation does.
+        description: A verbose explanation of the operation behavior.
+        tags: A list of tags for API documentation control.
+        operation_id: Unique string used to identify the operation.
+        deprecated: Declares this operation to be deprecated.
+        responses: The responses the API can return.
+        security: A declaration of which security mechanisms can be used for this operation.
+        external_docs: Additional external documentation.
+        language: Language code to use for I18nString values (default: current language).
+        prefix_config: Configuration object for parameter prefixes.
 
-    Example:
+    Returns:
+        The decorated function with OpenAPI metadata attached.
+
+    Examples:
         >>> from flask_restful import Resource
         >>> from flask_x_openapi_schema.x.flask_restful import openapi_metadata
         >>> from flask_x_openapi_schema import OpenAPIMetaResponse, OpenAPIMetaResponseItem
@@ -496,12 +521,10 @@ def openapi_metadata(
         ...         ),
         ...     )
         ...     def post(self, _x_body: ItemRequest):
-        ...         # _x_body is automatically populated from the request JSON
         ...         item = {"id": "123", "name": _x_body.name, "price": _x_body.price}
         ...         return item, 201
 
     """
-    # Create the decorator directly
     return FlaskRestfulOpenAPIDecorator(
         summary=summary,
         description=description,

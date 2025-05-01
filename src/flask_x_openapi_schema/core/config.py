@@ -2,6 +2,9 @@
 
 This module provides configuration classes and utilities for managing
 parameter prefixes and other settings for OpenAPI schema generation.
+
+Includes classes for managing conventional parameter prefixes, caching behavior,
+and OpenAPI schema generation settings, along with thread-safe global configuration.
 """
 
 import threading
@@ -27,18 +30,14 @@ class ConventionalPrefixConfig:
     This class holds configuration settings for parameter prefixes used in
     binding request data to function parameters.
 
-    :param request_body_prefix: Prefix for request body parameters (default: "_x_body")
-    :type request_body_prefix: str
-    :param request_query_prefix: Prefix for query parameters (default: "_x_query")
-    :type request_query_prefix: str
-    :param request_path_prefix: Prefix for path parameters (default: "_x_path")
-    :type request_path_prefix: str
-    :param request_file_prefix: Prefix for file parameters (default: "_x_file")
-    :type request_file_prefix: str
-    :param extra_options: Additional configuration options
-    :type extra_options: Dict[str, Any]
+    Attributes:
+        request_body_prefix: Prefix for request body parameters (default: "_x_body")
+        request_query_prefix: Prefix for query parameters (default: "_x_query")
+        request_path_prefix: Prefix for path parameters (default: "_x_path")
+        request_file_prefix: Prefix for file parameters (default: "_x_file")
+        extra_options: Additional configuration options
 
-    Example:
+    Examples:
         >>> from flask_x_openapi_schema import ConventionalPrefixConfig
         >>> config = ConventionalPrefixConfig(
         ...     request_body_prefix="req_body",
@@ -87,7 +86,7 @@ class OpenAPIConfig:
         servers: List of server objects
         external_docs: External documentation
         webhooks: Webhook definitions
-        jsonSchemaDialect: JSON Schema dialect
+        json_schema_dialect: JSON Schema dialect
         cache_config: Configuration for caching behavior
 
     """
@@ -107,7 +106,10 @@ class OpenAPIConfig:
 
 # Global configuration instance with thread safety
 class ThreadSafeConfig:
-    """Thread-safe configuration holder."""
+    """Thread-safe configuration holder.
+
+    This class provides thread-safe access to configuration settings.
+    """
 
     def __init__(self) -> None:  # noqa: D107
         self._prefix_config = ConventionalPrefixConfig()
@@ -116,7 +118,12 @@ class ThreadSafeConfig:
         self._lock = threading.RLock()
 
     def get(self) -> ConventionalPrefixConfig:
-        """Get the current prefix configuration."""
+        """Get the current prefix configuration.
+
+        Returns:
+            ConventionalPrefixConfig: Current prefix configuration
+
+        """
         with self._lock:
             # Return a copy to prevent modification
             return ConventionalPrefixConfig(
@@ -128,7 +135,12 @@ class ThreadSafeConfig:
             )
 
     def get_cache_config(self) -> CacheConfig:
-        """Get the current cache configuration."""
+        """Get the current cache configuration.
+
+        Returns:
+            CacheConfig: Current cache configuration
+
+        """
         with self._lock:
             # Return a copy to prevent modification
             return CacheConfig(
@@ -136,7 +148,12 @@ class ThreadSafeConfig:
             )
 
     def get_openapi_config(self) -> OpenAPIConfig:
-        """Get the current OpenAPI configuration."""
+        """Get the current OpenAPI configuration.
+
+        Returns:
+            OpenAPIConfig: Current OpenAPI configuration
+
+        """
         with self._lock:
             # Return a copy to prevent modification
             return OpenAPIConfig(
@@ -156,7 +173,12 @@ class ThreadSafeConfig:
             )
 
     def set(self, config: ConventionalPrefixConfig) -> None:
-        """Set a new prefix configuration."""
+        """Set a new prefix configuration.
+
+        Args:
+            config: New prefix configuration
+
+        """
         with self._lock:
             self._prefix_config = ConventionalPrefixConfig(
                 request_body_prefix=config.request_body_prefix,
@@ -167,7 +189,12 @@ class ThreadSafeConfig:
             )
 
     def set_openapi_config(self, config: OpenAPIConfig) -> None:
-        """Set a new OpenAPI configuration."""
+        """Set a new OpenAPI configuration.
+
+        Args:
+            config: New OpenAPI configuration
+
+        """
         with self._lock:
             self._openapi_config = OpenAPIConfig(
                 title=config.title,
@@ -188,14 +215,24 @@ class ThreadSafeConfig:
             self.set_cache_config(config.cache_config)
 
     def set_cache_config(self, config: CacheConfig) -> None:
-        """Set a new cache configuration."""
+        """Set a new cache configuration.
+
+        Args:
+            config: New cache configuration
+
+        """
         with self._lock:
             self._cache_config = CacheConfig(
                 enabled=config.enabled,
             )
 
     def reset(self) -> None:
-        """Reset to default prefix configuration."""
+        """Reset to default prefix configuration.
+
+        Returns:
+            None
+
+        """
         with self._lock:
             self._prefix_config = ConventionalPrefixConfig(
                 request_body_prefix=DEFAULT_BODY_PREFIX,
@@ -206,7 +243,12 @@ class ThreadSafeConfig:
             )
 
     def reset_all(self) -> None:
-        """Reset all configurations to defaults."""
+        """Reset all configurations to defaults.
+
+        Returns:
+            None
+
+        """
         with self._lock:
             self.reset()
             self._openapi_config = OpenAPIConfig()
@@ -224,11 +266,10 @@ def configure_prefixes(config: ConventionalPrefixConfig) -> None:
     to function parameters. This affects all decorators that don't specify their own
     prefix configuration.
 
-    :param config: Configuration object with parameter prefixes
-    :type config: ConventionalPrefixConfig
-    :return: None
+    Args:
+        config: Configuration object with parameter prefixes
 
-    Example:
+    Examples:
         >>> from flask_x_openapi_schema import ConventionalPrefixConfig, configure_prefixes
         >>> custom_config = ConventionalPrefixConfig(request_body_prefix="req_body", request_query_prefix="req_query")
         >>> configure_prefixes(custom_config)
@@ -258,9 +299,7 @@ def reset_prefixes() -> None:
     - request_path_prefix: "_x_path"
     - request_file_prefix: "_x_file"
 
-    :return: None
-
-    Example:
+    Examples:
         >>> from flask_x_openapi_schema import reset_prefixes
         >>> reset_prefixes()  # Resets to default prefixes
 
@@ -270,7 +309,11 @@ def reset_prefixes() -> None:
 
 
 def reset_all_config() -> None:
-    """Reset all configuration to default values."""
+    """Reset all configuration to default values.
+
+    Resets all configuration settings to their default values, including
+    parameter prefixes, OpenAPI settings, and cache configuration.
+    """
     # Reset the configuration in a thread-safe manner
     GLOBAL_CONFIG_HOLDER.reset_all()
 
@@ -279,7 +322,7 @@ def get_openapi_config() -> OpenAPIConfig:
     """Get the current OpenAPI configuration.
 
     Returns:
-        Current OpenAPI configuration
+        OpenAPIConfig: Current OpenAPI configuration
 
     """
     return GLOBAL_CONFIG_HOLDER.get_openapi_config()
@@ -289,7 +332,7 @@ def get_cache_config() -> CacheConfig:
     """Get the current cache configuration.
 
     Returns:
-        Current cache configuration
+        CacheConfig: Current cache configuration
 
     """
     return GLOBAL_CONFIG_HOLDER.get_cache_config()
@@ -301,7 +344,7 @@ def configure_cache(config: CacheConfig) -> None:
     Args:
         config: Configuration object with cache settings
 
-    Example:
+    Examples:
         >>> from flask_x_openapi_schema import CacheConfig, configure_cache
         >>> cache_config = CacheConfig(enabled=True)
         >>> configure_cache(cache_config)

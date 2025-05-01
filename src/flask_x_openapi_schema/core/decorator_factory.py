@@ -18,22 +18,21 @@ Benefits:
       hiding implementation details from clients.
     - Testability: Factories can be mocked or replaced in tests to isolate components.
 
-Usage:
-    ```python
-    # Create a factory for Flask
-    factory = create_decorator_factory("flask")
+Examples:
+    Create a decorator factory for Flask and use it to decorate an endpoint:
 
-    # Create a decorator with specific options
-    decorator = factory.create_decorator(
-        summary="My API endpoint", description="Detailed description", tags=["api", "v1"]
-    )
+    >>> factory = create_decorator_factory("flask")
+    >>> decorator = factory.create_decorator(
+    ...     summary="My API endpoint", description="Detailed description", tags=["api", "v1"]
+    ... )
+    >>> @decorator
+    ... def my_endpoint():
+    ...     return {"message": "Hello, world!"}
 
+    Create a decorator factory for Flask-RESTful:
 
-    # Apply the decorator to a function
-    @decorator
-    def my_endpoint():
-        return {"message": "Hello, world!"}
-    ```
+    >>> factory = create_decorator_factory("flask_restful")
+
 """
 
 from abc import ABC, abstractmethod
@@ -44,12 +43,15 @@ from flask_x_openapi_schema.core.config import ConventionalPrefixConfig
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr
 from flask_x_openapi_schema.models.responses import OpenAPIMetaResponse
 
-# Type variable for decorated functions
 F = TypeVar("F", bound=Callable[..., Any])
 
 
 class OpenAPIDecoratorFactory(ABC):
-    """Abstract factory for creating OpenAPI decorators."""
+    """Abstract factory for creating OpenAPI decorators.
+
+    This class defines the interface for creating OpenAPI decorators.
+    Concrete implementations provide framework-specific decorator creation.
+    """
 
     @abstractmethod
     def create_decorator(
@@ -68,25 +70,28 @@ class OpenAPIDecoratorFactory(ABC):
         """Create an OpenAPI decorator.
 
         Args:
-            summary: Operation summary
-            description: Operation description
-            tags: Operation tags
-            operation_id: Operation ID
-            responses: Response models
-            deprecated: Whether the operation is deprecated
-            security: Security requirements
-            external_docs: External documentation
-            language: Language for i18n strings
-            prefix_config: Parameter prefix configuration
+            summary: Operation summary.
+            description: Operation description.
+            tags: Operation tags.
+            operation_id: Operation ID.
+            responses: Response models.
+            deprecated: Whether the operation is deprecated.
+            security: Security requirements.
+            external_docs: External documentation.
+            language: Language for i18n strings.
+            prefix_config: Parameter prefix configuration.
 
         Returns:
-            A decorator function
+            A decorator function that can be applied to API endpoints.
 
         """
 
 
 class FlaskOpenAPIDecoratorFactory(OpenAPIDecoratorFactory):
-    """Factory for creating Flask OpenAPI decorators."""
+    """Factory for creating Flask OpenAPI decorators.
+
+    This factory creates decorators specifically for Flask endpoints.
+    """
 
     def create_decorator(
         self,
@@ -104,25 +109,23 @@ class FlaskOpenAPIDecoratorFactory(OpenAPIDecoratorFactory):
         """Create a Flask OpenAPI decorator.
 
         Args:
-            summary: Operation summary
-            description: Operation description
-            tags: Operation tags
-            operation_id: Operation ID
-            responses: Response models
-            deprecated: Whether the operation is deprecated
-            security: Security requirements
-            external_docs: External documentation
-            language: Language for i18n strings
-            prefix_config: Parameter prefix configuration
+            summary: Operation summary.
+            description: Operation description.
+            tags: Operation tags.
+            operation_id: Operation ID.
+            responses: Response models.
+            deprecated: Whether the operation is deprecated.
+            security: Security requirements.
+            external_docs: External documentation.
+            language: Language for i18n strings.
+            prefix_config: Parameter prefix configuration.
 
         Returns:
-            A decorator function for Flask endpoints
+            A decorator function for Flask endpoints.
 
         """
-        # Import here to avoid circular imports
         from flask_x_openapi_schema.x.flask.decorators import FlaskOpenAPIDecorator
 
-        # Create the decorator directly
         decorator = FlaskOpenAPIDecorator(
             summary=summary,
             description=description,
@@ -140,7 +143,10 @@ class FlaskOpenAPIDecoratorFactory(OpenAPIDecoratorFactory):
 
 
 class FlaskRestfulOpenAPIDecoratorFactory(OpenAPIDecoratorFactory):
-    """Factory for creating Flask-RESTful OpenAPI decorators."""
+    """Factory for creating Flask-RESTful OpenAPI decorators.
+
+    This factory creates decorators specifically for Flask-RESTful endpoints.
+    """
 
     def create_decorator(
         self,
@@ -158,25 +164,23 @@ class FlaskRestfulOpenAPIDecoratorFactory(OpenAPIDecoratorFactory):
         """Create a Flask-RESTful OpenAPI decorator.
 
         Args:
-            summary: Operation summary
-            description: Operation description
-            tags: Operation tags
-            operation_id: Operation ID
-            responses: Response models
-            deprecated: Whether the operation is deprecated
-            security: Security requirements
-            external_docs: External documentation
-            language: Language for i18n strings
-            prefix_config: Parameter prefix configuration
+            summary: Operation summary.
+            description: Operation description.
+            tags: Operation tags.
+            operation_id: Operation ID.
+            responses: Response models.
+            deprecated: Whether the operation is deprecated.
+            security: Security requirements.
+            external_docs: External documentation.
+            language: Language for i18n strings.
+            prefix_config: Parameter prefix configuration.
 
         Returns:
-            A decorator function for Flask-RESTful endpoints
+            A decorator function for Flask-RESTful endpoints.
 
         """
-        # Import here to avoid circular imports
         from flask_x_openapi_schema.x.flask_restful.decorators import FlaskRestfulOpenAPIDecorator
 
-        # Create the decorator directly
         decorator = FlaskRestfulOpenAPIDecorator(
             summary=summary,
             description=description,
@@ -197,13 +201,22 @@ def create_decorator_factory(framework: str) -> OpenAPIDecoratorFactory:
     """Create a decorator factory for the specified framework.
 
     Args:
-        framework: The framework to create a factory for ('flask' or 'flask_restful')
+        framework: The framework to create a factory for ('flask' or 'flask_restful').
 
     Returns:
-        A decorator factory instance
+        A decorator factory instance for the specified framework.
 
     Raises:
-        ValueError: If the framework is not supported
+        ValueError: If the framework is not supported.
+
+    Examples:
+        >>> factory = create_decorator_factory("flask")
+        >>> isinstance(factory, FlaskOpenAPIDecoratorFactory)
+        True
+
+        >>> factory = create_decorator_factory("flask_restful")
+        >>> isinstance(factory, FlaskRestfulOpenAPIDecoratorFactory)
+        True
 
     """
     if framework == "flask":

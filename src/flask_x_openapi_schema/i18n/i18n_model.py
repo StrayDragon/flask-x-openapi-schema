@@ -15,7 +15,7 @@ class I18nBaseModel(BaseModel):
     This class provides methods for working with internationalized fields in Pydantic models.
     Fields that should be internationalized should be annotated with I18nString.
 
-    Example:
+    Examples:
         ```python
         class MyModel(I18nBaseModel):
             name: str
@@ -24,13 +24,10 @@ class I18nBaseModel(BaseModel):
 
     """
 
-    # Class variable to store i18n field names
     __i18n_fields__: ClassVar[list[str]] = []
 
-    # Configure Pydantic model to allow arbitrary types
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    # Serialize I18nString fields to strings
     @field_serializer("*")
     def serialize_i18n_string(self, v, _):  # noqa: ANN001, ANN201, D102
         if isinstance(v, I18nStr):
@@ -46,16 +43,13 @@ class I18nBaseModel(BaseModel):
         """
         super().__init_subclass__(**kwargs)
 
-        # Get type hints for the class
         hints = get_type_hints(cls)
 
-        # Find fields that are annotated with I18nString
         i18n_fields = []
         for field_name, field_type in hints.items():
             if field_type == I18nStr:
                 i18n_fields.append(field_name)
 
-        # Store the i18n field names in the class
         cls.__i18n_fields__ = i18n_fields
 
     def model_dump(self, **kwargs) -> dict[str, Any]:
@@ -71,10 +65,8 @@ class I18nBaseModel(BaseModel):
             A dictionary representation of the model
 
         """
-        # Get the dictionary representation of the model
         data = super().model_dump(**kwargs)
 
-        # Convert I18nString fields to strings in the current language
         for field_name in self.__i18n_fields__:
             if field_name in data and isinstance(data[field_name], I18nStr):
                 data[field_name] = str(data[field_name])
@@ -95,16 +87,13 @@ class I18nBaseModel(BaseModel):
             A JSON schema for the model
 
         """
-        # Get the JSON schema for the model
         schema = super().model_json_schema(**kwargs)
 
-        # Update the schema for I18nString fields
         properties = schema.get("properties", {})
         for field_name in cls.__i18n_fields__:
             if field_name in properties:
-                # Convert I18nString fields to string fields in the schema
                 properties[field_name]["type"] = "string"
-                # Add a note about internationalization
+
                 properties[field_name]["description"] = (
                     properties[field_name].get("description", "") + " (Internationalized field)"
                 )
@@ -129,20 +118,15 @@ class I18nBaseModel(BaseModel):
         if language is None:
             language = get_current_language()
 
-        # Get type hints for the class
         hints = get_type_hints(cls)
 
-        # Create field definitions for the new model
         fields = {}
         for field_name, field_type in hints.items():
             if field_name in cls.__i18n_fields__:
-                # Convert I18nString fields to string fields
                 fields[field_name] = (str, ...)
             else:
-                # Keep other fields as they are
                 fields[field_name] = (field_type, ...)
 
-        # Create a new model class
         return create_model(
             f"{cls.__name__}_{language}",
             **fields,

@@ -2,6 +2,25 @@
 
 This module provides utilities for extracting data from different types of requests.
 It implements the Strategy pattern for handling different request data formats.
+
+Examples:
+    Basic usage with Flask request (in a Flask route handler):
+
+    ```python
+    from flask import request
+    from flask_x_openapi_schema.core.request_extractors import request_processor
+    from pydantic import BaseModel
+
+
+    class UserModel(BaseModel):
+        name: str
+        age: int
+
+
+    # In a Flask route handler
+    user = request_processor.process_request_data(request, UserModel, "user")
+    ```
+
 """
 
 import functools
@@ -15,7 +34,6 @@ from pydantic import BaseModel
 
 from flask_x_openapi_schema.core.logger import get_logger
 
-# Type variable for the return type of the decorated function
 T = TypeVar("T")
 
 logger = get_logger(__name__)
@@ -24,11 +42,24 @@ logger = get_logger(__name__)
 def log_operation(func: Callable[..., T]) -> Callable[..., T]:
     """Decorator for logging function calls and exceptions.
 
+    This decorator logs when a function is called and any exceptions that occur
+    during execution.
+
     Args:
-        func: The function to decorate
+        func: The function to decorate.
 
     Returns:
-        The decorated function
+        The decorated function that logs its calls and exceptions.
+
+    Examples:
+        ```python
+        @log_operation
+        def example_function(x):
+            return x * 2
+
+
+        result = example_function(5)  # result will be 10
+        ```
 
     """
 
@@ -48,13 +79,26 @@ def log_operation(func: Callable[..., T]) -> Callable[..., T]:
 def safe_operation(operation: Callable[[], T], fallback: Any = None, log_error: bool = True) -> T:
     """Safely execute an operation, returning a fallback value on error.
 
+    This function executes the provided operation and returns its result. If the
+    operation raises an exception, it returns the fallback value instead.
+
     Args:
-        operation: The operation to execute
-        fallback: The value to return if the operation fails
-        log_error: Whether to log the error
+        operation: The operation to execute.
+        fallback: The value to return if the operation fails. If callable, it will be called.
+        log_error: Whether to log the error. Defaults to True.
 
     Returns:
-        The result of the operation or the fallback value
+        The result of the operation or the fallback value.
+
+    Examples:
+        ```python
+        def risky_operation():
+            return 1 / 0  # Will raise ZeroDivisionError
+
+
+        result1 = safe_operation(risky_operation, fallback=0)  # result1 will be 0
+        result2 = safe_operation(lambda: 42, fallback=0)  # result2 will be 42
+        ```
 
     """
     try:
@@ -70,18 +114,36 @@ class RequestDataExtractor(ABC):
     """Base class for request data extractors.
 
     This class defines the interface for extracting data from requests.
-    Concrete implementations handle different request formats.
+    Concrete implementations handle different request formats such as JSON,
+    form data, or raw request data.
+
+    Attributes:
+        None
+
+    Examples:
+        ```python
+        class CustomExtractor(RequestDataExtractor):
+            def can_extract(self, request):
+                return True
+
+            def extract(self, request):
+                return {"custom_data": "value"}
+        ```
+
     """
 
     @abstractmethod
     def can_extract(self, request: Request) -> bool:
         """Check if this extractor can handle the given request.
 
+        This method determines if the extractor is capable of processing
+        the provided request based on its format or content.
+
         Args:
-            request: The Flask request object
+            request: The Flask request object to check.
 
         Returns:
-            True if this extractor can handle the request, False otherwise
+            bool: True if this extractor can handle the request, False otherwise.
 
         """
 
@@ -89,17 +151,33 @@ class RequestDataExtractor(ABC):
     def extract(self, request: Request) -> dict[str, Any]:
         """Extract data from the request.
 
+        This method extracts and processes data from the request object,
+        converting it to a dictionary format for further processing.
+
         Args:
-            request: The Flask request object
+            request: The Flask request object to extract data from.
 
         Returns:
-            The extracted data as a dictionary
+            dict[str, Any]: The extracted data as a dictionary.
 
         """
 
 
 class JsonRequestExtractor(RequestDataExtractor):
-    """Extractor for JSON request data."""
+    """Extractor for JSON request data.
+
+    This extractor handles requests with JSON content type that have been
+    properly parsed by Flask's request parser.
+
+    Examples:
+        ```python
+        extractor = JsonRequestExtractor()
+        # Assuming request.is_json is True
+        if extractor.can_extract(request):
+            data = extractor.extract(request)  # {'key': 'value'}
+        ```
+
+    """
 
     @log_operation
     def can_extract(self, request: Request) -> bool:
@@ -129,7 +207,20 @@ class JsonRequestExtractor(RequestDataExtractor):
 
 
 class FormRequestExtractor(RequestDataExtractor):
-    """Extractor for form data requests."""
+    """Extractor for form data requests.
+
+    This extractor handles requests with form data, including multipart/form-data
+    with file uploads. It combines both form fields and files into a single dictionary.
+
+    Examples:
+        ```python
+        extractor = FormRequestExtractor()
+        # Assuming request.form contains data
+        if extractor.can_extract(request):
+            data = extractor.extract(request)  # {'name': 'John', 'file': <FileStorage object>}
+        ```
+
+    """
 
     @log_operation
     def can_extract(self, request: Request) -> bool:
@@ -163,7 +254,21 @@ class FormRequestExtractor(RequestDataExtractor):
 
 
 class ContentTypeJsonExtractor(RequestDataExtractor):
-    """Extractor for requests with JSON content type but not parsed as JSON."""
+    """Extractor for requests with JSON content type but not parsed as JSON.
+
+    This extractor handles requests that have a JSON content type header but
+    where Flask's automatic JSON parsing has not been applied. It manually
+    parses the raw request data as JSON.
+
+    Examples:
+        ```python
+        extractor = ContentTypeJsonExtractor()
+        # Assuming request has content_type with 'json' but not parsed
+        if extractor.can_extract(request):
+            data = extractor.extract(request)  # {'key': 'value'}
+        ```
+
+    """
 
     @log_operation
     def can_extract(self, request: Request) -> bool:
@@ -199,20 +304,40 @@ class ContentTypeJsonExtractor(RequestDataExtractor):
 
 
 class RawDataJsonExtractor(RequestDataExtractor):
-    """Extractor for raw request data that might be JSON."""
+    """Extractor for raw request data that might be JSON.
+
+    This extractor is a fallback that attempts to parse any request's raw data
+    as JSON. It always returns True for can_extract, making it suitable as a
+    last resort in the extractor chain.
+
+    Examples:
+        ```python
+        extractor = RawDataJsonExtractor()
+        # This extractor always returns True
+        if extractor.can_extract(request):
+            # If request data contains valid JSON
+            data = extractor.extract(request)  # {'key': 'value'}
+
+            # If request data is not valid JSON
+            data = extractor.extract(request_with_invalid_json)  # {}
+        ```
+
+    """
 
     @log_operation
     def can_extract(self, request: Request) -> bool:  # noqa: ARG002
         """Check if this extractor can handle the given request.
 
+        This extractor always returns True as it's designed to be a fallback
+        that attempts to handle any request.
+
         Args:
-            request: The Flask request object
+            request: The Flask request object (not used).
 
         Returns:
-            True if the request has raw data, False otherwise
+            bool: Always returns True.
 
         """
-        # This extractor is a fallback, so it can always try to extract
         return True
 
     @log_operation
@@ -236,7 +361,21 @@ class RawDataJsonExtractor(RequestDataExtractor):
 
 
 class RequestJsonAttributeExtractor(RequestDataExtractor):
-    """Extractor for request.json attribute (for test environments)."""
+    """Extractor for request.json attribute (for test environments).
+
+    This extractor is designed for test environments where the request object
+    might have a direct json attribute. It checks for the presence of this
+    attribute and extracts data from it.
+
+    Examples:
+        ```python
+        extractor = RequestJsonAttributeExtractor()
+        # Assuming request has a json attribute
+        if extractor.can_extract(request_with_json_attr):
+            data = extractor.extract(request_with_json_attr)  # {'key': 'value'}
+        ```
+
+    """
 
     @log_operation
     def can_extract(self, request: Request) -> bool:
@@ -266,7 +405,21 @@ class RequestJsonAttributeExtractor(RequestDataExtractor):
 
 
 class RequestCachedJsonExtractor(RequestDataExtractor):
-    """Extractor for request._cached_json attribute (for pytest-flask)."""
+    """Extractor for request._cached_json attribute (for pytest-flask).
+
+    This extractor is specifically designed for pytest-flask environments,
+    where the request object might have a _cached_json attribute. It checks
+    for the presence of this attribute and extracts data from it.
+
+    Examples:
+        ```python
+        extractor = RequestCachedJsonExtractor()
+        # Assuming request has a _cached_json attribute (pytest-flask)
+        if extractor.can_extract(pytest_flask_request):
+            data = extractor.extract(pytest_flask_request)  # {'key': 'value'}
+        ```
+
+    """
 
     @log_operation
     def can_extract(self, request: Request) -> bool:
@@ -279,7 +432,7 @@ class RequestCachedJsonExtractor(RequestDataExtractor):
             True if the request has a _cached_json attribute, False otherwise
 
         """
-        return hasattr(request, "_cached_json") and request._cached_json is not None  # noqa: SLF001
+        return hasattr(request, "_cached_json") and request._cached_json is not None
 
     @log_operation
     def extract(self, request: Request) -> dict[str, Any]:
@@ -292,35 +445,74 @@ class RequestCachedJsonExtractor(RequestDataExtractor):
             The extracted JSON data as a dictionary
 
         """
-        return request._cached_json or {}  # noqa: SLF001
+        return request._cached_json or {}
 
 
 class ModelFactory:
-    """Factory for creating model instances from data."""
+    """Factory for creating model instances from data.
+
+    This class provides static methods for creating Pydantic model instances
+    from dictionary data. It handles validation errors and provides fallback
+    mechanisms for model creation.
+
+    Examples:
+        ```python
+        from pydantic import BaseModel
+
+
+        class User(BaseModel):
+            name: str
+            age: int
+
+
+        data = {"name": "John", "age": 30}
+        user = ModelFactory.create_from_data(User, data)
+        # user.name will be 'John'
+        ```
+
+    """
 
     @staticmethod
     @log_operation
     def create_from_data(model_class: type[BaseModel], data: dict[str, Any]) -> BaseModel:
         """Create a model instance from data.
 
+        This method attempts to create a Pydantic model instance from dictionary data.
+        It first tries using model_validate, and if that fails, it falls back to
+        filtering the data to only include fields defined in the model and using
+        the constructor.
+
         Args:
-            model_class: The model class to instantiate
-            data: The data to use for instantiation
+            model_class: The model class to instantiate.
+            data: The data to use for instantiation.
 
         Returns:
-            An instance of the model
+            BaseModel: An instance of the specified model class.
 
         Raises:
-            ValueError: If the model cannot be instantiated
+            ValueError: If the model cannot be instantiated using either method.
+
+        Examples:
+            ```python
+            from pydantic import BaseModel
+
+
+            class User(BaseModel):
+                name: str
+                age: int
+
+
+            data = {"name": "John", "age": 30, "extra": "ignored"}
+            user = ModelFactory.create_from_data(User, data)
+            # user.model_dump() will be {'name': 'John', 'age': 30}
+            ```
 
         """
-        # Try model_validate first (better handling of complex types)
         try:
             return model_class.model_validate(data)
         except Exception as e:
             logger.warning(f"Validation error using model_validate: {e}")
 
-            # Try using the constructor with filtered data
             try:
                 model_fields = model_class.model_fields
                 filtered_data = {k: v for k, v in data.items() if k in model_fields}
@@ -332,7 +524,33 @@ class ModelFactory:
 
 
 class RequestProcessor:
-    """Processor for extracting and validating request data."""
+    """Processor for extracting and validating request data.
+
+    This class orchestrates the extraction of data from Flask requests using
+    a chain of extractors. It tries each extractor in sequence until one
+    successfully extracts data, then processes that data to create model instances.
+
+    Attributes:
+        extractors: A list of RequestDataExtractor instances to try in sequence.
+
+    Examples:
+        ```python
+        from flask import request
+        from pydantic import BaseModel
+
+
+        class User(BaseModel):
+            name: str
+            age: int
+
+
+        processor = RequestProcessor()
+        user = processor.process_request_data(request, User, "user")
+        if user:
+            print(f"User: {user.name}, Age: {user.age}")
+        ```
+
+    """
 
     def __init__(self) -> None:
         """Initialize the request processor with default extractors."""
@@ -349,11 +567,23 @@ class RequestProcessor:
     def extract_data(self, request: Request) -> dict[str, Any]:
         """Extract data from the request using the first applicable extractor.
 
+        This method tries each extractor in the chain until one successfully
+        extracts data from the request. It returns the first non-empty result.
+
         Args:
-            request: The Flask request object
+            request: The Flask request object to extract data from.
 
         Returns:
-            The extracted data as a dictionary
+            dict[str, Any]: The extracted data as a dictionary. Returns an empty
+            dictionary if no extractor could extract data.
+
+        Examples:
+            ```python
+            processor = RequestProcessor()
+            data = processor.extract_data(request)
+            if data:
+                print(f"Extracted data: {data}")
+            ```
 
         """
         for extractor in self.extractors:
@@ -371,28 +601,47 @@ class RequestProcessor:
     def process_request_data(self, request: Request, model: type[BaseModel], param_name: str) -> BaseModel | None:
         """Process request data and create a model instance.
 
+        This method extracts data from the request, preprocesses it according to
+        the model's requirements, and then creates a model instance. It handles
+        the entire pipeline from raw request to validated model instance.
+
         Args:
-            request: The Flask request object
-            model: The model class to instantiate
-            param_name: The parameter name (for logging)
+            request: The Flask request object containing the data.
+            model: The Pydantic model class to instantiate.
+            param_name: The parameter name (for logging and error messages).
 
         Returns:
-            An instance of the model or None if processing fails
+            BaseModel | None: An instance of the specified model if successful,
+            or None if data extraction or model creation fails.
+
+        Examples:
+            ```python
+            from flask import request
+            from pydantic import BaseModel
+
+
+            class User(BaseModel):
+                name: str
+                age: int
+
+
+            processor = RequestProcessor()
+            user = processor.process_request_data(request, User, "user")
+            if user:
+                print(f"Processed user: {user.name}")
+            ```
 
         """
         from flask_x_openapi_schema.core.request_processing import preprocess_request_data
 
-        # Extract data from the request
         data = self.extract_data(request)
         if not data:
             logger.debug(f"No data extracted for {param_name}")
             return None
 
-        # Preprocess the data
         processed_data = preprocess_request_data(data, model)
         logger.debug(f"Processed data for {param_name}: {processed_data}")
 
-        # Create model instance
         try:
             model_instance = ModelFactory.create_from_data(model, processed_data)
             logger.debug(f"Created model instance for {param_name}")
@@ -403,5 +652,4 @@ class RequestProcessor:
             return model_instance
 
 
-# Create a singleton instance for reuse
 request_processor = RequestProcessor()
