@@ -1,6 +1,6 @@
 [project]
 name = "flask-x-openapi-schema"
-version = "0.1.1"
+version = "0.1.2"
 description = "A powerful utility for automatically generating OpenAPI schemas from Flask-RESTful resources, Flask.MethodView classes, and Pydantic models."
 readme = "README.md"
 authors = [{ name = "straydragon", email = "straydragonl@foxmail.com" }]
