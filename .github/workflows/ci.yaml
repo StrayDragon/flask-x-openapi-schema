@@ -60,11 +60,10 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
-          file: ./coverage.xml
-          fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
-          verbose: true
-          slug: $GITHUB_REPOSITORY
+          slug: straydragon/flask-x-openapi-schema
+          # fail_ci_if_error: false
+          # verbose: true
 
   check-build:
     name: Check Build distribution
