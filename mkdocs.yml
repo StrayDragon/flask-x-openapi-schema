@@ -12,7 +12,7 @@ theme:
 
   features:
     - content.code.annotate
-    - content.code.copy
+    # - content.code.copy
     # - content.tabs.link
     - content.tooltips
     # - header.autohide
@@ -141,4 +141,4 @@ extra:
       link: https://github.com/StrayDragon/flask-x-openapi-schema
       name: Flask-X-OpenAPI-Schema on GitHub
 
-copyright: Copyright &copy; 2023 - 2024 straydragon
+copyright: Copyright &copy; 2025-now straydragon
