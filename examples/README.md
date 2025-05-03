@@ -2,16 +2,6 @@
 
 This directory contains examples demonstrating how to use Flask-X-OpenAPI-Schema with different Flask frameworks.
 
-## Examples Overview
-
-1. **Flask MethodView Examples**:
-   - `app.py` - Basic example with Flask MethodView
-   - `response_example.py` - Example demonstrating structured responses with OpenAPIMetaResponse
-
-2. **Flask-RESTful Examples**:
-   - `app.py` - Basic example with Flask-RESTful
-   - `response_example.py` - Example demonstrating structured responses with OpenAPIMetaResponse
-
 All examples implement a simple Product API with the following features:
 
 - CRUD operations for products

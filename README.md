@@ -47,6 +47,25 @@ uv pip install flask-x-openapi-schema[flask-restful]
 - **Flexible Architecture**: Modular design with framework-specific implementations
 - **Performance Optimized**: Caching of static information for improved performance
 
+## 🚀 Performance
+
+Flask-X-OpenAPI-Schema is designed with performance in mind. Our benchmarks show minimal overhead when using the library compared to standard Flask and Flask-RESTful applications.
+
+### Benchmark Results
+
+![](./benchmarks/results/performance_charts.png)
+
+| Framework     | Endpoint | Requests | Success Rate | Median (ms) | 95%ile (ms) | Avg (ms) | RPS    | Overhead |
+|---------------|----------|----------|--------------|-------------|-------------|----------|--------|----------|
+| Flask         | Standard | 7930     | 100.00%      | 270.00      | 270.00      | 306.01   | 132.18 | baseline |
+| Flask         | OpenAPI  | 7797     | 100.00%      | 280.00      | 280.00      | 312.85   | 129.96 | +2.23%   |
+| Flask-RESTful | Standard | 7654     | 100.00%      | 310.00      | 310.00      | 348.35   | 127.30 | baseline |
+| Flask-RESTful | OpenAPI  | 7603     | 99.68%       | 310.00      | 310.00      | 358.92   | 126.45 | +3.03%   |
+
+These benchmarks were conducted using Locust with 200 concurrent users and a ramp-up rate of 20 users per second over a 60-second test period. The tests measured the performance of identical endpoints implemented with and without Flask-X-OpenAPI-Schema.
+
+For more detailed benchmarks and to run your own performance tests, see the [benchmarks](./benchmarks) directory.
+
 ## 📦 Installation
 
 ### Development Setup
