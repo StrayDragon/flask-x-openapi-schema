@@ -59,6 +59,3 @@ mkdocs-build:
 
 mkdocs-serve:
 	uv run mkdocs serve
-
-mkdocs-deploy:
-	uv run mkdocs gh-deploy --force
