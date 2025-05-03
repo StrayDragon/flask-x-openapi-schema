@@ -61,7 +61,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: straydragon/flask-x-openapi-schema
+          slug: StrayDragon/flask-x-openapi-schema
           # fail_ci_if_error: false
           # verbose: true
 

@@ -1,9 +1,10 @@
 # Flask-X-OpenAPI-Schema
 
+[![GitHub](https://img.shields.io/badge/github-flask--x--openapi--schema-lightgrey.svg)](https://github.com/StrayDragon/flask-x-openapi-schema)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/flask-x-openapi-schema)](https://pypi.org/project/flask-x-openapi-schema/)
 [![PyPI - Version](https://img.shields.io/pypi/v/flask-x-openapi-schema)](https://pypi.org/project/flask-x-openapi-schema/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![GitHub](https://img.shields.io/badge/github-flask--x--openapi--schema-lightgrey.svg)](https://github.com/StrayDragon/flask-x-openapi-schema)
+
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![CI](https://github.com/StrayDragon/flask-x-openapi-schema/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/StrayDragon/flask-x-openapi-schema/actions/workflows/ci.yaml)
