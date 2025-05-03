@@ -1,6 +1,7 @@
 # Flask-X-OpenAPI-Schema
 
-![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FStrayDragon%2Fflask-x-openapi-schema%2Frefs%2Fheads%2Fmain%2Fpyproject.toml%3Ftoken%3DGHSAT0AAAAAACXCLWMTUK6B6EI7XGMEEZHI2AHLBYA)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/flask-x-openapi-schema)](https://pypi.org/project/flask-x-openapi-schema/)
+[![PyPI - Version](https://img.shields.io/pypi/v/flask-x-openapi-schema)](https://pypi.org/project/flask-x-openapi-schema/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/github-flask--x--openapi--schema-lightgrey.svg)](https://github.com/StrayDragon/flask-x-openapi-schema)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
