@@ -207,9 +207,8 @@ just test-parallel '' 4
 
 # View HTML coverage report
 # Open htmlcov/index.html in your browser
-
-See [Testing Guide](./docs/testing.md) for more details on testing.
 ```
+See [Testing Guide](./docs/testing.md) for more details on testing.
 
 ## 📊 Benchmarking
 
