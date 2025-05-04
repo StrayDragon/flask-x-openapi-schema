@@ -313,7 +313,7 @@ class TestMethodViewUtilsCoverage:
 
         # Test with different parameter types
         class TypesView(MethodView):
-            def get(self, int_id: int, float_id: float, bool_flag: bool, str_id: str):  # noqa: ARG002, FBT001
+            def get(self, int_id: int, float_id: float, bool_flag: bool, str_id: str):
                 return {"status": "ok"}
 
         params = extract_openapi_parameters_from_methodview(
