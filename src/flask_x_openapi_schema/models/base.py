@@ -7,7 +7,7 @@ standardized methods for converting models to Flask-compatible responses.
 
 from typing import Any, Self, TypeVar
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 T = TypeVar("T", bound="BaseRespModel")
 
@@ -124,3 +124,33 @@ class BaseRespModel(BaseModel):
             return response_dict, status_code
 
         return response_dict
+
+
+class BaseErrorResponse(BaseRespModel):
+    """Base model for API error responses.
+
+    This class extends BaseRespModel to provide a standard way to represent
+    error responses. It includes fields for error code, message, and details.
+
+    All error responses in the application should inherit from this class
+    to ensure consistent error handling.
+
+    Attributes:
+        error: Error identifier or code.
+        message: Human-readable error message.
+        details: Optional additional error details.
+
+    Examples:
+        >>> from flask_x_openapi_schema import BaseErrorResponse
+        >>> error = BaseErrorResponse(error="VALIDATION_ERROR", message="Invalid input data")
+        >>> response = error.to_response(400)
+        >>> response[1]
+        400
+        >>> response[0]["error"]
+        'VALIDATION_ERROR'
+
+    """
+
+    error: str = Field(..., description="Error identifier or code")
+    message: str = Field(..., description="Human-readable error message")
+    details: dict[str, Any] | None = Field(None, description="Additional error details")

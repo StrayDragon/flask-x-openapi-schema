@@ -319,6 +319,7 @@ def methodview_test_client(methodview_test_app):
         yield client
 
 
+@pytest.mark.serial
 def test_list_users(methodview_test_client):
     """Test listing users."""
     response = methodview_test_client.get("/api/users")
@@ -331,6 +332,7 @@ def test_list_users(methodview_test_client):
     assert data[2]["username"] == "user3"
 
 
+@pytest.mark.serial
 def test_list_users_with_query_params(methodview_test_client):
     """Test listing users with query parameters."""
     response = methodview_test_client.get("/api/users?sort=age&order=desc&limit=2")
@@ -339,6 +341,7 @@ def test_list_users_with_query_params(methodview_test_client):
     assert isinstance(data, list)
 
 
+@pytest.mark.serial
 def test_create_user(methodview_test_client):
     """Test creating a user."""
     user_data = {
@@ -355,6 +358,7 @@ def test_create_user(methodview_test_client):
     assert "id" in data
 
 
+@pytest.mark.serial
 def test_get_user(methodview_test_client):
     """Test getting a user by ID."""
     response = methodview_test_client.get("/api/users/2")
@@ -366,6 +370,7 @@ def test_get_user(methodview_test_client):
     assert data["age"] == 35
 
 
+@pytest.mark.serial
 def test_get_user_not_found(methodview_test_client):
     """Test getting a non-existent user."""
     response = methodview_test_client.get("/api/users/999")
@@ -376,6 +381,7 @@ def test_get_user_not_found(methodview_test_client):
     assert data["code"] == 404
 
 
+@pytest.mark.serial
 def test_upload_avatar(methodview_test_client):
     """Test uploading a user avatar."""
     from io import BytesIO
@@ -399,6 +405,7 @@ def test_upload_avatar(methodview_test_client):
     assert data["user_id"] == "1"
 
 
+@pytest.mark.serial
 def test_upload_avatar_no_file(methodview_test_client):
     """Test uploading without a file."""
     response = methodview_test_client.post("/api/users/1/avatar")
@@ -408,6 +415,7 @@ def test_upload_avatar_no_file(methodview_test_client):
     assert data["code"] == 400
 
 
+@pytest.mark.serial
 def test_upload_avatar_user_not_found(methodview_test_client):
     """Test uploading to a non-existent user."""
     from io import BytesIO
@@ -430,6 +438,7 @@ def test_upload_avatar_user_not_found(methodview_test_client):
     assert data["code"] == 404
 
 
+@pytest.mark.serial
 def test_openapi_schema_generation(methodview_test_client):
     """Test OpenAPI schema generation."""
     response = methodview_test_client.get("/api/openapi.json")

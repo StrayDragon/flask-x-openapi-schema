@@ -1,6 +1,6 @@
 """Pydantic models for OpenAPI schema generation."""
 
-from .base import BaseRespModel
+from .base import BaseErrorResponse, BaseRespModel
 from .file_models import (
     DocumentUploadModel,
     FileUploadModel,
@@ -9,6 +9,7 @@ from .file_models import (
 )
 
 __all__ = [
+    "BaseErrorResponse",
     "BaseRespModel",
     "DocumentUploadModel",
     "FileUploadModel",

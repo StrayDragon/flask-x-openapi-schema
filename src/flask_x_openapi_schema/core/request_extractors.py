@@ -105,7 +105,7 @@ def safe_operation(operation: Callable[[], T], fallback: Any = None, log_error: 
         return operation()
     except Exception as e:
         if log_error:
-            logger = get_logger()
+            logger = get_logger(__name__)
             logger.warning(f"Operation failed: {e}")
         return fallback() if callable(fallback) else fallback
 

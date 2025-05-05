@@ -942,4 +942,4 @@ if __name__ == "__main__":
     print("Starting server on http://localhost:5001")
 
     # Run the app on a different port
-    app.run(debug=True, port=5001)  # noqa: S201
+    app.run(debug=True, port=5001)

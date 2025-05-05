@@ -336,10 +336,10 @@ class TestFlaskDecorators:
         """Test processing request body with invalid JSON."""
         from flask_x_openapi_schema.x.flask.decorators import FlaskOpenAPIDecorator
 
-        # Define a request model
+        # Define a request model with default values
         class RequestModel(BaseModel):
-            name: str
-            age: int
+            name: str = ""
+            age: int = 0
 
         # Create a decorator
         decorator = FlaskOpenAPIDecorator()

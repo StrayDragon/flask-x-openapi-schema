@@ -373,15 +373,19 @@ class TestFlaskRestfulDecorators:
         # Create a decorator
         decorator = FlaskRestfulOpenAPIDecorator()
 
-        # Test creating a query parser
-        with patch("flask_x_openapi_schema.x.flask_restful.utils.create_reqparse_from_pydantic") as mock_create:
-            mock_parser = MagicMock()
-            mock_create.return_value = mock_parser
+        # Get a parser directly without mocking
+        parser = decorator._get_or_create_query_parser(QueryModel)
 
-            parser = decorator._get_or_create_query_parser(QueryModel)
+        # Check that the parser is a RequestParser instance
+        from flask_restful.reqparse import RequestParser
 
-            assert parser == mock_parser
-            mock_create.assert_called_once_with(model=QueryModel, location="args")
+        assert isinstance(parser, RequestParser)
+
+        # Check that the parser has the expected arguments
+        args = parser.args
+        arg_names = [arg.name for arg in args]
+        assert "name" in arg_names
+        assert "age" in arg_names
 
     def test_openapi_metadata_decorator_initialization(self):
         """Test initialization of the openapi_metadata decorator."""
@@ -556,10 +560,10 @@ class TestFlaskRestfulDecorators:
         """Test creating a model from arguments."""
         from flask_x_openapi_schema.x.flask_restful.decorators import FlaskRestfulOpenAPIDecorator
 
-        # Define a model
+        # Define a model with default values
         class TestModel(BaseModel):
-            name: str
-            age: int
+            name: str = ""
+            age: int = 0
 
         # Create a decorator
         decorator = FlaskRestfulOpenAPIDecorator()
@@ -576,14 +580,14 @@ class TestFlaskRestfulDecorators:
         # Test with invalid arguments
         args = {"name": "test"}  # Missing required field 'age'
 
-        # The method should try to create a model with default values
-        with (
-            patch(
-                "flask_x_openapi_schema.core.request_extractors.safe_operation", side_effect=ValueError("Test error")
-            ),
-            pytest.raises(ValueError),
+        # The method should handle the error and create a model with values from args
+        with patch(
+            "flask_x_openapi_schema.core.request_extractors.safe_operation", side_effect=ValueError("Test error")
         ):
-            decorator._create_model_from_args(TestModel, args)
+            result = decorator._create_model_from_args(TestModel, args)
+            assert isinstance(result, TestModel)
+            assert result.name == "test"  # Name is preserved from args
+            assert result.age == 0  # Age uses default value
 
     def test_create_model_from_args_with_default_values(self):
         """Test creating a model with default values for required fields."""

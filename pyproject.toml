@@ -131,6 +131,8 @@ unfixable = []
     "TRY004",
     "PLR0911",
     "E501",
+    "SIM102",
+    "PLR2004",
 ]
 "**/{tests,docs,examples,benchmarks}/*" = [
     "S101",
@@ -162,6 +164,8 @@ unfixable = []
     "FBT002",
     "TRY003",
     "EM101",
+    "S201",
+    "W293",
 ]
 
 [tool.ruff.format]

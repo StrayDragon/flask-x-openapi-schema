@@ -1139,4 +1139,4 @@ if __name__ == "__main__":
     print("Starting server on http://localhost:5002")
 
     # Run the app on a different port
-    app.run(debug=True, port=5002)  # noqa: S201
+    app.run(debug=True, port=5002)

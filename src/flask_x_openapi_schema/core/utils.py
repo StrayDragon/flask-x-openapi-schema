@@ -188,7 +188,7 @@ def python_type_to_openapi_type(python_type: Any) -> dict[str, Any]:
         return {"type": "array"}
     if python_type is dict or origin is dict:
         args = getattr(python_type, "__args__", [])
-        if len(args) == 2 and is_openapi_31 and args[0] is str:  # noqa: PLR2004
+        if len(args) == 2 and is_openapi_31 and args[0] is str:
             value_type = python_type_to_openapi_type(args[1])
             return {"type": "object", "additionalProperties": value_type}
         return {"type": "object"}
@@ -210,7 +210,7 @@ def python_type_to_openapi_type(python_type: Any) -> dict[str, Any]:
 
     if origin is Union:
         args = getattr(python_type, "__args__", [])
-        if len(args) == 2 and args[1] is type(None):  # noqa: PLR2004
+        if len(args) == 2 and args[1] is type(None):
             inner_type = python_type_to_openapi_type(args[0])
             if is_openapi_31:
                 if "type" in inner_type:

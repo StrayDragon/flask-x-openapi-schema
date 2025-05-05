@@ -23,13 +23,19 @@ from typing import (
 
 from pydantic import BaseModel
 
+from flask_x_openapi_schema.models.content_types import (
+    RequestContentTypes,
+    ResponseContentTypes,
+    detect_content_type_from_model,
+)
+
 try:
     from typing import ParamSpec
 except ImportError:
     from typing_extensions import ParamSpec
 
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr, get_current_language
-from flask_x_openapi_schema.models.base import BaseRespModel
+from flask_x_openapi_schema.models.base import BaseErrorResponse, BaseRespModel
 from flask_x_openapi_schema.models.responses import OpenAPIMetaResponse
 
 from .cache import (
@@ -179,6 +185,9 @@ def _generate_openapi_metadata(
     actual_request_body: type[BaseModel] | dict[str, Any] | None,
     responses: OpenAPIMetaResponse | None,
     language: str | None,
+    content_type: str | None = None,
+    request_content_types: RequestContentTypes | None = None,
+    response_content_types: ResponseContentTypes | None = None,
 ) -> dict[str, Any]:
     """Generate OpenAPI metadata dictionary for API endpoints.
 
@@ -196,6 +205,9 @@ def _generate_openapi_metadata(
         actual_request_body: Request body model or schema dictionary.
         responses: Response models configuration.
         language: Language code to use for I18nStr values.
+        content_type: Custom content type for request body. If None, will be auto-detected.
+        request_content_types: Multiple content types for request body.
+        response_content_types: Multiple content types for response body.
 
     Returns:
         dict: OpenAPI metadata dictionary ready to be included in the schema.
@@ -247,34 +259,26 @@ def _generate_openapi_metadata(
     if external_docs:
         metadata["externalDocs"] = external_docs
 
-    if actual_request_body:
+    if request_content_types is not None:
+        metadata["requestBody"] = request_content_types.to_openapi_dict()
+        logger.debug(f"Added requestBody with multiple content types: {metadata['requestBody']}")
+    elif actual_request_body:
         logger.debug(f"Processing request body: {actual_request_body}")
         if isinstance(actual_request_body, type) and issubclass(actual_request_body, BaseModel):
             logger.debug(f"Request body is a Pydantic model: {actual_request_body.__name__}")
 
-            is_multipart = False
-            has_file_fields = False
+            if content_type is None:
+                detected_content_type = detect_content_type_from_model(actual_request_body)
+                final_content_type = detected_content_type
+            else:
+                final_content_type = content_type
 
-            if hasattr(actual_request_body, "model_config"):
-                config = getattr(actual_request_body, "model_config", {})
-                if isinstance(config, dict) and config.get("json_schema_extra", {}).get("multipart/form-data", False):
-                    is_multipart = True
-            elif hasattr(actual_request_body, "Config") and hasattr(actual_request_body.Config, "json_schema_extra"):
-                config_extra = getattr(actual_request_body.Config, "json_schema_extra", {})
-                is_multipart = config_extra.get("multipart/form-data", False)
-
-            if hasattr(actual_request_body, "model_fields"):
-                for field_info in actual_request_body.model_fields.values():
-                    field_schema = getattr(field_info, "json_schema_extra", None)
-                    if field_schema is not None and field_schema.get("format") == "binary":
-                        has_file_fields = True
-                        break
-
-            content_type = "multipart/form-data" if (is_multipart or has_file_fields) else "application/json"
-            logger.debug(f"Using content type: {content_type}")
+            logger.debug(f"Using content type: {final_content_type} (custom: {content_type is not None})")
 
             metadata["requestBody"] = {
-                "content": {content_type: {"schema": {"$ref": f"#/components/schemas/{actual_request_body.__name__}"}}},
+                "content": {
+                    final_content_type: {"schema": {"$ref": f"#/components/schemas/{actual_request_body.__name__}"}}
+                },
                 "required": True,
             }
             logger.debug(f"Added requestBody to metadata: {metadata['requestBody']}")
@@ -282,7 +286,21 @@ def _generate_openapi_metadata(
             logger.debug(f"Request body is a dict: {actual_request_body}")
             metadata["requestBody"] = actual_request_body
 
-    if responses:
+    if response_content_types is not None:
+        if "responses" in metadata and isinstance(metadata["responses"], dict):
+            for response in metadata["responses"].values():
+                if "content" not in response:
+                    response["content"] = response_content_types.to_openapi_dict()
+
+        else:
+            metadata["responses"] = {
+                "200": {
+                    "description": "Successful response",
+                    "content": response_content_types.to_openapi_dict(),
+                }
+            }
+        logger.debug(f"Added responses with multiple content types: {metadata['responses']}")
+    elif responses:
         metadata["responses"] = responses.to_openapi_dict()
 
     return metadata
@@ -321,7 +339,7 @@ def _handle_response(result: Any) -> Any:
         return result.to_response()
     if isinstance(result, tuple) and len(result) >= 1 and isinstance(result[0], BaseRespModel):
         model = result[0]
-        if len(result) >= 2 and isinstance(result[1], int):  # noqa: PLR2004
+        if len(result) >= 2 and isinstance(result[1], int):
             return model.to_response(result[1])
 
         return model.to_response()
@@ -380,7 +398,7 @@ def _detect_file_parameters(
 
         file_description = f"File upload for {file_param_name}"
 
-        if param_type and isinstance(param_type, type) and issubclass(param_type, BaseModel):  # noqa: SIM102
+        if param_type and isinstance(param_type, type) and issubclass(param_type, BaseModel):
             if hasattr(param_type, "model_fields") and "file" in param_type.model_fields:
                 field_info = param_type.model_fields["file"]
                 if field_info.description:
@@ -438,6 +456,10 @@ class OpenAPIDecoratorBase:
         language: str | None = None,
         prefix_config: ConventionalPrefixConfig | None = None,
         framework: str = "flask",
+        content_type: str | None = None,
+        request_content_types: Any = None,
+        response_content_types: Any = None,
+        content_type_resolver: Callable | None = None,
     ) -> None:
         """Initialize the decorator with OpenAPI metadata parameters.
 
@@ -453,6 +475,11 @@ class OpenAPIDecoratorBase:
             language: Language code to use for I18nStr values.
             prefix_config: Configuration for parameter prefixes.
             framework: Framework name ('flask' or 'flask_restful'). Defaults to "flask".
+            content_type: Custom content type for request body. If None, will be auto-detected.
+            request_content_types: Multiple content types for request body.
+            response_content_types: Multiple content types for response body.
+            content_type_resolver: Function to determine content type based on request.
+
 
         """
         self.summary = summary
@@ -466,6 +493,11 @@ class OpenAPIDecoratorBase:
         self.language = language
         self.prefix_config = prefix_config
         self.framework = framework
+        self.content_type = content_type
+        self.request_content_types = request_content_types
+        self.response_content_types = response_content_types
+        self.content_type_resolver = content_type_resolver
+        self.default_error_response = responses.default_error_response if responses else BaseErrorResponse
 
         self.framework_decorator = None
 
@@ -494,6 +526,10 @@ class OpenAPIDecoratorBase:
                     external_docs=self.external_docs,
                     language=self.language,
                     prefix_config=self.prefix_config,
+                    content_type=self.content_type,
+                    request_content_types=self.request_content_types,
+                    response_content_types=self.response_content_types,
+                    content_type_resolver=self.content_type_resolver,
                 )
             elif self.framework == "flask_restful":
                 from flask_x_openapi_schema.x.flask_restful.decorators import FlaskRestfulOpenAPIDecorator
@@ -509,6 +545,10 @@ class OpenAPIDecoratorBase:
                     external_docs=self.external_docs,
                     language=self.language,
                     prefix_config=self.prefix_config,
+                    content_type=self.content_type,
+                    request_content_types=self.request_content_types,
+                    response_content_types=self.response_content_types,
+                    content_type_resolver=self.content_type_resolver,
                 )
             else:
                 msg = f"Unsupported framework: {self.framework}"
@@ -601,7 +641,7 @@ class OpenAPIDecoratorBase:
 
     def _get_or_generate_metadata(
         self,
-        _cache_key: tuple,
+        cache_key: tuple,  # noqa: ARG002
         actual_request_body: type[BaseModel] | dict[str, Any] | None,
     ) -> dict[str, Any]:
         """Generate OpenAPI metadata for an endpoint.
@@ -610,7 +650,7 @@ class OpenAPIDecoratorBase:
         using the decorator's attributes.
 
         Args:
-            _cache_key: Cache key for metadata (not used in simplified cache system).
+            cache_key: Cache key for metadata (not used now).
             actual_request_body: Request body model or dict.
 
         Returns:
@@ -628,6 +668,9 @@ class OpenAPIDecoratorBase:
             actual_request_body=actual_request_body,
             responses=self.responses,
             language=self.language,
+            content_type=self.content_type,
+            request_content_types=self.request_content_types,
+            response_content_types=self.response_content_types,
         )
 
     def _generate_openapi_parameters(
@@ -916,10 +959,21 @@ class OpenAPIDecoratorBase:
             framework_decorator=self.framework_decorator,
         )
 
+        if hasattr(kwargs, "status_code") and hasattr(kwargs, "data"):
+            return kwargs
+
         kwargs = parameter_processor.process_parameters(func, cached_data, args, kwargs)
 
+        if hasattr(kwargs, "status_code") and hasattr(kwargs, "data"):
+            return kwargs
+
         sig_params = signature.parameters
-        valid_kwargs = {k: v for k, v in kwargs.items() if k in sig_params}
+
+        if not isinstance(kwargs, dict):
+            logger.warning(f"kwargs is not a dict: {type(kwargs)}")
+            valid_kwargs = {}
+        else:
+            valid_kwargs = {k: v for k, v in kwargs.items() if k in sig_params}
 
         for param_name, param in sig_params.items():
             if param_name not in valid_kwargs and param.default is param.empty:

@@ -9,6 +9,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from flask_x_openapi_schema.models import BaseErrorResponse
+
 
 class OpenAPIMetaResponseItem(BaseModel):
     """Represents a single response item in an OpenAPI specification.
@@ -75,6 +77,8 @@ class OpenAPIMetaResponse(BaseModel):
 
     Attributes:
         responses: Map of status codes to response definitions.
+        default_error_response: Default error response class for validation errors.
+            Must be a subclass of BaseErrorResponse.
 
     Examples:
         >>> from flask_x_openapi_schema.models.responses import OpenAPIMetaResponse, OpenAPIMetaResponseItem
@@ -96,6 +100,11 @@ class OpenAPIMetaResponse(BaseModel):
         ... )
 
     """
+
+    default_error_response: type[BaseErrorResponse] = Field(
+        default=BaseErrorResponse,
+        description="Default error response class for validation errors",
+    )
 
     responses: dict[str, OpenAPIMetaResponseItem] = Field(
         ...,
