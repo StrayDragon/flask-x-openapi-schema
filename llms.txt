@@ -1,0 +1,36 @@
+# Flask-X-OpenAPI-Schema
+
+> A powerful utility for automatically generating OpenAPI schemas from Flask-RESTful resources, Flask.MethodView classes, and Pydantic models.
+
+A powerful utility for automatically generating OpenAPI schemas from Flask-RESTful resources, Flask.MethodView classes, and Pydantic models to simplify API documentation with minimal effort.
+
+## Getting Started
+
+- [Getting Started](https://straydragon.github.io/flask-x-openapi-schema/getting_started/index.md)
+
+## Architecture
+
+- [Architecture](https://straydragon.github.io/flask-x-openapi-schema/architecture/index.md)
+
+## Usage Guide
+
+- [Overview](https://straydragon.github.io/flask-x-openapi-schema/core_components/index.md)
+- [Parameter Binding](https://straydragon.github.io/flask-x-openapi-schema/parameter_binding/index.md)
+- [Response Handling](https://straydragon.github.io/flask-x-openapi-schema/response_handling/index.md)
+- [Schema Generation](https://straydragon.github.io/flask-x-openapi-schema/schema_generation/index.md)
+- [Usage Guide](https://straydragon.github.io/flask-x-openapi-schema/usage_guide/index.md)
+
+## Features
+
+- [File Uploads](https://straydragon.github.io/flask-x-openapi-schema/file_uploads/index.md)
+- [Internationalization](https://straydragon.github.io/flask-x-openapi-schema/internationalization/index.md)
+
+## API Reference
+
+- [Overview](https://straydragon.github.io/flask-x-openapi-schema/api/index.md)
+- [Core Modules](https://straydragon.github.io/flask-x-openapi-schema/api/core/index.md)
+- [Flask Integration](https://straydragon.github.io/flask-x-openapi-schema/api/flask/index.md)
+- [Flask-RESTful Integration](https://straydragon.github.io/flask-x-openapi-schema/api/flask_restful/index.md)
+- [Internationalization](https://straydragon.github.io/flask-x-openapi-schema/api/i18n/index.md)
+- [Models](https://straydragon.github.io/flask-x-openapi-schema/api/models/index.md)
+
