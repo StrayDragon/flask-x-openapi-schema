@@ -166,6 +166,7 @@ unfixable = []
     "EM101",
     "S201",
     "W293",
+    "ERA001",
 ]
 
 [tool.ruff.format]

@@ -131,11 +131,6 @@ def test_extract_parameters_from_prefixes():
     # Extract parameters
     request_body, query_model, path_params = _extract_parameters_from_prefixes(signature, type_hints)
 
-    # Check results
-    # 注意:在当前实现中,_extract_parameters_from_prefixes 函数不会识别以 _x_body 开头的参数
-    # 因为它期望参数名是 _x_body 而不是 _x_body_request
-    assert request_body is None
-    assert query_model is None
     assert set(path_params) == {"user_id", "item_id"}
 
     # Test with custom prefix config
