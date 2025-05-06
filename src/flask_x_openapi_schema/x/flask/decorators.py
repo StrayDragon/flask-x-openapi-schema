@@ -172,17 +172,23 @@ class FlaskOpenAPIDecorator(DecoratorBase):
 
         from flask_x_openapi_schema.models.file_models import FileField
 
-        # Special handling for test cases with mocked files
         if hasattr(model, "model_fields") and hasattr(request, "files") and request.files:
             has_file_fields = False
             for field_info in model.model_fields.values():
                 field_type = field_info.annotation
+
                 if isinstance(field_type, type) and issubclass(field_type, FileField):
                     has_file_fields = True
                     break
 
+                origin = getattr(field_type, "__origin__", None)
+                if origin is list or origin is list:
+                    args = getattr(field_type, "__args__", [])
+                    if args and isinstance(args[0], type) and issubclass(args[0], FileField):
+                        has_file_fields = True
+                        break
+
             if has_file_fields:
-                # For test cases with mocked files
                 model_data = dict(request.form.items())
                 for field_name in model.model_fields:
                     if field_name in request.files:
@@ -190,7 +196,6 @@ class FlaskOpenAPIDecorator(DecoratorBase):
 
                 if model_data:
                     try:
-                        # Try direct instantiation for test mocks
                         model_instance = model(**model_data)
                         kwargs[param_name] = model_instance
                     except Exception as e:
@@ -201,7 +206,6 @@ class FlaskOpenAPIDecorator(DecoratorBase):
                     else:
                         return kwargs
 
-        # Use the ContentTypeProcessor from DecoratorBase for normal cases
         return super().process_request_body(param_name, model, kwargs)
 
     def process_query_params(self, param_name: str, model: type[BaseModel], kwargs: dict[str, Any]) -> dict[str, Any]:

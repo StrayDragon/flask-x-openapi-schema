@@ -26,7 +26,6 @@ Examples:
 """
 
 import inspect
-import logging
 from collections.abc import Callable
 from typing import Any, TypeVar
 
@@ -36,6 +35,7 @@ from pydantic import BaseModel
 
 from flask_x_openapi_schema.core.config import ConventionalPrefixConfig
 from flask_x_openapi_schema.core.decorator_base import DecoratorBase, OpenAPIDecoratorBase
+from flask_x_openapi_schema.core.logger import get_logger
 from flask_x_openapi_schema.core.request_extractors import ModelFactory, request_processor, safe_operation
 from flask_x_openapi_schema.core.request_processing import preprocess_request_data
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr
@@ -220,7 +220,7 @@ class FlaskRestfulOpenAPIDecorator(DecoratorBase):
             Updated kwargs dictionary with the model instance
 
         """
-        logger = logging.getLogger(__name__)
+        logger = get_logger(__name__)
         logger.debug(f"Processing request body for {param_name} with model {model.__name__}")
 
         is_multipart = False
@@ -245,19 +245,16 @@ class FlaskRestfulOpenAPIDecorator(DecoratorBase):
                 kwargs[param_name] = result
                 return kwargs
 
-        # First try to use the ContentTypeProcessor from DecoratorBase
         processed_kwargs = super().process_request_body(param_name, model, kwargs.copy())
         if param_name in processed_kwargs:
             return processed_kwargs
 
-        # If that didn't work, fall back to Flask-RESTful specific processing
         json_model_instance = request_processor.process_request_data(request, model, param_name)
         if json_model_instance:
             logger.debug(f"Successfully created model instance from request data for {param_name}")
             kwargs[param_name] = json_model_instance
             return kwargs
 
-        # Determine the parser location based on content type
         effective_content_type = self.content_type or request.content_type or ""
         if "form" in effective_content_type or "multipart" in effective_content_type:
             parser_location = "form"
@@ -275,7 +272,6 @@ class FlaskRestfulOpenAPIDecorator(DecoratorBase):
 
         logger.debug(f"Using parser location: {parser_location}")
 
-        # Use Flask-RESTful's reqparse
         parser = self._get_or_create_parser(model, location=parser_location)
         self.parsed_args = parser.parse_args()
 
@@ -292,7 +288,6 @@ class FlaskRestfulOpenAPIDecorator(DecoratorBase):
             except Exception:
                 logger.exception("Error processing reqparse data")
 
-        # If all else fails, create an empty model instance
         logger.warning(f"No valid request data found for {param_name}, creating default instance")
         try:
             model_instance = safe_operation(lambda: model(), fallback=None)
@@ -319,8 +314,15 @@ class FlaskRestfulOpenAPIDecorator(DecoratorBase):
 
         for field_info in model.model_fields.values():
             field_type = field_info.annotation
+
             if inspect.isclass(field_type) and issubclass(field_type, FileField):
                 return True
+
+            origin = getattr(field_type, "__origin__", None)
+            if origin is list or origin is list:
+                args = getattr(field_type, "__args__", [])
+                if args and isinstance(args[0], type) and issubclass(args[0], FileField):
+                    return True
 
         return False
 
@@ -334,7 +336,7 @@ class FlaskRestfulOpenAPIDecorator(DecoratorBase):
             An instance of the model with file data
 
         """
-        logger = logging.getLogger(__name__)
+        logger = get_logger(__name__)
         logger.debug(f"Processing file upload model for {model.__name__}")
 
         model_data = dict(request.form.items())
@@ -342,15 +344,27 @@ class FlaskRestfulOpenAPIDecorator(DecoratorBase):
 
         has_file_fields = False
         file_field_names = []
+
         for field_name, field_info in model.model_fields.items():
             field_type = field_info.annotation
+
             if inspect.isclass(field_type) and issubclass(field_type, FileField):
                 has_file_fields = True
                 file_field_names.append(field_name)
+                continue
+
+            origin = getattr(field_type, "__origin__", None)
+            if origin is list or origin is list:
+                args = getattr(field_type, "__args__", [])
+                if args and isinstance(args[0], type) and issubclass(args[0], FileField):
+                    has_file_fields = True
+                    file_field_names.append(field_name)
 
         files_found = False
+
         for field_name, field_info in model.model_fields.items():
             field_type = field_info.annotation
+
             if inspect.isclass(field_type) and issubclass(field_type, FileField):
                 if field_name in request.files:
                     model_data[field_name] = request.files[field_name]
@@ -369,6 +383,33 @@ class FlaskRestfulOpenAPIDecorator(DecoratorBase):
                     model_data[field_name] = request.files[file_key]
                     files_found = True
                     logger.debug(f"Using single file for field {field_name}: {request.files[file_key].filename}")
+
+            else:
+                origin = getattr(field_type, "__origin__", None)
+                if origin is list or origin is list:
+                    args = getattr(field_type, "__args__", [])
+                    if args and isinstance(args[0], type) and issubclass(args[0], FileField):
+                        if field_name in request.files:
+                            if hasattr(request.files, "getlist"):
+                                files_list = request.files.getlist(field_name)
+                                if files_list:
+                                    model_data[field_name] = files_list
+                                    files_found = True
+                                    logger.debug(
+                                        f"Found multiple files for field {field_name}: {len(files_list)} files"
+                                    )
+                        else:
+                            all_files = []
+                            for file_key in request.files:
+                                if hasattr(request.files, "getlist"):
+                                    all_files.extend(request.files.getlist(file_key))
+                                else:
+                                    all_files.append(request.files[file_key])
+
+                            if all_files:
+                                model_data[field_name] = all_files
+                                files_found = True
+                                logger.debug(f"Collected all files for field {field_name}: {len(all_files)} files")
 
         if has_file_fields and not files_found:
             logger.warning(f"No files found for file fields: {file_field_names}")
@@ -397,7 +438,7 @@ class FlaskRestfulOpenAPIDecorator(DecoratorBase):
 
         """
         if location == "binary":
-            logger = logging.getLogger(__name__)
+            logger = get_logger(__name__)
             logger.debug("Using binary parser, will handle raw data separately")
 
             return reqparse.RequestParser(bundle_errors=True)
@@ -415,7 +456,7 @@ class FlaskRestfulOpenAPIDecorator(DecoratorBase):
             An instance of the model
 
         """
-        logger = logging.getLogger(__name__)
+        logger = get_logger(__name__)
         logger.debug(f"Creating model instance for {model.__name__} from args")
 
         processed_data = preprocess_request_data(args, model)
@@ -479,7 +520,7 @@ class FlaskRestfulOpenAPIDecorator(DecoratorBase):
             Updated kwargs dictionary with the model instance.
 
         """
-        logger = logging.getLogger(__name__)
+        logger = get_logger(__name__)
 
         if self.parsed_args:
             model_instance = self._create_model_from_args(model, self.parsed_args)

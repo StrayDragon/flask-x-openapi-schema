@@ -188,9 +188,17 @@ def detect_content_type_from_model(model: type[BaseModel]) -> str:
     if hasattr(model, "model_fields"):
         for field_info in model.model_fields.values():
             field_type = field_info.annotation
+
             if isinstance(field_type, type) and issubclass(field_type, FileField):
                 has_file_fields = True
                 break
+
+            origin = getattr(field_type, "__origin__", None)
+            if origin is list or origin is list:
+                args = getattr(field_type, "__args__", [])
+                if args and isinstance(args[0], type) and issubclass(args[0], FileField):
+                    has_file_fields = True
+                    break
 
             field_schema = getattr(field_info, "json_schema_extra", None)
             if field_schema is not None and field_schema.get("format") == "binary":
