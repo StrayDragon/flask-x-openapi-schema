@@ -40,6 +40,7 @@ from flask_x_openapi_schema.core.request_extractors import ModelFactory, request
 from flask_x_openapi_schema.core.request_processing import preprocess_request_data
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr
 from flask_x_openapi_schema.models.base import BaseErrorResponse
+from flask_x_openapi_schema.models.content_types import RequestContentTypes, ResponseContentTypes
 from flask_x_openapi_schema.models.file_models import FileField
 from flask_x_openapi_schema.models.responses import OpenAPIMetaResponse
 from flask_x_openapi_schema.x.flask_restful.utils import create_reqparse_from_pydantic
@@ -82,9 +83,9 @@ class FlaskRestfulOpenAPIDecorator(DecoratorBase):
         language: str | None = None,
         prefix_config: ConventionalPrefixConfig | None = None,
         content_type: str | None = None,
-        request_content_types: Any = None,
-        response_content_types: Any = None,
-        content_type_resolver: Callable | None = None,
+        request_content_types: RequestContentTypes | None = None,
+        response_content_types: ResponseContentTypes | None = None,
+        content_type_resolver: Callable[[Any], str] | None = None,
     ) -> None:
         """Initialize the decorator with OpenAPI metadata parameters.
 
@@ -550,9 +551,9 @@ def openapi_metadata(
     language: str | None = None,
     prefix_config: ConventionalPrefixConfig | None = None,
     content_type: str | None = None,
-    request_content_types: Any = None,
-    response_content_types: Any = None,
-    content_type_resolver: Callable | None = None,
+    request_content_types: RequestContentTypes | None = None,
+    response_content_types: ResponseContentTypes | None = None,
+    content_type_resolver: Callable[[Any], str] | None = None,
 ) -> Callable[[F], F] | F:
     """Decorator to add OpenAPI metadata to a Flask-RESTful Resource endpoint.
 

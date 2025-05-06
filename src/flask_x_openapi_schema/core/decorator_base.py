@@ -462,9 +462,9 @@ class DecoratorBase(ABC):
         language: str | None = None,
         prefix_config: ConventionalPrefixConfig | None = None,
         content_type: str | None = None,
-        request_content_types: Any = None,
-        response_content_types: Any = None,
-        content_type_resolver: Callable | None = None,
+        request_content_types: RequestContentTypes | None = None,
+        response_content_types: ResponseContentTypes | None = None,
+        content_type_resolver: Callable[[Any], str] | None = None,
     ) -> None:
         """Initialize the decorator with OpenAPI metadata parameters.
 
@@ -661,9 +661,9 @@ class OpenAPIDecoratorBase:
         prefix_config: ConventionalPrefixConfig | None = None,
         framework: str = "flask",
         content_type: str | None = None,
-        request_content_types: Any = None,
-        response_content_types: Any = None,
-        content_type_resolver: Callable | None = None,
+        request_content_types: RequestContentTypes | None = None,
+        response_content_types: ResponseContentTypes | None = None,
+        content_type_resolver: Callable[[Any], str] | None = None,
     ) -> None:
         """Initialize the decorator with OpenAPI metadata parameters.
 
