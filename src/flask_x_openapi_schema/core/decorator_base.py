@@ -4,14 +4,17 @@ This module provides the core functionality for creating OpenAPI metadata decora
 that can be used with Flask and Flask-RESTful applications. It includes utilities for
 parameter extraction, metadata generation, and request processing.
 
-The main class is OpenAPIDecoratorBase, which serves as the foundation for framework-specific
-decorator implementations. It handles parameter binding, metadata caching, and OpenAPI
-schema generation.
+The main classes are:
+- OpenAPIDecoratorBase: Serves as the foundation for framework-specific decorator implementations.
+  It handles parameter binding, metadata caching, and OpenAPI schema generation.
+- DecoratorBase: A base class for framework-specific decorators that encapsulates common
+  functionality for processing request bodies, query parameters, and path parameters.
 """
 
 import contextlib
 import inspect
 import logging
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from functools import wraps
 from typing import (
@@ -21,8 +24,13 @@ from typing import (
     get_type_hints,
 )
 
+from flask import request
 from pydantic import BaseModel
 
+from flask_x_openapi_schema.core.content_type_utils import (
+    ContentTypeProcessor,
+)
+from flask_x_openapi_schema.core.logger import get_logger
 from flask_x_openapi_schema.models.content_types import (
     RequestContentTypes,
     ResponseContentTypes,
@@ -92,9 +100,7 @@ def _extract_parameters_from_prefixes(
         ['id']
 
     """
-    import logging
-
-    logger = logging.getLogger(__name__)
+    logger = get_logger(__name__)
 
     prefixes = get_parameter_prefixes(config)
     logger.debug(f"Extracting parameters with prefixes={prefixes}, signature={signature}, type_hints={type_hints}")
@@ -415,6 +421,204 @@ def _detect_file_parameters(
         )
 
     return file_params
+
+
+class DecoratorBase(ABC):
+    """Base class for framework-specific decorators.
+
+    This class encapsulates common functionality for processing request bodies,
+    query parameters, and path parameters. It is designed to be inherited by
+    framework-specific decorator implementations.
+
+    Attributes:
+        summary (str or I18nStr): Short summary of the endpoint.
+        description (str or I18nStr): Detailed description of the endpoint.
+        tags (list): List of tags to categorize the endpoint.
+        operation_id (str): Unique identifier for the operation.
+        responses (OpenAPIMetaResponse): Response models configuration.
+        deprecated (bool): Whether the endpoint is deprecated.
+        security (list): Security requirements for the endpoint.
+        external_docs (dict): External documentation references.
+        language (str): Language code to use for I18nStr values.
+        prefix_config (ConventionalPrefixConfig): Configuration for parameter prefixes.
+        content_type (str): Custom content type for request body.
+        request_content_types (RequestContentTypes): Multiple content types for request body.
+        response_content_types (ResponseContentTypes): Multiple content types for response body.
+        content_type_resolver (Callable): Function to determine content type based on request.
+        default_error_response (Type[BaseErrorResponse]): Default error response class.
+
+    """
+
+    def __init__(
+        self,
+        summary: str | I18nStr | None = None,
+        description: str | I18nStr | None = None,
+        tags: list[str] | None = None,
+        operation_id: str | None = None,
+        responses: OpenAPIMetaResponse | None = None,
+        deprecated: bool = False,
+        security: list[dict[str, list[str]]] | None = None,
+        external_docs: dict[str, str] | None = None,
+        language: str | None = None,
+        prefix_config: ConventionalPrefixConfig | None = None,
+        content_type: str | None = None,
+        request_content_types: Any = None,
+        response_content_types: Any = None,
+        content_type_resolver: Callable | None = None,
+    ) -> None:
+        """Initialize the decorator with OpenAPI metadata parameters.
+
+        Args:
+            summary: Short summary of the endpoint, can be an I18nStr for localization.
+            description: Detailed description of the endpoint, can be an I18nStr.
+            tags: List of tags to categorize the endpoint.
+            operation_id: Unique identifier for the operation.
+            responses: Response models configuration.
+            deprecated: Whether the endpoint is deprecated. Defaults to False.
+            security: Security requirements for the endpoint.
+            external_docs: External documentation references.
+            language: Language code to use for I18nStr values.
+            prefix_config: Configuration for parameter prefixes.
+            content_type: Custom content type for request body. If None, will be auto-detected.
+            request_content_types: Multiple content types for request body.
+            response_content_types: Multiple content types for response body.
+            content_type_resolver: Function to determine content type based on request.
+
+        """
+        self.summary = summary
+        self.description = description
+        self.tags = tags
+        self.operation_id = operation_id
+        self.responses = responses
+        self.deprecated = deprecated
+        self.security = security
+        self.external_docs = external_docs
+        self.language = language
+        self.prefix_config = prefix_config
+        self.content_type = content_type
+        self.request_content_types = request_content_types
+        self.response_content_types = response_content_types
+        self.content_type_resolver = content_type_resolver
+        self.default_error_response = responses.default_error_response if responses else BaseErrorResponse
+
+        # Initialize content type processor
+        self.content_type_processor = ContentTypeProcessor(
+            content_type=content_type,
+            request_content_types=request_content_types,
+            content_type_resolver=content_type_resolver,
+            default_error_response=self.default_error_response,
+        )
+
+    @abstractmethod
+    def __call__(self, func: Callable) -> Callable:
+        """Apply the decorator to the function.
+
+        Args:
+            func: The function to decorate
+
+        Returns:
+            The decorated function
+
+        """
+        # This method should be implemented by subclasses
+        msg = "Subclasses must implement __call__"
+        raise NotImplementedError(msg)
+
+    def extract_parameters_from_models(
+        self,
+        query_model: type[BaseModel] | None,
+        path_params: list[str] | None,
+    ) -> list[dict[str, Any]]:
+        """Extract OpenAPI parameters from models.
+
+        Args:
+            query_model: The query parameter model
+            path_params: List of path parameter names
+
+        Returns:
+            List of OpenAPI parameter objects
+
+        """
+        parameters = []
+
+        if path_params:
+            parameters.extend(
+                [
+                    {
+                        "name": param,
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string"},
+                    }
+                    for param in path_params
+                ]
+            )
+
+        if query_model:
+            schema = query_model.model_json_schema()
+            properties = schema.get("properties", {})
+            required = schema.get("required", [])
+
+            for field_name, field_schema in properties.items():
+                fixed_schema = _fix_references(field_schema)
+                param = {
+                    "name": field_name,
+                    "in": "query",
+                    "required": field_name in required,
+                    "schema": fixed_schema,
+                }
+
+                if "description" in field_schema:
+                    param["description"] = field_schema["description"]
+
+                parameters.append(param)
+
+        return parameters
+
+    def process_request_body(self, param_name: str, model: type[BaseModel], kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Process request body parameters.
+
+        Args:
+            param_name: The parameter name to bind the model instance to
+            model: The Pydantic model class to use for validation
+            kwargs: The keyword arguments to update
+
+        Returns:
+            Updated kwargs dictionary with the model instance
+
+        """
+        return self.content_type_processor.process_request_body(request, model, param_name, kwargs)
+
+    @abstractmethod
+    def process_query_params(self, param_name: str, model: type[BaseModel], kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Process query parameters.
+
+        Args:
+            param_name: The parameter name to bind the model instance to
+            model: The Pydantic model class to use for validation
+            kwargs: The keyword arguments to update
+
+        Returns:
+            Updated kwargs dictionary with the model instance
+
+        """
+        # This method should be implemented by subclasses
+        msg = "Subclasses must implement process_query_params"
+        raise NotImplementedError(msg)
+
+    def process_additional_params(self, kwargs: dict[str, Any], param_names: list[str]) -> dict[str, Any]:  # noqa: ARG002
+        """Process additional framework-specific parameters.
+
+        Args:
+            kwargs: The keyword arguments to update
+            param_names: List of parameter names that have been processed
+
+        Returns:
+            Updated kwargs dictionary
+
+        """
+        # This method should be implemented by subclasses
+        return kwargs
 
 
 class OpenAPIDecoratorBase:

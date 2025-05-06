@@ -26,7 +26,6 @@ Examples:
 """
 
 import inspect
-import io
 import logging
 from collections.abc import Callable
 from typing import Any, TypeVar
@@ -34,21 +33,19 @@ from typing import Any, TypeVar
 from flask import make_response, request
 from flask_restful import reqparse
 from pydantic import BaseModel
-from werkzeug.datastructures import FileStorage
 
 from flask_x_openapi_schema.core.config import ConventionalPrefixConfig
-from flask_x_openapi_schema.core.decorator_base import OpenAPIDecoratorBase
+from flask_x_openapi_schema.core.decorator_base import DecoratorBase, OpenAPIDecoratorBase
 from flask_x_openapi_schema.core.request_extractors import ModelFactory, request_processor, safe_operation
 from flask_x_openapi_schema.core.request_processing import preprocess_request_data
 from flask_x_openapi_schema.i18n.i18n_string import I18nStr
 from flask_x_openapi_schema.models.base import BaseErrorResponse
-from flask_x_openapi_schema.models.content_types import RequestContentTypes
 from flask_x_openapi_schema.models.file_models import FileField
 from flask_x_openapi_schema.models.responses import OpenAPIMetaResponse
 from flask_x_openapi_schema.x.flask_restful.utils import create_reqparse_from_pydantic
 
 
-class FlaskRestfulOpenAPIDecorator:
+class FlaskRestfulOpenAPIDecorator(DecoratorBase):
     """OpenAPI metadata decorator for Flask-RESTful Resource.
 
     This class implements the decorator functionality for adding OpenAPI metadata
@@ -69,7 +66,6 @@ class FlaskRestfulOpenAPIDecorator:
         framework (str): The framework being used ('flask_restful').
         base_decorator (OpenAPIDecoratorBase | None): The base decorator instance.
         parsed_args (Any | None): Parsed arguments from request parser.
-        default_error_response (dict[str, Any] | None): Default error response configuration.
 
     """
 
@@ -108,25 +104,24 @@ class FlaskRestfulOpenAPIDecorator:
             response_content_types: Multiple content types for response body.
             content_type_resolver: Function to determine content type based on request.
 
-
         """
-        self.summary = summary
-        self.description = description
-        self.tags = tags
-        self.operation_id = operation_id
-        self.responses = responses
-        self.deprecated = deprecated
-        self.security = security
-        self.external_docs = external_docs
-        self.language = language
-        self.prefix_config = prefix_config
-        self.content_type = content_type
-        self.request_content_types = request_content_types
-        self.response_content_types = response_content_types
-        self.content_type_resolver = content_type_resolver
+        super().__init__(
+            summary=summary,
+            description=description,
+            tags=tags,
+            operation_id=operation_id,
+            responses=responses,
+            deprecated=deprecated,
+            security=security,
+            external_docs=external_docs,
+            language=language,
+            prefix_config=prefix_config,
+            content_type=content_type,
+            request_content_types=request_content_types,
+            response_content_types=response_content_types,
+            content_type_resolver=content_type_resolver,
+        )
         self.framework = "flask_restful"
-        self.default_error_response = responses.default_error_response if responses else BaseErrorResponse
-
         self.base_decorator = None
         self.parsed_args = None
 
@@ -249,51 +244,20 @@ class FlaskRestfulOpenAPIDecorator:
                 kwargs[param_name] = result
                 return kwargs
 
+        # First try to use the ContentTypeProcessor from DecoratorBase
+        processed_kwargs = super().process_request_body(param_name, model, kwargs.copy())
+        if param_name in processed_kwargs:
+            return processed_kwargs
+
+        # If that didn't work, fall back to Flask-RESTful specific processing
         json_model_instance = request_processor.process_request_data(request, model, param_name)
         if json_model_instance:
             logger.debug(f"Successfully created model instance from request data for {param_name}")
             kwargs[param_name] = json_model_instance
             return kwargs
 
-        actual_content_type = request.content_type or ""
-        logger.debug(f"Actual request content type: {actual_content_type}")
-
-        if self.content_type_resolver and hasattr(request, "args"):
-            try:
-                resolved_content_type = self.content_type_resolver(request)
-                if resolved_content_type:
-                    logger.debug(f"Resolved content type using resolver: {resolved_content_type}")
-                    self.content_type = resolved_content_type
-            except Exception:
-                logger.exception("Error resolving content type")
-
-        if self.request_content_types:
-            if isinstance(self.request_content_types, RequestContentTypes):
-                if self.request_content_types.default_content_type:
-                    self.content_type = self.request_content_types.default_content_type
-                    logger.debug(f"Using default content type from RequestContentTypes: {self.content_type}")
-
-                if self.request_content_types.content_type_resolver and hasattr(request, "args"):
-                    try:
-                        resolved_content_type = self.request_content_types.content_type_resolver(request)
-                        if resolved_content_type:
-                            logger.debug(
-                                f"Resolved content type using RequestContentTypes resolver: {resolved_content_type}"
-                            )
-                            self.content_type = resolved_content_type
-                    except Exception:
-                        logger.exception("Error resolving content type from RequestContentTypes")
-
-                for content_type, content_model in self.request_content_types.content_types.items():
-                    if content_type in actual_content_type:
-                        if isinstance(content_model, type) and issubclass(content_model, BaseModel):
-                            logger.debug(f"Found matching content type: {content_type}")
-                            self.content_type = content_type
-                            break
-
-        effective_content_type = self.content_type or actual_content_type
-        logger.debug(f"Using effective content type: {effective_content_type}")
-
+        # Determine the parser location based on content type
+        effective_content_type = self.content_type or request.content_type or ""
         if "form" in effective_content_type or "multipart" in effective_content_type:
             parser_location = "form"
         elif "json" in effective_content_type:
@@ -310,47 +274,16 @@ class FlaskRestfulOpenAPIDecorator:
 
         logger.debug(f"Using parser location: {parser_location}")
 
-        if parser_location == "binary":
-            logger.debug("Processing binary content type")
-            try:
-                raw_data = request.get_data()
-                file_name = request.headers.get("Content-Disposition", "").split("filename=")[-1].strip('"') or "file"
-
-                file_obj = FileStorage(
-                    stream=io.BytesIO(raw_data),
-                    filename=file_name,
-                    content_type=effective_content_type,
-                )
-
-                if hasattr(model, "model_fields") and "file" in model.model_fields:
-                    model_data = {"file": file_obj}
-                    processed_data = preprocess_request_data(model_data, model)
-                    model_instance = safe_operation(
-                        lambda: ModelFactory.create_from_data(model, processed_data), fallback=None
-                    )
-                    if model_instance:
-                        kwargs[param_name] = model_instance
-                        return kwargs
-                else:
-                    model_instance = safe_operation(lambda: model(), fallback=None)
-                    if model_instance:
-                        model_instance._raw_data = raw_data
-                        kwargs[param_name] = model_instance
-                        return kwargs
-            except Exception:
-                logger.exception("Failed to process binary content")
-
+        # Use Flask-RESTful's reqparse
         parser = self._get_or_create_parser(model, location=parser_location)
         self.parsed_args = parser.parse_args()
 
         if self.parsed_args:
             try:
                 processed_data = preprocess_request_data(self.parsed_args, model)
-
                 model_instance = safe_operation(
                     lambda: ModelFactory.create_from_data(model, processed_data), fallback=None
                 )
-
                 if model_instance:
                     logger.debug(f"Successfully created model instance from reqparse for {param_name}")
                     kwargs[param_name] = model_instance
@@ -358,8 +291,8 @@ class FlaskRestfulOpenAPIDecorator:
             except Exception:
                 logger.exception("Error processing reqparse data")
 
+        # If all else fails, create an empty model instance
         logger.warning(f"No valid request data found for {param_name}, creating default instance")
-
         try:
             model_instance = safe_operation(lambda: model(), fallback=None)
             if model_instance:
@@ -470,7 +403,7 @@ class FlaskRestfulOpenAPIDecorator:
 
         return create_reqparse_from_pydantic(model=model, location=location)
 
-    def _create_model_from_args(self, model: type[BaseModel], args: dict) -> BaseModel:
+    def _create_model_from_args(self, model: type[BaseModel], args: dict[str, Any]) -> BaseModel:
         """Create a model instance from parsed arguments.
 
         Args:
